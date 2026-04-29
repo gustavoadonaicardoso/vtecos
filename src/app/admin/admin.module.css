@@ -1,0 +1,254 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  gap: 2.5rem;
+  padding: 1.5rem;
+}
+
+.header {
+  margin-bottom: 1rem;
+}
+
+.titleBlock h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 8px 0;
+  letter-spacing: -0.05rem;
+}
+
+.titleBlock p {
+  font-size: 1.1rem;
+  opacity: 0.5;
+}
+
+.masterBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05rem;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.masterGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 2rem;
+}
+
+.moduleCard {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 2rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.moduleCard:hover {
+  transform: translateY(-8px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.iconBox {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arrowIcon {
+  opacity: 0.2;
+  transition: transform 0.3s;
+}
+
+.moduleCard:hover .arrowIcon {
+  opacity: 1;
+  transform: translateX(5px);
+}
+
+.cardBody h3 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.cardBody p {
+  font-size: 0.95rem;
+  opacity: 0.5;
+  line-height: 1.6;
+}
+
+/* System Status */
+.systemStatus {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 2rem;
+  margin-top: auto;
+}
+
+.statusHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.statusHeader h3 {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05rem;
+  opacity: 0.8;
+}
+
+.liveIndicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #10b981;
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.statsRow {
+  display: flex;
+  gap: 3rem;
+}
+
+.statItem label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 800;
+  opacity: 0.4;
+  letter-spacing: 0.05rem;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.statValue {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--foreground);
+}
+
+.statLabel {
+  font-size: 0.7rem;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Responsividade Mobile Master */
+@media (max-width: 768px) {
+  .container {
+    height: auto;
+    padding: 1.5rem 1rem;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .titleBlock h1 {
+    font-size: 1.8rem;
+    letter-spacing: -0.02rem;
+  }
+
+  .titleBlock p {
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+
+  .masterGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .moduleCard {
+    padding: 1.5rem;
+    border-radius: 20px;
+    gap: 1rem;
+  }
+
+  .cardBody h3 {
+    font-size: 1.2rem;
+  }
+
+  .cardBody p {
+    font-size: 0.85rem;
+  }
+
+  .iconBox {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  .systemStatus {
+    padding: 1.5rem;
+    border-radius: 20px;
+  }
+
+  .statusHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .statsRow {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .statValue {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .titleBlock h1 {
+    font-size: 1.5rem;
+  }
+
+  .masterBadge {
+    padding: 4px 10px;
+    font-size: 0.65rem;
+  }
+}

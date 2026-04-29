@@ -1,0 +1,793 @@
+.container {
+  padding: 2.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: calc(100vh - var(--header-height));
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  animation: fadeIn 0.8s ease-out;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  background: var(--panel-bg);
+  padding: 1.5rem 2rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.titleSection h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.titleSection p {
+  color: var(--foreground);
+  opacity: 0.6;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.systemTools {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-right: 0.5rem;
+  padding-right: 1.5rem;
+  border-right: 1px solid var(--border);
+}
+
+.systemIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground);
+  opacity: 0.6;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  position: relative;
+}
+
+.systemIcon:hover {
+  opacity: 1;
+  color: var(--accent);
+  transform: scale(1.1);
+}
+
+.notificationWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.systemBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #3b82f6;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--background);
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 6px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.tab {
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--foreground);
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tab:hover {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.activeTab {
+  background: var(--accent) !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  box-shadow: 0 4px 15px var(--accent-glow);
+}
+
+/* Calendar Styles */
+.calendarContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.calendarControl {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.monthDisplay {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.monthDisplay h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.navBtns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.iconBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  transition: all 0.2s;
+}
+
+.iconBtn:hover {
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.addEventBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--foreground);
+  color: var(--background);
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 700;
+  transition: all 0.3s;
+}
+
+.addEventBtn:hover {
+  transform: translateY(-2px);
+  opacity: 0.9;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.calendarDayHeader {
+  background: var(--panel-bg);
+  padding: 1rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--foreground);
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+
+.calendarDay {
+  background: var(--background);
+  min-height: 140px;
+  padding: 1rem;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.calendarDay:hover {
+  background: var(--panel-bg);
+}
+
+.otherMonth {
+  opacity: 0.3;
+}
+
+.dayNumber {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  display: inline-block;
+  color: var(--foreground);
+  opacity: 0.8;
+}
+
+.event {
+  background: var(--accent-glow);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.event:hover {
+  transform: scale(1.02);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Kanban Styles */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: var(--panel-bg);
+  padding: 1.5rem;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+}
+
+.columnHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.colTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.colTitle h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.taskCount {
+  background: var(--border);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--foreground);
+  opacity: 0.6;
+}
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.taskCard {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1.25rem;
+  transition: all 0.3s;
+  cursor: grab;
+}
+
+.taskCard:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.taskHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.priority {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+}
+
+.priorityHigh { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.priorityMedium { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.priorityLow { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+
+.taskCard h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--foreground);
+}
+
+.taskCard p {
+  font-size: 0.9rem;
+  color: var(--foreground);
+  opacity: 0.6;
+  line-height: 1.5;
+}
+
+.taskMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.metaInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--foreground);
+  opacity: 0.5;
+}
+
+.assignee {
+  width: 24px;
+  height: 24px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.addTaskBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  color: var(--foreground);
+  opacity: 0.6;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.addTaskBtn:hover {
+  background: var(--border);
+  opacity: 1;
+  color: var(--foreground);
+}
+
+/* Message Scheduler Styles */
+.schedulerContent {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 3rem;
+}
+
+.scheduleForm {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 32px;
+  padding: 3rem;
+}
+
+.scheduleForm h3 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin-bottom: 0.75rem;
+  color: var(--foreground);
+}
+
+.scheduleForm p {
+  color: var(--foreground);
+  opacity: 0.5;
+  margin-bottom: 2.5rem;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.formGroupFull {
+  grid-column: span 2;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--foreground);
+  opacity: 0.9;
+}
+
+.input, .textarea, .select {
+  width: 100%;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: var(--foreground);
+  font-size: 0.9rem;
+  transition: all 0.3s;
+}
+
+.input:focus, .textarea:focus, .select:focus {
+  border-color: var(--accent);
+  background: var(--background);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+.inputWithIcon {
+  position: relative;
+}
+
+.inputWithIcon svg {
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--foreground);
+  opacity: 0.3;
+}
+
+.inputWithIcon .input {
+  padding-left: 3.25rem;
+}
+
+.submitBtn {
+  margin-top: 2rem;
+  width: 100%;
+  padding: 1.25rem;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: 1.05rem;
+  transition: all 0.3s;
+}
+
+.submitBtn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 30px var(--accent-glow);
+}
+
+.sidebarInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.infoCard {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 1.75rem;
+}
+
+.infoCard h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: var(--foreground);
+}
+
+.pendingList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.pendingItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pendingIcon {
+  width: 40px;
+  height: 40px;
+  background: var(--accent-glow);
+  color: var(--accent);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pendingDetails p {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+  color: var(--foreground);
+}
+
+.pendingDetails span {
+  font-size: 0.75rem;
+  color: var(--foreground);
+  opacity: 0.5;
+}
+
+.statsCard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.stat {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.statVal {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--foreground);
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--foreground);
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 1200px) {
+  .schedulerContent {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .kanban {
+    grid-template-columns: 1fr;
+  }
+}
+/* Event Modal Styles */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modalBody {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  overflow-y: auto;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modalHeader {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modalHeader h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.closeBtn {
+  color: var(--foreground);
+  opacity: 0.5;
+  transition: all 0.2s;
+}
+
+.closeBtn:hover {
+  opacity: 1;
+}
+
+.modalFooter {
+  padding: 1rem 1.25rem;
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.cancelBtn {
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+  color: var(--foreground);
+  opacity: 0.7;
+  transition: all 0.2s;
+}
+
+.cancelBtn:hover {
+  opacity: 1;
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.saveBtn {
+  padding: 0.75rem 1.5rem;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 700;
+  transition: all 0.3s;
+}
+
+.saveBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.deleteBtn {
+  margin-right: auto;
+  color: #ef4444;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.8;
+}
+
+.deleteBtn:hover {
+  opacity: 1;
+}
+
+.clickable {
+  cursor: pointer !important;
+}
+/* Synchronization & Type Styles */
+.typeTag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--foreground);
+  opacity: 0.6;
+}
+
+.typeEvent {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  opacity: 1;
+}
+
+.typeTask {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  opacity: 1;
+}
+
+.taskItem {
+  background: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  color: #10b981 !important;
+}
+
+.itemDone {
+  text-decoration: line-through;
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.itemDone:hover {
+  opacity: 0.8;
+  filter: none;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  color: var(--foreground);
+  opacity: 0.6;
+  font-size: 0.9rem;
+}

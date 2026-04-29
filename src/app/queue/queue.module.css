@@ -1,0 +1,400 @@
+.container {
+  padding: 2.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  animation: fadeIn 0.5s ease-out;
+  min-height: calc(100vh - var(--header-height));
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.5rem;
+  height: var(--header-height);
+  background: var(--panel-bg);
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  margin: -2.5rem -2.5rem 2.5rem -2.5rem;
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.headerActions {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.systemTools {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-right: 0.5rem;
+  padding-right: 1.5rem;
+  border-right: 1px solid var(--border);
+}
+
+.systemIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground);
+  opacity: 0.6;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  position: relative;
+}
+
+.systemIcon:hover {
+  opacity: 1;
+  color: var(--accent);
+  transform: scale(1.1);
+}
+
+.notificationWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.systemBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #3b82f6;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--background);
+  font-size: 0.65rem;
+  font-weight: bold;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.linkBtn, .resetBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid var(--border);
+}
+
+.linkBtn {
+  background: var(--panel-bg);
+  color: var(--foreground);
+}
+
+.linkBtn:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.resetBtn {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.resetBtn:hover {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+
+.titleArea {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.deskSelector {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: var(--panel-bg);
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.deskSelector label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.deskSelector select {
+  background: rgba(128, 128, 128, 0.1);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  padding: 8px 15px;
+  border-radius: 8px;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 30px;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.currentSection, .manualSection, .queueSection {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.currentSection h2, .manualSection h2, .queueSection h2 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ticketCardLarge {
+  background: linear-gradient(135deg, var(--accent), #1d4ed8);
+  border-radius: 20px;
+  padding: 40px;
+  text-align: center;
+  color: white;
+  box-shadow: 0 20px 40px -10px var(--accent-glow);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ticketCardLarge::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.ticketNumber {
+  font-size: 5rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -2px;
+}
+
+.ticketName {
+  font-size: 1.25rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+  justify-content: center;
+}
+
+.recallBtn, .nextBtn, .generateBtn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.recallBtn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.recallBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.nextBtn {
+  background: white;
+  color: var(--accent);
+  border: none;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.nextBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 25px rgba(0,0,0,0.15);
+}
+
+.currentSection .nextBtn {
+  background: white;
+  color: var(--accent);
+}
+
+.emptyState .nextBtn {
+  background: var(--accent);
+  color: white;
+  align-self: center;
+}
+
+.emptyState {
+  background: rgba(128, 128, 128, 0.05);
+  border: 2px dashed var(--border);
+  border-radius: 20px;
+  padding: 60px 40px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.emptyState p {
+  font-size: 1.1rem;
+  opacity: 0.5;
+  font-weight: 500;
+}
+
+/* Manual Form */
+.manualForm {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.manualForm input {
+  background: rgba(128, 128, 128, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  color: var(--foreground);
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.manualForm input:focus {
+  border-color: var(--accent);
+  background: rgba(128, 128, 128, 0.08);
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+.generateBtn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  margin-top: 5px;
+}
+
+.generateBtn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+/* Queue List */
+.ticketList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 500px;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.ticketList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ticketList::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+.ticketItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+
+.ticketItem:hover {
+  border-color: var(--accent);
+  transform: translateX(5px);
+}
+
+.itemNumber {
+  font-weight: 800;
+  color: var(--accent);
+  font-size: 1.1rem;
+  background: var(--accent-glow);
+  padding: 4px 12px;
+  border-radius: 10px;
+}
+
+.itemName {
+  flex: 1;
+  margin: 0 20px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.itemTime {
+  font-size: 0.85rem;
+  opacity: 0.4;
+  font-weight: 700;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
