@@ -261,8 +261,13 @@ export default function MasterPage() {
   const handleFileUpload = (key: 'logoUrl' | 'faviconUrl', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setSettings(prev => ({ ...prev, [key]: url }));
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const b64 = event.target?.result as string;
+      setSettings(prev => ({ ...prev, [key]: b64 }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
