@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { 
-  Search, 
-  Send, 
-  User, 
-  MoreVertical, 
-  MessageSquare, 
+import {
+  Search,
+  Send,
+  User,
+  MoreVertical,
+  MessageSquare,
   ChevronLeft,
   X,
   Smile,
@@ -70,7 +70,7 @@ function ChatContent() {
         .select('*')
         .neq('id', user?.id || '')
         .eq('status', 'ACTIVE');
-      
+
       if (!error && data) {
         setProfiles(data);
       }
@@ -111,17 +111,17 @@ function ChatContent() {
     // Subscribe to new messages
     const channel = supabase
       .channel(`internal_chat_${user.id}_${selectedProfileId}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'internal_chat' 
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'internal_chat'
       }, (payload) => {
         const newMessage = payload.new as InternalMessage;
         // Only add if it belongs to this conversation
-        const isBelonging = 
+        const isBelonging =
           (newMessage.sender_id === user.id && newMessage.receiver_id === selectedProfileId) ||
           (newMessage.sender_id === selectedProfileId && newMessage.receiver_id === user.id);
-        
+
         if (isBelonging) {
           setMessages(prev => [...prev, newMessage]);
         }
@@ -143,7 +143,7 @@ function ChatContent() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('is_read', false);
-      
+
       if (!error) setUnreadCount(count || 0);
     };
 
@@ -151,9 +151,9 @@ function ChatContent() {
 
     const channel = supabase
       .channel('chat_system_notifications')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'system_notifications',
         filter: `user_id=eq.${user.id}`
       }, () => fetchCount())
@@ -170,7 +170,7 @@ function ChatContent() {
   }, [messages]);
 
   const filteredProfiles = useMemo(() => {
-    return profiles.filter(p => 
+    return profiles.filter(p =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -190,10 +190,10 @@ function ChatContent() {
     const { error } = await supabase
       .from('internal_chat')
       .insert([
-        { 
-          sender_id: user.id, 
-          receiver_id: selectedProfileId, 
-          text: textToSubmit 
+        {
+          sender_id: user.id,
+          receiver_id: selectedProfileId,
+          text: textToSubmit
         }
       ]);
 
@@ -231,19 +231,19 @@ function ChatContent() {
           <h2>Chat Interno</h2>
           <div className={styles.searchBar}>
             <Search size={18} opacity={0.5} />
-            <input 
-              type="text" 
-              placeholder="Pesquisar colega..." 
+            <input
+              type="text"
+              placeholder="Pesquisar colega..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
-        
+
         <div className={styles.userList}>
           {filteredProfiles.length > 0 ? (
             filteredProfiles.map(profile => (
-              <motion.div 
+              <motion.div
                 key={profile.id}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -270,13 +270,13 @@ function ChatContent() {
 
       {/* MAIN CHAT AREA */}
       <main className={`${styles.mainChat} ${!selectedProfileId ? styles.hiddenOnMobile : ''}`}>
-        
+
         {/* UNIFIED HEADER FOR THE MODULE */}
         <header className={styles.chatHeader}>
           <div className={styles.headerInfo}>
             {selectedProfileId && (
-              <button 
-                className={`${styles.actionBtn} ${styles.hideOnDesktop}`} 
+              <button
+                className={`${styles.actionBtn} ${styles.hideOnDesktop}`}
                 onClick={() => setSelectedProfileId(null)}
               >
                 <ChevronLeft size={24} />
@@ -303,7 +303,7 @@ function ChatContent() {
               <HelpCircle size={22} opacity={0.6} />
             </Link>
             <div className={styles.notificationWrapper}>
-              <button 
+              <button
                 className={styles.systemIcon}
                 onClick={() => setShowNotifications(!showNotifications)}
               >
@@ -312,9 +312,9 @@ function ChatContent() {
                   <span className={styles.systemBadge}>{unreadCount}</span>
                 )}
               </button>
-              <NotificationDropdown 
-                isOpen={showNotifications} 
-                onClose={() => setShowNotifications(false)} 
+              <NotificationDropdown
+                isOpen={showNotifications}
+                onClose={() => setShowNotifications(false)}
               />
             </div>
             {selectedProfileId && (
@@ -328,7 +328,7 @@ function ChatContent() {
             <div className={styles.messagesArea}>
               {messages.length > 0 ? (
                 messages.map((msg) => (
-                  <motion.div 
+                  <motion.div
                     key={msg.id}
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -352,9 +352,9 @@ function ChatContent() {
               <form className={styles.inputContainer} onSubmit={handleSendMessage}>
                 <button type="button" className={styles.actionBtn}><Paperclip size={20} /></button>
                 <button type="button" className={styles.actionBtn}><Smile size={20} /></button>
-                <textarea 
-                  rows={1} 
-                  placeholder="Escreva sua mensagem..." 
+                <textarea
+                  rows={1}
+                  placeholder="Escreva sua mensagem..."
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => {
@@ -364,9 +364,9 @@ function ChatContent() {
                     }
                   }}
                 />
-                <button 
-                  type="submit" 
-                  className={styles.sendBtn} 
+                <button
+                  type="submit"
+                  className={styles.sendBtn}
                   disabled={!inputText.trim()}
                 >
                   <Send size={18} />
