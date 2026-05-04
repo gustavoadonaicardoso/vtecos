@@ -12,7 +12,8 @@ import {
   X,
   Smile,
   Paperclip,
-  Circle
+  Circle,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
@@ -50,6 +51,7 @@ function ChatContent() {
   const [loading, setLoading] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
 
@@ -214,6 +216,18 @@ function ChatContent() {
     }
   };
 
+  const handleDeleteChat = async () => {
+    if (!deletingProfileId || !user || !supabase) return;
+    await supabase
+      .from('internal_chat')
+      .delete()
+      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${deletingProfileId}),and(sender_id.eq.${deletingProfileId},receiver_id.eq.${user.id})`);
+    if (selectedProfileId === deletingProfileId) {
+      setMessages([]);
+    }
+    setDeletingProfileId(null);
+  };
+
   const getInitials = (name: string) => {
     const parts = name.split(' ');
     return (parts[0]?.charAt(0) || '') + (parts[1]?.charAt(0) || '');
@@ -258,6 +272,13 @@ function ChatContent() {
                   <span className={styles.userName}>{profile.name}</span>
                   <span className={styles.userRole}>{profile.role}</span>
                 </div>
+                <button
+                  className={styles.deleteBtn}
+                  onClick={(e) => { e.stopPropagation(); setDeletingProfileId(profile.id); }}
+                  title="Apagar conversa"
+                >
+                  <Trash2 size={15} />
+                </button>
               </motion.div>
             ))
           ) : (
@@ -384,6 +405,42 @@ function ChatContent() {
           </div>
         )}
       </main>
+
+      <AnimatePresence>
+        {deletingProfileId && (
+          <motion.div
+            className={styles.modalOverlay}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setDeletingProfileId(null)}
+          >
+            <motion.div
+              className={styles.modalContent}
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.modalIcon}>
+                <Trash2 size={28} />
+              </div>
+              <h3>Apagar conversa</h3>
+              <p>
+                Todas as mensagens com <strong>{profiles.find(p => p.id === deletingProfileId)?.name.split(' ')[0]}</strong> serão apagadas permanentemente. Esta ação não pode ser desfeita.
+              </p>
+              <div className={styles.modalActions}>
+                <button className={styles.cancelBtn} onClick={() => setDeletingProfileId(null)}>
+                  Cancelar
+                </button>
+                <button className={styles.confirmDeleteBtn} onClick={handleDeleteChat}>
+                  Apagar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
