@@ -75,7 +75,22 @@
   background: var(--panel-bg);
   border-bottom: 1px solid var(--border);
 }
-.tabs::-webkit-scrollbar { height: 0px; }
+.tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabs::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
+  border-radius: 4px;
+}
+
+.tabs::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.5);
+}
 
 .tabBtn {
   padding: 8px 16px;

@@ -228,14 +228,12 @@
 }
 
 .sent {
-  align-self: flex-end;
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
   border-bottom-right-radius: 4px;
 }
 
 .received {
-  align-self: flex-start;
   background: var(--card-bg, rgba(255, 255, 255, 0.05));
   border: 1px solid var(--border);
   border-bottom-left-radius: 4px;
@@ -253,10 +251,53 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
+.dateDivider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.dateDivider span {
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--foreground);
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border-radius: 12px;
+  opacity: 0.7;
+}
+
+.fileAttachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  margin-top: 4px;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.fileAttachment:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.emojiPickerContainer {
+  position: absolute;
+  bottom: 80px;
+  left: 24px;
+  z-index: 50;
+}
+
 .inputArea {
   padding: 20px 24px;
   border-top: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
+  position: relative;
 }
 
 .inputContainer {
@@ -338,6 +379,45 @@
 .emptyState h3 {
   font-size: 1.5rem;
   font-weight: 600;
+}
+
+.msgWrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.msgWrapperSent {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.msgWrapperReceived {
+  align-self: flex-start;
+}
+
+.msgDeleteBtn {
+  opacity: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  color: inherit;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msgWrapper:hover .msgDeleteBtn {
+  opacity: 1;
+}
+
+.msgDeleteBtn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 }
 
 .deleteBtn {
@@ -471,4 +551,58 @@
   .hideOnDesktop {
     display: none;
   }
+}
+
+.chatMainWrapper {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+}
+
+.infoSidebar {
+  width: 350px;
+  background: var(--background);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.infoSidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.infoSidebar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.infoHeader {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.02);
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.infoSection {
+  padding: 24px;
+  border-bottom: 8px solid rgba(255,255,255,0.02);
+  text-align: left;
+}
+
+.infoSection h4 {
+  font-size: 0.85rem;
+  color: var(--foreground);
+  opacity: 0.6;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }

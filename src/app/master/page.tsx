@@ -187,9 +187,9 @@ export default function MasterPage() {
   useEffect(() => {
     if (activeTab === 'tenants') {
       const fetchTenants = async () => {
-        if (!supabase) return;
-        const { data } = await supabase.from('tenants').select('*').order('created_at', { ascending: false });
-        if (data) setTenants(data);
+        const res = await fetch('/api/tenants');
+        const json = await res.json();
+        if (json.data) setTenants(json.data);
       };
       fetchTenants();
     }
@@ -197,27 +197,21 @@ export default function MasterPage() {
 
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTenantName || !supabase) return;
+    if (!newTenantName.trim()) return;
     setLoading(true);
-    
-    // Verificar se a tabela existe verificando uma simples leitura rápida pra evitar crash feio
-    const { data: checkTable, error: tableErr } = await supabase.from('tenants').select('id').limit(1);
-    
-    if (tableErr && tableErr.code === '42P01') {
-       alert('ATENÇÃO: A tabela "tenants" não existe no banco de dados.\n\nPor favor, copie o conteúdo do arquivo "supabase/migrations/008_multi_tenant_setup.sql" e execute no editor SQL do Supabase antes de continuar.');
-       setLoading(false);
-       return;
-    }
 
-    const { data, error } = await supabase.from('tenants').insert({ name: newTenantName }).select().single();
-    
-    if (error) {
-       console.error('Database Error Completo:', JSON.stringify(error, null, 2));
-       console.error('Database Error Objeto:', error);
-       alert(`Erro ao criar empresa (Tenant):\n${error.message || JSON.stringify(error)}\n(Código: ${error.code || 'Desconhecido'})`);
-    } else if (data) {
-       setTenants([data, ...tenants]);
-       setNewTenantName('');
+    const res = await fetch('/api/tenants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newTenantName.trim() }),
+    });
+    const json = await res.json();
+
+    if (!res.ok || json.error) {
+      alert(`Erro ao criar empresa:\n${json.error}`);
+    } else if (json.data) {
+      setTenants(prev => [json.data, ...prev]);
+      setNewTenantName('');
     }
     setLoading(false);
   };

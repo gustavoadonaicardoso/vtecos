@@ -5,11 +5,9 @@ import { motion } from 'framer-motion';
 import { 
   User, 
   Lock, 
-  ArrowRight, 
-  ShieldCheck, 
-  Zap,
-  Globe
+  ArrowRight
 } from 'lucide-react';
+import Image from 'next/image';
 import styles from './login.module.css';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase'; // Mantido só pro recuperar senha
@@ -88,12 +86,6 @@ export default function LoginPage() {
   if (resetMode) {
     return (
       <div className={styles.loginPage}>
-        <div className={styles.gridOverlay}></div>
-        <div className={styles.backgroundBlobs}>
-          <div className={styles.blob1}></div>
-          <div className={styles.blob2}></div>
-          <div className={styles.blob3}></div>
-        </div>
         <motion.div
           className={styles.loginCard}
           initial={{ opacity: 0, y: 30 }}
@@ -101,8 +93,19 @@ export default function LoginPage() {
           transition={{ duration: 0.6, ease: 'easeOut' }}
         >
           <div className={styles.logoSection}>
-            <h1>Recuperar Senha</h1>
-            <p>Digite seu e-mail e enviaremos um link de redefinição.</p>
+            <Image 
+              src="/logo-dark.png" 
+              alt="Vórtice Tecnologia" 
+              width={380} 
+              height={125} 
+              className={styles.companyLogo}
+              style={{ objectFit: 'contain' }}
+              priority
+            />
+            <h2>Recuperar Senha</h2>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '8px' }}>
+              Digite seu e-mail e enviaremos um link de redefinição.
+            </p>
           </div>
           <form className={styles.loginForm} onSubmit={handleForgotPassword}>
             {error && <div className={styles.errorMessage}>{error}</div>}
@@ -126,7 +129,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => { setResetMode(false); setError(''); setResetMsg(''); }}
-              style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', marginTop: '8px', fontSize: '14px' }}
+              className={styles.backBtn}
             >
               ← Voltar ao login
             </button>
@@ -138,13 +141,6 @@ export default function LoginPage() {
 
   return (
     <div className={styles.loginPage}>
-      <div className={styles.gridOverlay}></div>
-      <div className={styles.backgroundBlobs}>
-        <div className={styles.blob1}></div>
-        <div className={styles.blob2}></div>
-        <div className={styles.blob3}></div>
-      </div>
-
       <motion.div 
         className={styles.loginCard}
         initial={{ opacity: 0, y: 30 }}
@@ -152,12 +148,15 @@ export default function LoginPage() {
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
         <div className={styles.logoSection}>
-          <div className={styles.vortexLogo}>
-            <div className={styles.vortexInner}></div>
-            <Zap size={24} className={styles.vortexIcon} />
-          </div>
-          <h1>VÓRTICE</h1>
-          <p>Sua central de comando comercial</p>
+          <Image 
+            src="/logo-dark.png" 
+            alt="Vórtice Tecnologia" 
+            width={380} 
+            height={125} 
+            className={styles.companyLogo}
+            style={{ objectFit: 'contain' }}
+            priority
+          />
         </div>
 
         <form className={styles.loginForm} onSubmit={handleLogin}>
@@ -212,23 +211,12 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        <div className={styles.footerInfo}>
-          <div className={styles.infoItem}>
-            <ShieldCheck size={14} />
-            <span>Acesso Seguro SSL</span>
-          </div>
-          <div className={styles.infoItem}>
-            <Globe size={14} />
-            <span>Multi-Plataforma</span>
-          </div>
-        </div>
       </motion.div>
 
       <div className={styles.loginBranding}>
         <p>
-          © 2026 Vórtice Tecnologia. Todos os direitos reservados. |{' '}
-          <a href="/politica-de-privacidade" style={{ color: 'inherit', textDecoration: 'underline' }}>
+          © 2026 Vórtice Tecnologia |{' '}
+          <a href="/politica-de-privacidade">
             Política de Privacidade
           </a>
         </p>

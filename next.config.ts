@@ -1,6 +1,22 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  // Fix Turbopack usando o diretório errado do workspace (detectava package-lock.json do C:\Users\Gustavo)
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
+
+  // Impede que o Supabase seja re-bundled no servidor (evita leitura de .map cloud-only)
+  serverExternalPackages: [
+    "@supabase/supabase-js",
+    "@supabase/postgrest-js",
+    "@supabase/realtime-js",
+    "@supabase/storage-js",
+    "@supabase/auth-js",
+    "@supabase/functions-js",
+  ],
+
   // FIX #15: Headers de segurança (CSP, X-Frame-Options, etc.)
   async headers() {
     return [
