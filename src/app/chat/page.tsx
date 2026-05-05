@@ -157,7 +157,7 @@ function ChatContent() {
           .select('*, profiles(name)')
           .eq('group_id', selectedProfileId)
           .order('created_at', { ascending: true });
-        
+
         if (!error && data) {
           setMessages(data as any[]);
         }
@@ -184,7 +184,7 @@ function ChatContent() {
 
     // Subscribe to new messages
     const tableName = isGroup ? 'chat_group_messages' : 'internal_chat';
-    
+
     const channel = supabase
       .channel(`chat_${user.id}_${selectedProfileId}`)
       .on('postgres_changes', {
@@ -203,15 +203,15 @@ function ChatContent() {
           setMessages(prev => prev.map(m => m.id === newMessage.id ? { ...m, text: newMessage.text, is_edited: newMessage.is_edited } : m));
           return;
         }
-        
+
         if (isGroup) {
-           if (newMessage.group_id === selectedProfileId) {
-             if (newMessage.sender_id && !newMessage.profiles) {
-               const { data: pData } = await supabase.from('profiles').select('name').eq('id', newMessage.sender_id).single();
-               if (pData) newMessage.profiles = { name: pData.name };
-             }
-             setMessages(prev => [...prev, newMessage]);
-           }
+          if (newMessage.group_id === selectedProfileId) {
+            if (newMessage.sender_id && !newMessage.profiles) {
+              const { data: pData } = await supabase.from('profiles').select('name').eq('id', newMessage.sender_id).single();
+              if (pData) newMessage.profiles = { name: pData.name };
+            }
+            setMessages(prev => [...prev, newMessage]);
+          }
         } else {
           const isBelonging =
             (newMessage.sender_id === user.id && newMessage.receiver_id === selectedProfileId) ||
@@ -289,7 +289,7 @@ function ChatContent() {
     if (!inputText.trim() || !selectedProfileId || !user || !supabase) return;
 
     const textToSubmit = inputText;
-    
+
     const isGroup = selectedProfile?.isGroup;
     const table = isGroup ? 'chat_group_messages' : 'internal_chat';
 
@@ -307,7 +307,7 @@ function ChatContent() {
 
     setInputText('');
 
-    const payload = isGroup 
+    const payload = isGroup
       ? { sender_id: user.id, group_id: selectedProfileId, text: textToSubmit }
       : { sender_id: user.id, receiver_id: selectedProfileId, text: textToSubmit };
 
@@ -333,7 +333,7 @@ function ChatContent() {
     if (!deletingMsgId || !user || !supabase) return;
     const isGroup = selectedProfile?.isGroup;
     const table = isGroup ? 'chat_group_messages' : 'internal_chat';
-    
+
     const { error } = await supabase.from(table).delete().eq('id', deletingMsgId);
     if (!error) {
       setMessages(prev => prev.filter(m => m.id !== deletingMsgId));
@@ -425,7 +425,7 @@ function ChatContent() {
     try {
       setIsUploading(true);
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,9)}.${fileExt}`;
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
       const filePath = `chat_attachments/${user.id}/${fileName}`;
 
       const { error } = await supabase.storage.from('files').upload(filePath, file);
@@ -443,9 +443,9 @@ function ChatContent() {
 
       const isGroup = selectedProfile?.isGroup;
       const table = isGroup ? 'chat_group_messages' : 'internal_chat';
-      const payload = isGroup 
-        ? { sender_id: user.id, group_id: selectedProfileId, text: textToSubmit }
-        : { sender_id: user.id, receiver_id: selectedProfileId, text: textToSubmit };
+      const payload = isGroup
+        ? { sender_id: user.id, group_id: selectedProfileId, text: inputText }
+        : { sender_id: user.id, receiver_id: selectedProfileId, text: inputText };
 
       await supabase.from(table).insert([payload]);
     } catch (err) {
@@ -463,7 +463,7 @@ function ChatContent() {
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim() || newGroupMembers.size === 0 || !user || !supabase) return;
-    
+
     const { data: groupData, error: groupError } = await supabase
       .from('chat_groups')
       .insert([{ name: newGroupName, created_by: user.id }])
@@ -578,8 +578,8 @@ function ChatContent() {
       <aside className={`${styles.sidebar} ${selectedProfileId ? styles.hiddenOnMobile : ''}`}>
         <div className={styles.sidebarHeader}>
           <h2>Chat Interno</h2>
-          <button 
-            className={styles.actionBtn} 
+          <button
+            className={styles.actionBtn}
             onClick={() => setShowNewGroupModal(true)}
             title="Novo Grupo"
           >
@@ -610,7 +610,7 @@ function ChatContent() {
               >
                 <div className={styles.userAvatar}>
                   {profile.isGroup ? (
-                    profile.avatar_url ? <img src={profile.avatar_url} alt="Group" style={{width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover'}} /> : <UsersIcon size={20} />
+                    profile.avatar_url ? <img src={profile.avatar_url} alt="Group" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <UsersIcon size={20} />
                   ) : getInitials(profile.name)}
                   {!profile.isGroup && <div className={styles.statusIndicator} />}
                 </div>
@@ -664,10 +664,10 @@ function ChatContent() {
             {selectedProfile ? (
               <>
                 <div className={styles.userAvatar} style={{ width: 40, height: 40 }}>
-                {selectedProfile.isGroup ? (
-                  selectedProfile.avatar_url ? <img src={selectedProfile.avatar_url} alt="Group" style={{width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover'}} /> : <UsersIcon size={20} />
-                ) : getInitials(selectedProfile.name)}
-                {!selectedProfile.isGroup && <div className={styles.statusIndicator} />}
+                  {selectedProfile.isGroup ? (
+                    selectedProfile.avatar_url ? <img src={selectedProfile.avatar_url} alt="Group" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <UsersIcon size={20} />
+                  ) : getInitials(selectedProfile.name)}
+                  {!selectedProfile.isGroup && <div className={styles.statusIndicator} />}
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1rem' }}>{selectedProfile.name}</h3>
@@ -699,7 +699,7 @@ function ChatContent() {
                 onClose={() => setShowNotifications(false)}
               />
               {selectedProfile?.isGroup && (
-                <button 
+                <button
                   className={styles.actionBtn}
                   onClick={() => {
                     fetchGroupInfo();
@@ -717,142 +717,142 @@ function ChatContent() {
         <div className={styles.chatMainWrapper}>
           {selectedProfileId && selectedProfile ? (
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative' }}>
-            <div className={styles.messagesArea}>
-              {Object.keys(groupedMessages).length > 0 ? (
-                Object.entries(groupedMessages).map(([date, msgs]) => (
-                  <React.Fragment key={date}>
-                    <div className={styles.dateDivider}>
-                      <span>{date === new Date().toLocaleDateString('pt-BR') ? 'Hoje' : date}</span>
-                    </div>
-                    {msgs.map((msg) => {
-                      const isSent = msg.sender_id === user?.id;
-                      return (
-                        <motion.div
-                          key={msg.id}
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`${styles.msgWrapper} ${isSent ? styles.msgWrapperSent : styles.msgWrapperReceived}`}
-                        >
-                          <div className={`${styles.message} ${isSent ? styles.sent : styles.received}`}>
-                            {msg.profiles?.name && !isSent && selectedProfile?.isGroup && (
-                              <div style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '4px', opacity: 0.8 }}>
-                                {msg.profiles.name}
-                              </div>
-                            )}
-                            {renderMessageText(msg.text)}
-                            <span className={styles.msgTime}>
-                              {msg.is_edited && <span style={{ fontStyle: 'italic', marginRight: '6px', opacity: 0.8 }}>Editada</span>}
-                              {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            {isSent && (
+              <div className={styles.messagesArea}>
+                {Object.keys(groupedMessages).length > 0 ? (
+                  Object.entries(groupedMessages).map(([date, msgs]) => (
+                    <React.Fragment key={date}>
+                      <div className={styles.dateDivider}>
+                        <span>{date === new Date().toLocaleDateString('pt-BR') ? 'Hoje' : date}</span>
+                      </div>
+                      {msgs.map((msg) => {
+                        const isSent = msg.sender_id === user?.id;
+                        return (
+                          <motion.div
+                            key={msg.id}
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`${styles.msgWrapper} ${isSent ? styles.msgWrapperSent : styles.msgWrapperReceived}`}
+                          >
+                            <div className={`${styles.message} ${isSent ? styles.sent : styles.received}`}>
+                              {msg.profiles?.name && !isSent && selectedProfile?.isGroup && (
+                                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '4px', opacity: 0.8 }}>
+                                  {msg.profiles.name}
+                                </div>
+                              )}
+                              {renderMessageText(msg.text)}
+                              <span className={styles.msgTime}>
+                                {msg.is_edited && <span style={{ fontStyle: 'italic', marginRight: '6px', opacity: 0.8 }}>Editada</span>}
+                                {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {isSent && (
+                                <button
+                                  className={styles.msgDeleteBtn}
+                                  onClick={() => { setEditingMsgId(msg.id); setInputText(msg.text); }}
+                                  title="Editar mensagem"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                              )}
                               <button
                                 className={styles.msgDeleteBtn}
-                                onClick={() => { setEditingMsgId(msg.id); setInputText(msg.text); }}
-                                title="Editar mensagem"
+                                onClick={() => setDeletingMsgId(msg.id)}
+                                title="Apagar mensagem"
                               >
-                                <Pencil size={13} />
+                                <Trash2 size={13} />
                               </button>
-                            )}
-                            <button
-                              className={styles.msgDeleteBtn}
-                              onClick={() => setDeletingMsgId(msg.id)}
-                              title="Apagar mensagem"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </React.Fragment>
-                ))
-              ) : (
-                <div className={styles.emptyState}>
-                  <p>Inicie uma conversa com {selectedProfile.name.split(' ')[0]}.</p>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <div className={styles.inputArea}>
-              {editingMsgId && (
-                <div style={{ padding: '8px 16px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6' }}>
-                    <Pencil size={14} />
-                    <span style={{ fontSize: '0.85rem' }}>Editando mensagem...</span>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <div className={styles.emptyState}>
+                    <p>Inicie uma conversa com {selectedProfile.name.split(' ')[0]}.</p>
                   </div>
-                  <button onClick={() => { setEditingMsgId(null); setInputText(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--foreground)', opacity: 0.6 }}>
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-              {showEmojiPicker && (
-                <div className={styles.emojiPickerContainer}>
-                  <EmojiPicker 
-                    onEmojiClick={handleEmojiClick} 
-                    theme={Theme.AUTO}
-                    searchPlaceHolder="Buscar emoji..."
-                  />
-                </div>
-              )}
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                style={{ display: 'none' }} 
-                onChange={handleFileUpload} 
-              />
-              <form className={styles.inputContainer} onSubmit={handleSendMessage}>
-                <button 
-                  type="button" 
-                  className={styles.actionBtn}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                >
-                  <Paperclip size={20} />
-                </button>
-                <button 
-                  type="button" 
-                  className={styles.actionBtn}
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                >
-                  <Smile size={20} />
-                </button>
-                <textarea
-                  rows={1}
-                  placeholder={isUploading ? "Enviando arquivo..." : "Escreva sua mensagem..."}
-                  value={inputText}
-                  disabled={isUploading}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                />
-                <button
-                  type="submit"
-                  className={styles.sendBtn}
-                  disabled={(!inputText.trim() && !isUploading) || isUploading}
-                >
-                  <Send size={18} />
-                </button>
-              </form>
-            </div>
-          </div>
-        ) : (
-          <div className={styles.emptyState}>
-            <UsersIcon size={48} opacity={0.2} />
-            <h3>Bem-vindo ao Chat Interno</h3>
-            <p>Selecione um colega ou grupo na barra lateral para começar a conversar.</p>
-          </div>
-        )}
+                )}
+                <div ref={messagesEndRef} />
+              </div>
 
-        <AnimatePresence>
+              <div className={styles.inputArea}>
+                {editingMsgId && (
+                  <div style={{ padding: '8px 16px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#3b82f6' }}>
+                      <Pencil size={14} />
+                      <span style={{ fontSize: '0.85rem' }}>Editando mensagem...</span>
+                    </div>
+                    <button onClick={() => { setEditingMsgId(null); setInputText(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--foreground)', opacity: 0.6 }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+                {showEmojiPicker && (
+                  <div className={styles.emojiPickerContainer}>
+                    <EmojiPicker
+                      onEmojiClick={handleEmojiClick}
+                      theme={Theme.AUTO}
+                      searchPlaceHolder="Buscar emoji..."
+                    />
+                  </div>
+                )}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleFileUpload}
+                />
+                <form className={styles.inputContainer} onSubmit={handleSendMessage}>
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    <Paperclip size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  >
+                    <Smile size={20} />
+                  </button>
+                  <textarea
+                    rows={1}
+                    placeholder={isUploading ? "Enviando arquivo..." : "Escreva sua mensagem..."}
+                    value={inputText}
+                    disabled={isUploading}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    className={styles.sendBtn}
+                    disabled={(!inputText.trim() && !isUploading) || isUploading}
+                  >
+                    <Send size={18} />
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.emptyState}>
+              <UsersIcon size={48} opacity={0.2} />
+              <h3>Bem-vindo ao Chat Interno</h3>
+              <p>Selecione um colega ou grupo na barra lateral para começar a conversar.</p>
+            </div>
+          )}
+
+          <AnimatePresence>
             {showGroupInfoModal && selectedProfile?.isGroup && (
-              <motion.aside 
+              <motion.aside
                 className={styles.infoSidebar}
                 initial={{ width: 0, opacity: 0 }}
                 animate={{ width: 350, opacity: 1 }}
@@ -866,7 +866,7 @@ function ChatContent() {
                 </div>
 
                 <div className={styles.infoSection} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', borderBottom: '8px solid rgba(255,255,255,0.02)' }}>
-                  <div 
+                  <div
                     style={{ width: '150px', height: '150px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', position: 'relative', marginBottom: '16px' }}
                     onClick={() => groupAvatarInputRef.current?.click()}
                     title="Alterar foto do grupo"
@@ -893,7 +893,7 @@ function ChatContent() {
                             {getInitials(m.name)}
                           </div>
                           <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>
-                            {m.name} {m.id === user?.id && <span style={{opacity:0.6}}>(Você)</span>}
+                            {m.name} {m.id === user?.id && <span style={{ opacity: 0.6 }}>(Você)</span>}
                           </span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -994,8 +994,8 @@ function ChatContent() {
                 {profiles.find(p => p.id === deletingProfileId)?.isGroup && profiles.find(p => p.id === deletingProfileId)?.createdBy !== user?.id ? <LogOut size={28} /> : <Trash2 size={28} />}
               </div>
               <h3>
-                {profiles.find(p => p.id === deletingProfileId)?.isGroup && profiles.find(p => p.id === deletingProfileId)?.createdBy !== user?.id 
-                  ? 'Sair do grupo' 
+                {profiles.find(p => p.id === deletingProfileId)?.isGroup && profiles.find(p => p.id === deletingProfileId)?.createdBy !== user?.id
+                  ? 'Sair do grupo'
                   : 'Apagar conversa'}
               </h3>
               <p>
@@ -1037,18 +1037,18 @@ function ChatContent() {
                 <UsersIcon size={28} />
               </div>
               <h3>Criar Novo Grupo</h3>
-              <input 
-                type="text" 
-                placeholder="Nome do grupo..." 
-                value={newGroupName} 
+              <input
+                type="text"
+                placeholder="Nome do grupo..."
+                value={newGroupName}
                 onChange={e => setNewGroupName(e.target.value)}
                 style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'inherit', marginBottom: '12px' }}
               />
               <div style={{ width: '100%', maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px', textAlign: 'left' }}>
                 {profiles.filter(p => !p.isGroup).map(p => (
                   <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={newGroupMembers.has(p.id)}
                       onChange={(e) => {
                         const newSet = new Set(newGroupMembers);
@@ -1065,8 +1065,8 @@ function ChatContent() {
                 <button className={styles.cancelBtn} onClick={() => setShowNewGroupModal(false)}>
                   Cancelar
                 </button>
-                <button 
-                  className={styles.confirmDeleteBtn} 
+                <button
+                  className={styles.confirmDeleteBtn}
                   style={{ background: '#3b82f6' }}
                   onClick={handleCreateGroup}
                   disabled={!newGroupName.trim() || newGroupMembers.size === 0}
