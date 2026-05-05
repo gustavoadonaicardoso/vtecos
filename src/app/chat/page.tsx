@@ -514,7 +514,7 @@ function ChatContent() {
     if (data) {
       setGroupMembers(data.map(d => ({
         id: d.user_id,
-        name: d.profiles?.name || 'Desconhecido',
+        name: (Array.isArray(d.profiles) ? d.profiles[0]?.name : d.profiles?.name) || 'Desconhecido',
         isAdmin: d.is_admin || d.user_id === selectedProfile?.createdBy
       })));
     }
