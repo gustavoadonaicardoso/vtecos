@@ -38,6 +38,8 @@ export interface UserProfile {
   status: 'ACTIVE' | 'INACTIVE';
   permissions: UserPermissions;
   allowed_templates?: string[]; // empty = vê todos; com IDs = apenas os listados
+  phone?: string | null;
+  avatar_url?: string | null;
 }
 
 // ─── CRM — Leads & Pipeline ──────────────────────────────────
@@ -165,7 +167,7 @@ export interface MetaWhatsAppConfig {
   phoneNumberId: string;
   businessAccountId: string;
   webhookVerifyToken: string;
-  appSecret: string;
+  appSecret?: string;
   apiVersion?: string; // default: v21.0
 }
 

@@ -47,7 +47,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { WhatsAppService } from '@/lib/whatsapp';
+import { WhatsAppService, getWhatsAppConfig } from '@/lib/whatsapp';
 
 function getSupabase() {
   return createClient(
@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
   let service: WhatsAppService;
 
   try {
-    service = new WhatsAppService();
+    const config = await getWhatsAppConfig(supabase);
+    service = new WhatsAppService(config);
   } catch (err: any) {
     return NextResponse.json({
       error: 'Configuração WhatsApp incompleta.',

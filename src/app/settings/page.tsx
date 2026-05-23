@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Building2, 
@@ -15,11 +15,13 @@ import {
 } from 'lucide-react';
 import styles from './settings.module.css';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 type TabType = 'profile' | 'company' | 'preferences' | 'integrations' | 'billing' | 'senhas';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const { user, refreshUser } = useAuth();
 
   // Senhas States
   const [queueTotalDesks, setQueueTotalDesks] = useState(5);
@@ -32,9 +34,20 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Perfil States
-  const [profileName, setProfileName] = useState('Gustavo Admin');
-  const [profileEmail, setProfileEmail] = useState('gustavo@vortice.tech');
-  const [profilePhone, setProfilePhone] = useState('+55 11 99999-9999');
+  const [profileName, setProfileName] = useState('');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileAvatar, setProfileAvatar] = useState('');
+
+  // Sincronizar dados do banco
+  useEffect(() => {
+    if (user) {
+      setProfileName(user.name || '');
+      setProfileEmail(user.email || '');
+      setProfilePhone(user.phone || '');
+      setProfileAvatar(user.avatar_url || '');
+    }
+  }, [user]);
 
   // Empresa States
   const [companyName, setCompanyName] = useState('Vórtice Tecnologia');
@@ -59,14 +72,65 @@ export default function SettingsPage() {
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (activeTab === 'integrations') fetchIntegrations();
   }, [activeTab]);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("O arquivo excede o limite de 2MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setProfileAvatar(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetPasswordDemand = async () => {
+    if (!profileEmail) return;
+    setIsSaving(true);
+    try {
+      const resp = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: profileEmail })
+      });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json.error || 'Erro ao processar solicitação.');
+      alert("Solicitação de redefinição de senha enviada com sucesso ao Administrador!");
+    } catch (err: any) {
+      alert(err.message || "Erro ao processar solicitação.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      if (activeTab === 'senhas') {
+      if (activeTab === 'profile') {
+        const resp = await fetch('/api/users/profile', {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-user-id': user?.id || ''
+          },
+          body: JSON.stringify({
+            name: profileName,
+            phone: profilePhone,
+            avatar_url: profileAvatar
+          })
+        });
+        const json = await resp.json();
+        if (!resp.ok) throw new Error(json.error || 'Erro ao salvar perfil.');
+        await refreshUser();
+        alert("Informações de perfil atualizadas com sucesso!");
+      } else if (activeTab === 'senhas') {
         const { error } = await supabase?.from('queue_settings').upsert({
           id: 'default',
           total_desks: queueTotalDesks,
@@ -109,10 +173,30 @@ export default function SettingsPage() {
             
             <div className={styles.avatarUpload}>
               <div className={styles.avatarPreview}>
-                GA
+                {profileAvatar ? (
+                  <img 
+                    src={profileAvatar} 
+                    alt="Avatar" 
+                    style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  profileName ? profileName.slice(0, 2).toUpperCase() : 'US'
+                )}
               </div>
               <div>
-                <button className={styles.uploadBtn}>Trocar Foto (Avatar)</button>
+                <input 
+                  type="file" 
+                  id="avatar-input" 
+                  accept="image/*" 
+                  style={{ display: 'none' }} 
+                  onChange={handleAvatarChange} 
+                />
+                <button 
+                  className={styles.uploadBtn}
+                  onClick={() => document.getElementById('avatar-input')?.click()}
+                >
+                  Trocar Foto (Avatar)
+                </button>
                 <p style={{ fontSize: '0.8rem', opacity: 0.5, marginTop: '8px' }}>JPG, GIF ou PNG. Máximo de 2MB.</p>
               </div>
             </div>
@@ -124,7 +208,13 @@ export default function SettingsPage() {
               </div>
               <div className={styles.formGroup}>
                 <label>E-mail (Login)</label>
-                <input type="email" className={styles.input} value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
+                <input 
+                  type="email" 
+                  className={styles.input} 
+                  value={profileEmail} 
+                  readOnly 
+                  style={{ opacity: 0.6, cursor: 'not-allowed' }}
+                />
               </div>
               <div className={styles.formGroup}>
                 <label>Telefone / WhatsApp</label>
@@ -142,7 +232,11 @@ export default function SettingsPage() {
             <div className={styles.dangerZone}>
               <div className={styles.dangerTitle}>Segurança da Conta</div>
               <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '1rem' }}>Sua senha deve ter no mínimo 8 caracteres e uma combinação de letras e números.</p>
-              <button className={styles.uploadBtn} style={{ borderColor: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button 
+                className={styles.uploadBtn} 
+                onClick={handleResetPasswordDemand}
+                style={{ borderColor: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
                 <Lock size={16} /> Redefinir Senha
               </button>
             </div>

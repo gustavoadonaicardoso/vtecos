@@ -61,7 +61,7 @@ export default function LoginPage() {
     }
   };
 
-  // FIX #13: Recuperação de senha via Supabase Auth
+  // FIX #13: Recuperação de senha via Solicitação ao Admin
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -71,13 +71,21 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`,
+      const resp = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
       });
-      if (resetError) throw resetError;
-      setResetMsg('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+      
+      const json = await resp.json();
+      
+      if (!resp.ok) {
+        throw new Error(json.error || 'Erro ao processar solicitação.');
+      }
+      
+      setResetMsg('Solicitação enviada com sucesso! O administrador foi notificado para redefinir sua senha.');
     } catch (err: any) {
-      setError('Não foi possível enviar o e-mail. Verifique o endereço informado.');
+      setError(err.message || 'Não foi possível processar a solicitação. Verifique o e-mail informado.');
     } finally {
       setIsLoading(false);
     }

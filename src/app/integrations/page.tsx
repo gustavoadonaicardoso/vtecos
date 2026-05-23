@@ -92,6 +92,13 @@ export default function Integrations() {
   const [filter, setFilter] = useState('Todos'); // Changed to localized "Todos"
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [originUrl, setOriginUrl] = useState('https://vtec.vorticetecnologia.com.br');
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOriginUrl(window.location.origin);
+    }
+  }, []);
   
   // WhatsApp Config State
   const [waConfig, setWaConfig] = useState({
@@ -371,7 +378,7 @@ export default function Integrations() {
                   <input type="text" defaultValue="vortice_verify_token_2024" readOnly className={styles.premiumInput} style={{ background: 'rgba(255,255,255,0.03)', cursor: 'not-allowed' }} />
                   <CheckCircle2 size={14} className={styles.inputIcon} color="#25D366" />
                 </div>
-                <small style={{ opacity: 0.5, marginTop: '4px', display: 'block' }}>URL Webhook: https://system-vt.vercel.app/api/webhooks/whatsapp</small>
+                <small style={{ opacity: 0.5, marginTop: '4px', display: 'block' }}>URL Webhook: {originUrl}/api/webhooks/meta</small>
               </div>
             </div>
 
@@ -486,7 +493,7 @@ export default function Integrations() {
 
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
                  <p style={{ fontSize: '0.8rem', opacity: 0.6, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Globe size={14} /> Webhook Meta: <code>https://system-vt.vercel.app/api/webhooks/meta</code>
+                    <Globe size={14} /> Webhook Meta: <code>{originUrl}/api/webhooks/meta</code>
                  </p>
               </div>
 
@@ -596,7 +603,7 @@ export default function Integrations() {
                <div>
                  <p style={{ fontSize: '0.85rem', color: '#a855f7', fontWeight: 600, marginBottom: '4px' }}>Configure o webhook no painel Z-API:</p>
                  <code style={{ background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', display: 'block' }}>
-                   https://system-vt.vercel.app/api/webhooks/z-api
+                   {originUrl}/api/webhooks/z-api
                  </code>
                </div>
             </div>

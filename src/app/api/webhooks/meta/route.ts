@@ -27,7 +27,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { WhatsAppService } from '@/lib/whatsapp';
+import { WhatsAppService, getWhatsAppConfig } from '@/lib/whatsapp';
 import { logAudit } from '@/lib/audit';
 import type { WhatsAppWebhookPayload, WhatsAppInboundMessage, WhatsAppMessageStatus } from '@/types';
 
@@ -40,8 +40,9 @@ function getSupabase() {
 }
 
 // ─── Instância do serviço WhatsApp ───────────────────────────
-function getService() {
-  return new WhatsAppService();
+async function getService(supabaseClient?: any) {
+  const config = await getWhatsAppConfig(supabaseClient);
+  return new WhatsAppService(config);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -66,7 +67,8 @@ export async function GET(request: NextRequest) {
   // Responde somente quando modo = subscribe e token correto
   if (mode === 'subscribe' && token) {
     try {
-      const service = getService();
+      const supabase = getSupabase();
+      const service = await getService(supabase);
       if (service.verifyWebhookToken(token) && challenge) {
         console.log('[Webhook Meta] ✅ Verificação do webhook aprovada.');
         // Retorna o challenge como plain text (obrigatório)
@@ -92,9 +94,12 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get('x-hub-signature-256') ?? '';
 
+  const supabase = getSupabase();
+  let service: WhatsAppService | null = null;
+
   // 2. Valida assinatura HMAC-SHA256 (segurança)
   try {
-    const service = getService();
+    service = await getService(supabase);
     if (!service.validateWebhookSignature(rawBody, signature)) {
       console.warn('[Webhook Meta] ❌ Assinatura HMAC inválida. Requisição rejeitada.');
       return NextResponse.json({ error: 'Assinatura inválida.' }, { status: 401 });
@@ -103,10 +108,10 @@ export async function POST(request: NextRequest) {
     // Se as env vars não estiverem configuradas, loga mas não bloqueia
     // em ambiente de desenvolvimento/testes
     if (process.env.NODE_ENV === 'production') {
-      console.error('[Webhook Meta] Erro na validação HMAC:', err.message);
+      console.error('[Webhook Meta] Erro na validação HMAC ou de configuração:', err.message);
       return NextResponse.json({ error: 'Configuração incompleta.' }, { status: 500 });
     }
-    console.warn('[Webhook Meta] ⚠️ Validação HMAC ignorada (modo desenvolvimento).');
+    console.warn('[Webhook Meta] ⚠️ Validação HMAC ignorada (modo desenvolvimento):', err.message);
   }
 
   // 3. Parse do payload
@@ -125,7 +130,15 @@ export async function POST(request: NextRequest) {
   // 5. Processa cada entry de forma assíncrona (não bloqueia a resposta)
   // A Meta espera resposta HTTP 200 em até 20 segundos.
   // Disparamos o processamento e retornamos 200 imediatamente.
-  processWebhookEntries(payload).catch(err =>
+  const finalService = service || new WhatsAppService({
+    accessToken: '',
+    phoneNumberId: '',
+    businessAccountId: '',
+    webhookVerifyToken: 'vortice_verify_token_2024',
+    appSecret: ''
+  });
+
+  processWebhookEntries(payload, finalService).catch(err =>
     console.error('[Webhook Meta] Erro no processamento:', err)
   );
 
@@ -135,7 +148,7 @@ export async function POST(request: NextRequest) {
 // ─────────────────────────────────────────────────────────────
 // Processamento de Entries
 // ─────────────────────────────────────────────────────────────
-async function processWebhookEntries(payload: WhatsAppWebhookPayload) {
+async function processWebhookEntries(payload: WhatsAppWebhookPayload, service: WhatsAppService) {
   const supabase = getSupabase();
 
   for (const entry of payload.entry) {
@@ -150,7 +163,7 @@ async function processWebhookEntries(payload: WhatsAppWebhookPayload) {
         for (const message of value.messages) {
           const senderName = value.contacts?.find(c => c.wa_id === message.from)?.profile.name
             ?? 'Cliente WhatsApp';
-          await handleInboundMessage(supabase, message, senderName, phoneNumberId);
+          await handleInboundMessage(supabase, message, senderName, phoneNumberId, service);
         }
       }
 
@@ -171,7 +184,8 @@ async function handleInboundMessage(
   supabase: ReturnType<typeof getSupabase>,
   message: WhatsAppInboundMessage,
   senderName: string,
-  phoneNumberId: string
+  phoneNumberId: string,
+  service: WhatsAppService
 ) {
   try {
     const cleanPhone = message.from; // já vem com código do país, sem +
@@ -274,7 +288,6 @@ async function handleInboundMessage(
 
     // 5. Marca mensagem como lida (envia duplo-check azul)
     try {
-      const service = new WhatsAppService();
       await service.markAsRead(wamid);
     } catch {
       // Não critico — as env vars podem não estar configuradas ainda
