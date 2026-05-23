@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { Bell, HelpCircle, Menu, X } from 'lucide-react';
+import { Bell, HelpCircle, Menu, X, Phone } from 'lucide-react';
 import styles from './Navbar.module.css';
 import ThemeToggle from './ThemeToggle';
 import { useSidebar } from '@/components/SidebarProvider';
@@ -19,11 +19,13 @@ import { useLeads } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
+import { useTwilio } from '@/context/TwilioContext';
 
 const Navbar = () => {
   const { isMobileOpen, toggleMobileMenu } = useSidebar();
   const { openModal } = useLeads();
   const { user } = useAuth();
+  const { toggleDialer } = useTwilio();
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [unreadCount, setUnreadCount] = React.useState(0);
 
@@ -65,6 +67,14 @@ const Navbar = () => {
         <Link href="/help" className={styles.actionButton}>
           <HelpCircle size={22} />
         </Link>
+
+        <button 
+          className={styles.actionButton} 
+          onClick={toggleDialer}
+          title="Abrir Discador"
+        >
+          <Phone size={20} />
+        </button>
 
         <button
           className={`${styles.actionButton} ${styles.notificationBtn}`}

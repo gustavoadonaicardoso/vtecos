@@ -32,7 +32,19 @@ import {
   Bell,
   HelpCircle,
   Building2,
-  Plus
+  Plus,
+  Trash2,
+  X,
+  Flame,
+  Rocket,
+  Star,
+  Shield,
+  Globe,
+  Award,
+  Sparkles,
+  MapPin,
+  Clock,
+  Info,
 } from 'lucide-react';
 import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -71,7 +83,7 @@ const SIDEBAR_PRESETS = [
 export default function MasterPage() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'branding' | 'modules' | 'permissions' | 'tenants'>('modules');
+  const [activeTab, setActiveTab] = useState<'branding' | 'modules' | 'permissions' | 'tenants' | 'banners'>('modules');
   const [tenants, setTenants] = useState<any[]>([]);
   const [newTenantName, setNewTenantName] = useState('');
   const [selectedRole, setSelectedRole] = useState<'ADMIN' | 'MANAGER' | 'SELLER'>('SELLER');
@@ -87,6 +99,152 @@ export default function MasterPage() {
     SELLER: { dashboard: { view: true, kpis: false }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: false }, team: { view: false }, automations: { view: false }, integrations: { view: false }, admin: { projects: false, settings: false } }
   });
   const router = useRouter();
+
+  // ── Banner Management State ──────────────────────────────────
+  const BANNER_PRESET_COLORS = [
+    'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+    'linear-gradient(135deg, #10b981, #059669)',
+    'linear-gradient(135deg, #f59e0b, #d97706)',
+    'linear-gradient(135deg, #ef4444, #991b1b)',
+    'linear-gradient(135deg, #8b5cf6, #d946ef)',
+    'linear-gradient(135deg, #1e293b, #0f172a)',
+    'linear-gradient(135deg, #06b6d4, #0891b2)',
+    'linear-gradient(135deg, #6366f1, #4f46e5)',
+  ];
+
+  const BANNER_PRESET_ICONS = [
+    { id: 'zap', icon: Zap },
+    { id: 'flame', icon: Flame },
+    { id: 'rocket', icon: Rocket },
+    { id: 'star', icon: Star },
+    { id: 'shield', icon: Shield },
+    { id: 'globe', icon: Globe },
+    { id: 'award', icon: Award },
+    { id: 'sparkles', icon: Sparkles },
+  ];
+
+  const BANNER_ROLE_OPTIONS = [
+    { value: '', label: 'Todos os usuários' },
+    { value: 'ADMIN', label: 'Apenas Admins' },
+    { value: 'MANAGER', label: 'Apenas Gerentes' },
+    { value: 'SELLER', label: 'Apenas Vendedores' },
+  ];
+
+  interface BannerItem {
+    id?: string;
+    title: string;
+    description: string;
+    date: string;
+    type: string;
+    color: string;
+    iconName?: string;
+    target_roles: string[];
+  }
+
+  const [banners, setBanners] = useState<BannerItem[]>([]);
+  const [editingBannerIdx, setEditingBannerIdx] = useState<number | null>(null);
+  const [bannerSaved, setBannerSaved] = useState(false);
+  const [bannerLoading, setBannerLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'banners') fetchBanners();
+  }, [activeTab]);
+
+  const fetchBanners = async () => {
+    if (!supabase) return;
+    setBannerLoading(true);
+    const { data } = await supabase.from('platform_banners').select('*').order('created_at', { ascending: false });
+    if (data) {
+      setBanners(data.map(b => ({
+        id: b.id,
+        title: b.title,
+        description: b.description,
+        date: b.date,
+        type: b.type,
+        color: b.color,
+        iconName: b.iconName,
+        target_roles: b.target_roles ?? [],
+      })));
+    } else {
+      try { const s = localStorage.getItem('vortice_banners'); if (s) setBanners(JSON.parse(s)); } catch {}
+    }
+    setBannerLoading(false);
+  };
+
+  const saveBanner = async (idx: number) => {
+    const banner = banners[idx];
+    if (!supabase) return;
+    if (banner.id) {
+      await supabase.from('platform_banners').update({
+        title: banner.title,
+        description: banner.description,
+        date: banner.date,
+        type: banner.type,
+        color: banner.color,
+        iconName: banner.iconName,
+        target_roles: banner.target_roles,
+      }).eq('id', banner.id);
+    } else {
+      const { data } = await supabase.from('platform_banners').insert({
+        title: banner.title,
+        description: banner.description,
+        date: banner.date,
+        type: banner.type,
+        color: banner.color,
+        iconName: banner.iconName,
+        target_roles: banner.target_roles,
+      }).select().single();
+      if (data) {
+        const updated = [...banners];
+        updated[idx] = { ...updated[idx], id: data.id };
+        setBanners(updated);
+      }
+    }
+    localStorage.setItem('vortice_banners', JSON.stringify(banners));
+    setBannerSaved(true);
+    setEditingBannerIdx(null);
+    setTimeout(() => setBannerSaved(false), 2500);
+  };
+
+  const removeBanner = async (idx: number) => {
+    if (!confirm('Remover este banner permanentemente?')) return;
+    const banner = banners[idx];
+    if (supabase && banner.id) {
+      await supabase.from('platform_banners').delete().eq('id', banner.id);
+    }
+    const next = banners.filter((_, i) => i !== idx);
+    setBanners(next);
+    localStorage.setItem('vortice_banners', JSON.stringify(next));
+    setEditingBannerIdx(null);
+  };
+
+  const addBanner = () => {
+    const newBanner: BannerItem = {
+      title: 'Novo Comunicado',
+      description: 'Descreva aqui o conteúdo do banner.',
+      date: new Date().toLocaleDateString('pt-BR'),
+      type: 'Comunicado',
+      color: BANNER_PRESET_COLORS[0],
+      iconName: 'sparkles',
+      target_roles: [],
+    };
+    setBanners(prev => [newBanner, ...prev]);
+    setEditingBannerIdx(0);
+  };
+
+  const updateBannerField = (idx: number, field: keyof BannerItem, val: any) => {
+    const next = [...banners];
+    next[idx] = { ...next[idx], [field]: val };
+    setBanners(next);
+  };
+
+  const toggleBannerRole = (idx: number, role: string) => {
+    const current = banners[idx].target_roles ?? [];
+    const next = current.includes(role)
+      ? current.filter(r => r !== role)
+      : [...current, role];
+    updateBannerField(idx, 'target_roles', next);
+  };
   
   const logoRef = useRef<HTMLInputElement>(null);
   const faviconRef = useRef<HTMLInputElement>(null);
@@ -386,6 +544,12 @@ export default function MasterPage() {
           >
             Múltiplas Empresas
           </button>
+          <button 
+            className={`${styles.tabBtn} ${activeTab === 'banners' ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab('banners')}
+          >
+            Banners
+          </button>
         </div>
 
         <div className={styles.headerActions}>
@@ -402,6 +566,18 @@ export default function MasterPage() {
                 onClick={activeTab === 'branding' ? handleSave : applyToAll}
                >
                 {saved ? <><CheckCircle2 size={16} /> Salvo!</> : <><Save size={16} /> {activeTab === 'permissions' ? 'Salvar e Aplicar' : 'Salvar'}</>}
+               </button>
+             </div>
+           )}
+           {activeTab === 'banners' && (
+             <div className={styles.actionButtons}>
+               {bannerSaved && (
+                 <span style={{ display:'flex', alignItems:'center', gap:6, color:'#10b981', fontWeight:700, fontSize:'0.9rem' }}>
+                   <CheckCircle2 size={16} /> Salvo!
+                 </span>
+               )}
+               <button className={styles.saveBtn} onClick={addBanner}>
+                 <Plus size={16} /> Novo Banner
                </button>
              </div>
            )}
@@ -500,6 +676,240 @@ export default function MasterPage() {
                 );
               })}
             </div>
+          </motion.div>
+        ) : activeTab === 'banners' ? (
+          <motion.div
+            key="banners"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            style={{ width: '100%' }}
+          >
+            {/* Banner List */}
+            {bannerLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>Carregando banners...</div>
+            ) : banners.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+                <Layout size={40} style={{ margin: '0 auto 1rem', display: 'block' }} />
+                <p>Nenhum banner criado ainda.</p>
+                <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Clique em "Novo Banner" para começar.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+                {banners.map((banner, idx) => {
+                  const IconComp = BANNER_PRESET_ICONS.find(i => i.id === banner.iconName)?.icon || Sparkles;
+                  const audienceLabel = banner.target_roles?.length === 0
+                    ? 'Todos'
+                    : banner.target_roles?.join(', ');
+                  return (
+                    <motion.div
+                      key={banner.id ?? idx}
+                      style={{
+                        background: banner.color,
+                        borderRadius: 16,
+                        padding: '1.5rem',
+                        position: 'relative',
+                        color: 'white',
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        minHeight: 160,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                      }}
+                      whileHover={{ scale: 1.02, y: -4 }}
+                      onClick={() => setEditingBannerIdx(idx)}
+                    >
+                      <div style={{ position: 'absolute', right: -10, bottom: -16, opacity: 0.12, transform: 'rotate(-12deg)' }}>
+                        <IconComp size={100} />
+                      </div>
+                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom: 10 }}>
+                        <span style={{ fontSize:'0.65rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', background:'rgba(255,255,255,0.2)', padding:'3px 10px', borderRadius:100 }}>
+                          {banner.type}
+                        </span>
+                        <span style={{ fontSize:'0.7rem', opacity:0.85, fontWeight:600 }}>{banner.date}</span>
+                      </div>
+                      <h3 style={{ fontWeight:700, marginBottom:6, fontSize:'1.1rem' }}>{banner.title}</h3>
+                      <p style={{ fontSize:'0.82rem', opacity:0.88, marginBottom:12, lineHeight:1.4 }}>{banner.description}</p>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:'0.72rem', background:'rgba(0,0,0,0.2)', padding:'3px 10px', borderRadius:100, width:'fit-content' }}>
+                        <UsersIcon size={11} />
+                        <span>{audienceLabel}</span>
+                      </div>
+                      <button
+                        style={{ position:'absolute', top:12, right:12, background:'rgba(255,255,255,0.9)', border:'none', borderRadius:8, padding:'5px 10px', fontSize:'0.72rem', fontWeight:700, color:'#111', cursor:'pointer' }}
+                        onClick={(e) => { e.stopPropagation(); setEditingBannerIdx(idx); }}
+                      >
+                        Editar
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Edit Modal */}
+            <AnimatePresence>
+              {editingBannerIdx !== null && banners[editingBannerIdx] && (
+                <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'1.5rem' }}>
+                  <motion.div
+                    initial={{ opacity:0, scale:0.92, y:20 }}
+                    animate={{ opacity:1, scale:1, y:0 }}
+                    exit={{ opacity:0, scale:0.92, y:20 }}
+                    style={{ background:'var(--panel-bg)', border:'1px solid var(--border)', borderRadius:24, width:'100%', maxWidth:540, maxHeight:'90vh', overflowY:'auto', padding:'2rem', position:'relative' }}
+                  >
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem' }}>
+                      <h2 style={{ fontWeight:700, fontSize:'1.15rem' }}>Editar Banner</h2>
+                      <button style={{ background:'rgba(128,128,128,0.1)', border:'none', borderRadius:'50%', width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--foreground)' }} onClick={() => setEditingBannerIdx(null)}>
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+                      {/* Título e Tipo */}
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                        <div>
+                          <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:6 }}>Título</label>
+                          <input
+                            value={banners[editingBannerIdx].title}
+                            onChange={e => updateBannerField(editingBannerIdx, 'title', e.target.value)}
+                            className={styles.input}
+                            placeholder="Título do banner"
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:6 }}>Tipo / Badge</label>
+                          <input
+                            value={banners[editingBannerIdx].type}
+                            onChange={e => updateBannerField(editingBannerIdx, 'type', e.target.value)}
+                            className={styles.input}
+                            placeholder="Ex: Comunicado"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Descrição */}
+                      <div>
+                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:6 }}>Descrição</label>
+                        <textarea
+                          value={banners[editingBannerIdx].description}
+                          onChange={e => updateBannerField(editingBannerIdx, 'description', e.target.value)}
+                          className={styles.input}
+                          rows={3}
+                          style={{ resize:'vertical', width:'100%' }}
+                          placeholder="Descrição curta para o card..."
+                        />
+                      </div>
+
+                      {/* Data */}
+                      <div>
+                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:6 }}>Data de Exibição</label>
+                        <input
+                          value={banners[editingBannerIdx].date}
+                          onChange={e => updateBannerField(editingBannerIdx, 'date', e.target.value)}
+                          className={styles.input}
+                          placeholder="Ex: 23 Mai 2026"
+                        />
+                      </div>
+
+                      {/* Audiência (target_roles) */}
+                      <div>
+                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:10 }}>Audiência (quem vê este banner)</label>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                          {(['ADMIN', 'MANAGER', 'SELLER'] as const).map(role => {
+                            const isSelected = (banners[editingBannerIdx].target_roles ?? []).includes(role);
+                            return (
+                              <button
+                                key={role}
+                                type="button"
+                                onClick={() => toggleBannerRole(editingBannerIdx, role)}
+                                style={{
+                                  padding:'6px 16px', borderRadius:100, border:'1px solid',
+                                  fontSize:'0.8rem', fontWeight:700, cursor:'pointer',
+                                  transition:'all 0.15s',
+                                  background: isSelected ? 'var(--accent)' : 'rgba(128,128,128,0.08)',
+                                  borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                                  color: isSelected ? 'white' : 'var(--foreground)',
+                                }}
+                              >
+                                {role}
+                              </button>
+                            );
+                          })}
+                          <span style={{ fontSize:'0.78rem', opacity:0.45, alignSelf:'center' }}>
+                            {(banners[editingBannerIdx].target_roles ?? []).length === 0 ? '→ Nenhum selecionado = todos verão' : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Cores */}
+                      <div>
+                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:10 }}>Cor do Card</label>
+                        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                          {BANNER_PRESET_COLORS.map(c => (
+                            <div
+                              key={c}
+                              onClick={() => updateBannerField(editingBannerIdx, 'color', c)}
+                              style={{
+                                width:36, height:36, borderRadius:10, background:c, cursor:'pointer',
+                                border: banners[editingBannerIdx].color === c ? '3px solid white' : '3px solid transparent',
+                                boxShadow: banners[editingBannerIdx].color === c ? '0 0 0 2px var(--accent)' : 'none',
+                                transition:'all 0.15s',
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Ícones */}
+                      <div>
+                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:10 }}>Ícone</label>
+                        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                          {BANNER_PRESET_ICONS.map(({ id, icon: Ico }) => (
+                            <div
+                              key={id}
+                              onClick={() => updateBannerField(editingBannerIdx, 'iconName', id)}
+                              style={{
+                                width:40, height:40, borderRadius:10,
+                                display:'flex', alignItems:'center', justifyContent:'center',
+                                cursor:'pointer', transition:'all 0.15s',
+                                background: banners[editingBannerIdx].iconName === id ? 'var(--accent)' : 'rgba(128,128,128,0.08)',
+                                border: banners[editingBannerIdx].iconName === id ? '1px solid var(--accent)' : '1px solid var(--border)',
+                                color: banners[editingBannerIdx].iconName === id ? 'white' : 'var(--foreground)',
+                              }}
+                            >
+                              <Ico size={18} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Preview */}
+                      <div style={{ borderRadius:16, padding:'1.25rem', background: banners[editingBannerIdx].color, color:'white', position:'relative', overflow:'hidden' }}>
+                        <div style={{ position:'absolute', right:-8, bottom:-12, opacity:0.12, transform:'rotate(-12deg)' }}>
+                          {(() => { const Ico = BANNER_PRESET_ICONS.find(i => i.id === banners[editingBannerIdx].iconName)?.icon || Sparkles; return <Ico size={80} />; })()}
+                        </div>
+                        <span style={{ fontSize:'0.65rem', fontWeight:800, textTransform:'uppercase', background:'rgba(255,255,255,0.2)', padding:'3px 10px', borderRadius:100 }}>{banners[editingBannerIdx].type}</span>
+                        <h3 style={{ marginTop:10, marginBottom:6, fontWeight:700 }}>{banners[editingBannerIdx].title}</h3>
+                        <p style={{ fontSize:'0.82rem', opacity:0.9 }}>{banners[editingBannerIdx].description}</p>
+                      </div>
+                    </div>
+
+                    <div style={{ display:'flex', justifyContent:'space-between', marginTop:'1.5rem', paddingTop:'1.25rem', borderTop:'1px solid var(--border)' }}>
+                      <button
+                        onClick={() => removeBanner(editingBannerIdx)}
+                        style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', borderRadius:10, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', cursor:'pointer', fontWeight:700 }}
+                      >
+                        <Trash2 size={16} /> Remover
+                      </button>
+                      <button
+                        onClick={() => saveBanner(editingBannerIdx)}
+                        style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 22px', borderRadius:10, background:'var(--accent)', border:'none', color:'white', cursor:'pointer', fontWeight:700 }}
+                      >
+                        <Save size={16} /> Salvar Banner
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
           </motion.div>
         ) : activeTab === 'tenants' ? (
           <motion.div

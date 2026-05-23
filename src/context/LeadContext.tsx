@@ -94,7 +94,11 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
   // Busca dados do banco via API
   const fetchDatabase = useCallback(async () => {
     try {
-      const resp = await fetch('/api/leads');
+      const headers: Record<string, string> = {};
+      if (user?.id) headers['x-user-id'] = user.id;
+      if (user?.role) headers['x-user-role'] = user.role;
+
+      const resp = await fetch('/api/leads', { headers });
       if (resp.ok) {
         const { data } = await resp.json();
         setDbStatus(true);
@@ -104,7 +108,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.error('Falha ao buscar leads via API', e);
     }
-  }, []);
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     fetchDatabase();
@@ -170,6 +174,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
       color: colors[Math.floor(Math.random() * colors.length)],
       channels: ['whatsapp'],
       lastMsg: 'Agora mesmo',
+      assignedTo: leadData.assignedTo || null,
     };
     setLeads((prev) => [newLead, ...prev]);
     setPipelineStages((prev) =>

@@ -124,6 +124,8 @@ export default function Pipeline() {
   const [editForm, setEditForm] = useState<any>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [filterMine, setFilterMine] = useState(false);
+  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
   const { user } = useAuth();
 
   const toggleMenu = (stageId: string, e: React.MouseEvent) => {
@@ -137,6 +139,14 @@ export default function Pipeline() {
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (!supabase) return;
+      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').order('name');
+      if (data) setProfiles(data);
+    };
+    fetchProfiles();
+  }, []);
 
   useEffect(() => {
     setIsReady(true);
@@ -226,20 +236,53 @@ export default function Pipeline() {
 
   // Helper to map global leads to the pipeline payload
   const getLeadData = (leadId: string) => {
-    return leads.find(l => l.id === leadId);
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return undefined;
+
+    const isSeller = user?.role === 'SELLER';
+    if ((isSeller || filterMine) && lead.assignedTo !== user?.id) {
+      return undefined;
+    }
+    return lead;
   };
 
   return (
     <div>
       <header className={styles.headerRow}>
         <div className={styles.welcomeText}>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 700 }}>Funil de Vendas</h2>
+          <h2 style={{ fontSize: '1.8rem', fontWeight: 700 }}>
+            {user?.role === 'SELLER' ? 'Meu Funil' : 'Funil de Vendas'}
+          </h2>
           <p style={{ color: 'var(--foreground)', opacity: 0.5 }}>
-            {viewMode === 'kanban' ? 'Arraste os cartões ou use a barra abaixo para navegar.' : 'Configure suas etapas e analise as conversões.'}
+            {user?.role === 'SELLER' 
+              ? 'Arraste os cartões para atualizar o status de seus leads.'
+              : (viewMode === 'kanban' ? 'Arraste os cartões ou use a barra abaixo para navegar.' : 'Configure suas etapas e analise as conversões.')}
           </p>
         </div>
 
         <div className={styles.headerActions}>
+          {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+            <button
+              className="glass"
+              style={{ 
+                color: filterMine ? '#3b82f6' : 'var(--foreground)', 
+                borderColor: filterMine ? '#3b82f6' : 'var(--border)',
+                padding: '10px 20px', 
+                borderRadius: '12px', 
+                fontSize: '0.9rem', 
+                fontWeight: 600, 
+                display: 'flex', 
+                gap: '8px', 
+                alignItems: 'center', 
+                cursor: 'pointer',
+                backgroundColor: filterMine ? 'rgba(59, 130, 246, 0.1)' : 'transparent'
+              }}
+              onClick={() => setFilterMine(!filterMine)}
+            >
+              <User size={18} />
+              {filterMine ? 'Ver Todos os Leads' : 'Ver Apenas Meus'}
+            </button>
+          )}
 
           <button 
             className="glass" 
@@ -336,7 +379,9 @@ export default function Pipeline() {
                       <div className={styles.techLabelCard} style={{ borderLeftColor: stage.color }}>
                          <h4 style={{ color: stage.color }}>{stage.name}</h4>
                          <div className={styles.techStats}>
-                           <span className={styles.techLeadCount}>{stage.leads.length} Leads</span>
+                           <span className={styles.techLeadCount}>
+                             {stage.leads.filter(id => !!getLeadData(id)).length} Leads
+                           </span>
                            <span className={styles.techDivider}>/</span>
                            <span className={styles.techValue}>
                               R$ {totalValue > 0 ? totalValue.toLocaleString('pt-BR') : '0,00'}
@@ -363,7 +408,9 @@ export default function Pipeline() {
                     <div className={styles.stageTitle}>
                       <CircleDot size={16} style={{ color: stage.color }} />
                       <span>{stage.name}</span>
-                      <span className={styles.leadCount}>{stage.leads.length}</span>
+                      <span className={styles.leadCount}>
+                        {stage.leads.filter(id => !!getLeadData(id)).length}
+                      </span>
                     </div>
                     
                     <div style={{ position: 'relative' }}>
@@ -446,8 +493,14 @@ export default function Pipeline() {
                                       <span className={styles.companyName}>{lead.name}</span>
                                       <Grab size={14} className={styles.dragHandleIcon} />
                                     </div>
-                                    <div className={styles.contactInfo}>
+                                    <div className={styles.contactInfo} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <span style={{ fontSize: '0.8rem', color: 'var(--foreground)', opacity: 0.6 }}>{lead.cpfCnpj || lead.email}</span>
+                                      {lead.assignedTo && (
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', width: 'fit-content', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 500 }}>
+                                          <User size={10} />
+                                          {profiles.find(p => p.id === lead.assignedTo)?.name || 'Carregando...'}
+                                        </div>
+                                      )}
                                     </div>
                                     <div className={styles.leadValue}>{lead.value || 'R$ 0'}</div>
                                                                         <div className={styles.leadMeta}>
@@ -588,6 +641,42 @@ export default function Pipeline() {
                         <input className={styles.editInput} value={editForm?.value || ''} onChange={e => setEditForm({...editForm, value: e.target.value})} />
                       ) : (
                         <span className={styles.importantValue}>{selectedLead.value || 'R$ 0,00'}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={styles.infoCard}>
+                    <div className={styles.infoIcon}><User size={16} /></div>
+                    <div className={styles.infoContent}>
+                      <label>Responsável</label>
+                      {isEditing ? (
+                        (user?.role === 'ADMIN' || user?.role === 'MANAGER') ? (
+                          <select 
+                            className={styles.editInput} 
+                            value={editForm?.assignedTo || ''} 
+                            onChange={e => setEditForm({...editForm, assignedTo: e.target.value || null})}
+                            style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--foreground)', outline: 'none' }}
+                          >
+                            <option value="">Sem responsável</option>
+                            {profiles.map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span>
+                            {editForm?.assignedTo 
+                              ? (profiles.find(p => p.id === editForm.assignedTo)?.name || 'Carregando...') 
+                              : 'Sem responsável'}
+                          </span>
+                        )
+                      ) : (
+                        <span>
+                          {selectedLead.assignedTo 
+                            ? (profiles.find(p => p.id === selectedLead.assignedTo)?.name || 'Carregando...') 
+                            : 'Sem responsável'}
+                        </span>
                       )}
                     </div>
                   </div>

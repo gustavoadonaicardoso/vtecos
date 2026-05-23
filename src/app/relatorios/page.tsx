@@ -1,52 +1,89 @@
 "use client";
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-  Legend
-} from 'recharts';
-import { 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
-  Activity, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  Target,
-  Zap,
-  Briefcase
-} from 'lucide-react';
-import styles from './relatorios.module.css';
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell, Legend
+} from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  LayoutGrid, TrendingUp, TrendingDown, RefreshCw,
+  Calendar, MapPin, CreditCard, Activity,
+  TableProperties, BarChart2, Minus, ChevronLeft, ChevronRight
+} from "lucide-react";
+import styles from "./relatorios.module.css";
 
-import { supabase } from '@/lib/supabase';
-import { useLeads } from '@/context/LeadContext';
+// ─── CONSTANTS ─────────────────────────────────────────────────────────────
 
-const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#10b981'];
+const UNITS = ["Alphaville", "Barueri", "Cotia", "Granja Viana", "Itapevi", "Jandira", "Osasco", "Carapicuíba"];
+const DAYS  = Array.from({ length: 31 }, (_, i) => i + 1);
+const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const COLORS_CHART = ["#6366f1","#8b5cf6","#ec4899","#14b8a6","#f59e0b","#10b981","#3b82f6","#f97316"];
+
+// ─── MOCK DATA GENERATOR ────────────────────────────────────────────────────
+
+function rnd(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function buildSalesGrid() {
+  return UNITS.map((unit) => ({
+    unit,
+    days: DAYS.map(() => (Math.random() > 0.3 ? rnd(0, 12) : 0)),
+  }));
+}
+
+function buildUnfilGrid() {
+  return UNITS.map((unit) => ({
+    unit,
+    days: DAYS.map(() => (Math.random() > 0.55 ? rnd(0, 5) : 0)),
+  }));
+}
+
+function buildDiscounts() {
+  return UNITS.map((unit) => ({ unit, value: rnd(200, 3500) }));
+}
+
+function buildQuality() {
+  return UNITS.map((unit) => ({ unit, pct: rnd(62, 99) }));
+}
+
+function buildBalance(sales: ReturnType<typeof buildSalesGrid>, unfil: ReturnType<typeof buildUnfilGrid>) {
+  return UNITS.map((unit, i) => {
+    const s = sales[i].days.reduce((a, b) => a + b, 0);
+    const d = unfil[i].days.reduce((a, b) => a + b, 0);
+    return { unit, sales: s, unfil: d, saldo: s - d };
+  });
+}
+
+function buildQIA() {
+  return UNITS.map((unit) => ({ unit, value: rnd(30, 220) }));
+}
+
+function buildApp() {
+  return UNITS.map((unit) => ({ unit, sim: rnd(10, 90), nao: rnd(5, 40) }));
+}
+
+function buildPayment() {
+  return UNITS.map((unit) => ({
+    unit: unit.slice(0, 7),
+    credito: rnd(15, 80),
+    debito: rnd(10, 50),
+    boleto: rnd(5, 35),
+    energia: rnd(2, 20),
+  }));
+}
+
+// ─── TOOLTIP ────────────────────────────────────────────────────────────────
 
 const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
+  if (active && payload?.length) {
     return (
       <div className={styles.customTooltip}>
         <p className={styles.customTooltipLabel}>{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} className={styles.customTooltipItem} style={{ color: entry.color || '#fff' }}>
-            {entry.name === 'Receita' || entry.name === 'Receita Acumulada'
-              ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(entry.value)
-              : `${entry.name}: ${entry.value}`}
+        {payload.map((e: any, i: number) => (
+          <p key={i} className={styles.customTooltipItem} style={{ color: e.color || "#fff" }}>
+            {e.name}: {e.value}
           </p>
         ))}
       </div>
@@ -55,339 +92,497 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export default function ReportsPage() {
-  const [period, setPeriod] = useState('Mensal');
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalRevenue: 0,
-    newLeads: 0,
-    conversionRate: 0,
-    avgCycle: 0,
-    revenueHistory: [] as any[],
-    funnel: [] as any[],
-    sources: [] as any[]
-  });
-  const { refreshDatabase } = useLeads();
-  const [isRefreshing, setIsRefreshing] = useState(false);
+// ─── SECTION HEADER ─────────────────────────────────────────────────────────
 
-  const fetchData = React.useCallback(async () => {
-    if (!supabase) {
-      console.warn('Supabase client not initialized. Check your environment variables.');
-      setLoading(false);
-      return;
-    }
-    
-    // Only show the full loading screen on first load
-    // For refreshes, we might just show a small indicator or nothing
-    try {
-      const { data: leads, error } = await supabase.from('leads').select('*');
-      if (error) {
-        console.error('Supabase error fetching leads:', error.message, error.details, error.hint);
-        throw error;
-      }
+function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle?: React.ReactNode }) {
+  return (
+    <div className={styles.sectionHeader}>
+      <div className={styles.sectionIcon}>{icon}</div>
+      <div>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+        {subtitle && <p className={styles.sectionSubtitle}>{subtitle}</p>}
+      </div>
+      <div className={styles.sectionDivider} />
+    </div>
+  );
+}
 
-      const safeLeads = leads || [];
+// ─── DAILY GRID TABLE ────────────────────────────────────────────────────────
 
-      // 1. Process Revenue History (by Month)
-      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      const currentYear = new Date().getFullYear();
-      
-      const revMap = new Map();
-      let totalRevenue = 0;
-      let wonLeads = 0;
+function DailyTable({
+  title, rows, colorClass,
+}: {
+  title: string;
+  rows: { unit: string; days: number[] }[];
+  colorClass?: string;
+}) {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const totals = DAYS.map((_, di) => rows.reduce((s, r) => s + r.days[di], 0));
+  const grandTotal = totals.reduce((a, b) => a + b, 0);
 
-      safeLeads.forEach(l => {
-        if (!l.created_at) return;
-        const date = new Date(l.created_at);
-        if (isNaN(date.getTime())) return;
-        
-        if (date.getFullYear() === currentYear) {
-          const m = months[date.getMonth()];
-          const val = parseFloat(String(l.value || 0).replace(/[^0-9,-]+/g,"").replace(",",".") || "0") || 0;
-          if (l.stage_id === 'ganho') {
-            revMap.set(m, (revMap.get(m) || 0) + val);
-            totalRevenue += val;
-            wonLeads++;
-          }
-        }
-      });
-
-      const revenueHistory = months.map(m => ({ name: m, value: revMap.get(m) || 0 }));
-
-      // 2. Funnel Data
-      const stageMap: Record<string, number> = {};
-      safeLeads.forEach(l => {
-        if (l.stage_id) {
-          stageMap[l.stage_id] = (stageMap[l.stage_id] || 0) + 1;
-        }
-      });
-
-      const funnel = [
-        { name: 'Entrada', value: safeLeads.length },
-        { name: 'Qualificados', value: (stageMap['contato'] || 0) + (stageMap['proposta'] || 0) + (stageMap['negociacao'] || 0) + (stageMap['ganho'] || 0) },
-        { name: 'Em Negociação', value: (stageMap['negociacao'] || 0) + (stageMap['ganho'] || 0) },
-        { name: 'Fechados/Ganhos', value: stageMap['ganho'] || 0 },
-      ];
-
-      // 3. Source Data
-      const srcMap: Record<string, number> = {};
-      safeLeads.forEach(l => {
-        const s = l.source || 'Outros';
-        srcMap[s] = (srcMap[s] || 0) + 1;
-      });
-      const sources = Object.entries(srcMap).map(([name, value]) => ({ name, value }));
-
-      // 4. Summaries
-      const conversionRate = safeLeads.length ? (wonLeads / safeLeads.length) * 100 : 0;
-      
-      setStats({
-        totalRevenue,
-        newLeads: safeLeads.length,
-        conversionRate,
-        avgCycle: 12.5, // Placeholder for actual calculation
-        revenueHistory,
-        funnel,
-        sources
-      });
-    } catch (err: any) {
-      console.error('Error fetching stats detailed:', err?.message || err || 'Unknown Error');
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  const handleManualRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchData();
-  };
-
-  React.useEffect(() => {
-    setLoading(true);
-    fetchData();
-  }, [fetchData]);
-
-  // Auto-refresh 30s
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      fetchData();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { 
-        staggerChildren: 0.1 
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { 
-      y: 0, 
-      opacity: 1,
-      transition: { type: 'spring' as const, stiffness: 100 }
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const amount = direction === 'left' ? -350 : 350;
+      scrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
     }
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <div className={styles.titleWrapper}>
-          <h1 className={styles.title}>Relatórios Executivos</h1>
-          <p className={styles.subtitle}>Visão analítica e métricas de alta performance</p>
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+          <TableProperties size={14} color="#818cf8" />
+          <h3 className={styles.cardTitle}>{title}</h3>
         </div>
-        
-        <div className={styles.periodSelector}>
+        <div className={styles.tableNav}>
           <button 
-            className={`${styles.refreshBtn} ${isRefreshing ? styles.refreshBtnActive : ''}`}
-            onClick={handleManualRefresh}
-            disabled={isRefreshing}
-            title="Sincronizar dados agora"
+            onClick={() => scroll('left')} 
+            className={styles.navBtn}
+            title="Rolar para esquerda"
           >
-            <Activity className={isRefreshing ? styles.spin : ''} size={16} />
-            {isRefreshing ? 'Sincronizando...' : 'Sincronizar'}
+            <ChevronLeft size={16} />
           </button>
-
-          {['Semanal', 'Mensal', 'Trimestral', 'Anual'].map((p) => (
-            <button
-              key={p}
-              className={`${styles.periodBtn} ${period === p ? styles.periodBtnActive : ''}`}
-              onClick={() => setPeriod(p)}
-            >
-              {p}
-            </button>
-          ))}
+          <button 
+            onClick={() => scroll('right')} 
+            className={styles.navBtn}
+            title="Rolar para direita"
+          >
+            <ChevronRight size={16} />
+          </button>
         </div>
       </div>
+      <div className={styles.tableWrapper} ref={scrollRef}>
+        <table className={styles.dataTable}>
+          <thead>
+            <tr>
+              <th>Unidade</th>
+              {DAYS.map((d) => <th key={d}>{d}</th>)}
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const rowTotal = row.days.reduce((a, b) => a + b, 0);
+              return (
+                <tr key={row.unit}>
+                  <td>{row.unit}</td>
+                  {row.days.map((v, di) => (
+                    <td key={di}>
+                      {v === 0 ? (
+                        <span className={styles.cellEmpty}>–</span>
+                      ) : (
+                        <span className={v >= 8 ? styles.cellHighlight : v >= 4 ? styles.cellWarning : ""}>
+                          {v}
+                        </span>
+                      )}
+                    </td>
+                  ))}
+                  <td><strong>{rowTotal}</strong></td>
+                </tr>
+              );
+            })}
+            <tr className={styles.totalsRow}>
+              <td>Total</td>
+              {totals.map((t, i) => <td key={i}>{t || <span className={styles.cellEmpty}>–</span>}</td>)}
+              <td>{grandTotal}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
-      <AnimatePresence>
-        {loading && (
-          <motion.div 
-            className={styles.loadingOverlay}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+// ─── DISCOUNT TABLE ──────────────────────────────────────────────────────────
+
+function DiscountTable({ data }: { data: { unit: string; value: number }[] }) {
+  const total = data.reduce((a, b) => a + b.value, 0);
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <Minus size={14} color="#818cf8" />
+        <h3 className={styles.cardTitle}>Descontos nas Mensalidades</h3>
+      </div>
+      <div className={styles.tableWrapper}>
+        <table className={styles.smallTable}>
+          <thead><tr><th>Unidade</th><th>R$ Desconto</th></tr></thead>
+          <tbody>
+            {data.map((r) => (
+              <tr key={r.unit}>
+                <td>{r.unit}</td>
+                <td>
+                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(r.value)}
+                </td>
+              </tr>
+            ))}
+            <tr className={styles.totalsRow}>
+              <td>Total</td>
+              <td>{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── QUALITY TABLE ───────────────────────────────────────────────────────────
+
+function QualityTable({ data }: { data: { unit: string; pct: number }[] }) {
+  const avg = Math.round(data.reduce((a, b) => a + b.pct, 0) / data.length);
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <Activity size={14} color="#818cf8" />
+        <h3 className={styles.cardTitle}>Qualidade Cadastral</h3>
+      </div>
+      <div className={styles.tableWrapper}>
+        <table className={styles.smallTable}>
+          <thead><tr><th>Unidade</th><th>%</th></tr></thead>
+          <tbody>
+            {data.map((r) => (
+              <tr key={r.unit}>
+                <td>{r.unit}</td>
+                <td>
+                  <div className={styles.percentBar}>
+                    <div className={styles.percentTrack}>
+                      <div className={styles.percentFill} style={{ width: `${r.pct}%` }} />
+                    </div>
+                    <span className={styles.percentLabel}>{r.pct}%</span>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            <tr className={styles.totalsRow}>
+              <td>Média</td>
+              <td><span className={styles.percentLabel}>{avg}%</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── BALANCE TABLE ───────────────────────────────────────────────────────────
+
+function BalanceTable({ data }: { data: { unit: string; sales: number; unfil: number; saldo: number }[] }) {
+  const totS = data.reduce((a, b) => a + b.sales, 0);
+  const totU = data.reduce((a, b) => a + b.unfil, 0);
+  const totSaldo = totS - totU;
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <TrendingUp size={14} color="#818cf8" />
+        <h3 className={styles.cardTitle}>Saldo Final</h3>
+      </div>
+      <div className={styles.tableWrapper}>
+        <table className={styles.smallTable}>
+          <thead>
+            <tr>
+              <th>Unidade</th>
+              <th>Vendas</th>
+              <th>Desfiliação</th>
+              <th>Saldo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((r) => (
+              <tr key={r.unit}>
+                <td>{r.unit}</td>
+                <td><span className={styles.positive}>{r.sales}</span></td>
+                <td><span className={styles.negative}>{r.unfil}</span></td>
+                <td>
+                  <span className={r.saldo > 0 ? styles.positive : r.saldo < 0 ? styles.negative : styles.neutral}>
+                    {r.saldo > 0 ? "+" : ""}{r.saldo}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            <tr className={styles.totalsRow}>
+              <td>Total</td>
+              <td><span className={styles.positive}>{totS}</span></td>
+              <td><span className={styles.negative}>{totU}</span></td>
+              <td>
+                <span className={totSaldo >= 0 ? styles.positive : styles.negative}>
+                  {totSaldo > 0 ? "+" : ""}{totSaldo}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN PAGE ───────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const now = new Date();
+  const [filterDay,  setFilterDay]  = useState("Todos");
+  const [filterUnit, setFilterUnit] = useState("Todas");
+  const [filterPay,  setFilterPay]  = useState("Todas");
+  const [filterMonth,setFilterMonth]= useState(String(now.getMonth() + 1));
+  const [filterYear, setFilterYear] = useState(String(now.getFullYear()));
+  const [lastUpdate, setLastUpdate] = useState("");
+  const [currentTime, setCurrentTime] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  // data state
+  const [salesGrid,   setSalesGrid]   = useState(() => buildSalesGrid());
+  const [unfilGrid,   setUnfilGrid]   = useState(() => buildUnfilGrid());
+  const [discounts,   setDiscounts]   = useState(() => buildDiscounts());
+  const [quality,     setQuality]     = useState(() => buildQuality());
+  const [qiaData,     setQiaData]     = useState(() => buildQIA());
+  const [appData,     setAppData]     = useState(() => buildApp());
+  const [paymentData, setPaymentData] = useState(() => buildPayment());
+
+  const balance = buildBalance(salesGrid, unfilGrid);
+
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setSalesGrid(buildSalesGrid());
+      setUnfilGrid(buildUnfilGrid());
+      setDiscounts(buildDiscounts());
+      setQuality(buildQuality());
+      setQiaData(buildQIA());
+      setAppData(buildApp());
+      setPaymentData(buildPayment());
+      setLastUpdate(new Date().toLocaleTimeString("pt-BR"));
+      setRefreshing(false);
+    }, 700);
+  }, []);
+
+  // auto-refresh every 60s
+  useEffect(() => {
+    const id = setInterval(refresh, 60000);
+    return () => clearInterval(id);
+  }, [refresh]);
+
+  // Initialize time on client mount
+  useEffect(() => {
+    setLastUpdate(new Date().toLocaleTimeString("pt-BR"));
+    setCurrentTime(new Date().toLocaleTimeString("pt-BR"));
+    
+    const id = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString("pt-BR"));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className={styles.pageWrapper}>
+
+      {/* ── FILTER BAR ── */}
+      <motion.div 
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className={styles.filterBar}
+      >
+        <div className={styles.filterBarLeft}>
+
+          {/* Day */}
+          <div className={styles.filterGroup}>
+            <Calendar size={13} color="#6366f1" />
+            <span className={styles.filterLabel}>Dia</span>
+            <select className={styles.filterSelect} value={filterDay} onChange={e => setFilterDay(e.target.value)}>
+              <option value="Todos">Todos</option>
+              {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+
+          {/* Month */}
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Mês</span>
+            <select className={styles.filterSelect} value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
+              {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+            </select>
+          </div>
+
+          {/* Year */}
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Ano</span>
+            <select className={styles.filterSelect} value={filterYear} onChange={e => setFilterYear(e.target.value)}>
+              {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          <div className={styles.filterDivider} />
+
+          {/* Unit */}
+          <div className={styles.filterGroup}>
+            <MapPin size={13} color="#6366f1" />
+            <span className={styles.filterLabel}>Unidade</span>
+            <select className={styles.filterSelect} value={filterUnit} onChange={e => setFilterUnit(e.target.value)}>
+              <option value="Todas">Todas</option>
+              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+
+          <div className={styles.filterDivider} />
+
+          {/* Payment */}
+          <div className={styles.filterGroup}>
+            <CreditCard size={13} color="#6366f1" />
+            <span className={styles.filterLabel}>Pagamento</span>
+            <select className={styles.filterSelect} value={filterPay} onChange={e => setFilterPay(e.target.value)}>
+              <option value="Todas">Todas</option>
+              <option>Cartão de Crédito</option>
+              <option>Cartão de Débito</option>
+              <option>Boleto/Carnê</option>
+              <option>Concessionária de Energia</option>
+            </select>
+          </div>
+
+          <div className={styles.filterDivider} />
+
+          {/* Refresh */}
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            style={{
+              display: "flex", alignItems: "center", gap: "0.4rem",
+              background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.25)",
+              borderRadius: "8px", color: "#818cf8", fontSize: "0.78rem", fontWeight: 600,
+              padding: "0.4rem 0.85rem", cursor: "pointer", transition: "all 0.2s", fontFamily: "inherit",
+            }}
           >
-            <Zap className={styles.spin} size={48} />
-            <p>Sincronizando com Banco de Dados...</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <RefreshCw size={13} className={refreshing ? styles.spin : ""} />
+            {refreshing ? "Atualizando…" : "Atualizar"}
+          </button>
+        </div>
 
-      <motion.div 
-        className={styles.kpiGrid}
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <motion.div className={styles.kpiCard} variants={itemVariants}>
-          <div className={styles.kpiHeader}>
-            <p className={styles.kpiTitle}>Receita Total</p>
-            <div className={styles.kpiIcon}><DollarSign size={20} /></div>
-          </div>
-          <div>
-            <h3 className={styles.kpiValue}>
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalRevenue)}
-            </h3>
-            <div className={`${styles.kpiTrend} ${styles.trendPositive}`}>
-              <ArrowUpRight size={14} /> Dados reais da base
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div className={styles.kpiCard} variants={itemVariants}>
-          <div className={styles.kpiHeader}>
-            <p className={styles.kpiTitle}>Leads Totais</p>
-            <div className={styles.kpiIcon}><Users size={20} /></div>
-          </div>
-          <div>
-            <h3 className={styles.kpiValue}>{stats.newLeads}</h3>
-            <div className={`${styles.kpiTrend} ${styles.trendPositive}`}>
-              <ArrowUpRight size={14} /> Captados no período
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div className={styles.kpiCard} variants={itemVariants}>
-          <div className={styles.kpiHeader}>
-            <p className={styles.kpiTitle}>Taxa de Conversão</p>
-            <div className={styles.kpiIcon}><Target size={20} /></div>
-          </div>
-          <div>
-            <h3 className={styles.kpiValue}>{stats.conversionRate.toFixed(1)}%</h3>
-            <div className={`${styles.kpiTrend} ${styles.trendPositive}`}>
-              <ArrowUpRight size={14} /> Leads que viraram Ganhos
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div className={styles.kpiCard} variants={itemVariants}>
-          <div className={styles.kpiHeader}>
-            <p className={styles.kpiTitle}>Vendas Confirmadas</p>
-            <div className={styles.kpiIcon}><Briefcase size={20} /></div>
-          </div>
-          <div>
-            <h3 className={styles.kpiValue}>{stats.funnel.find(f => f.name === 'Fechados/Ganhos')?.value || 0}</h3>
-            <div className={`${styles.kpiTrend} ${styles.trendPositive}`}>
-              <ArrowUpRight size={14} /> Negócios fechados
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-
-      <motion.div 
-        className={styles.chartsGrid}
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.4, duration: 0.5 }}
-      >
-        <div className={styles.chartCard} style={{ gridColumn: '1 / -1' }}>
-          <div className={styles.chartHeader}>
-            <h2 className={styles.chartTitle}>Evolução de Receita</h2>
-            <p className={styles.chartSubtitle}>Crescimento financeiro real do ano de {new Date().getFullYear()}</p>
-          </div>
-          <div className={styles.chartBody}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.revenueHistory} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="name" stroke="#64748b" tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis stroke="#64748b" tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => `R$${value/1000}k`} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="value" name="Receita" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Live indicator */}
+        <div className={styles.liveIndicator}>
+          <div className={styles.liveDot} />
+          <span suppressHydrationWarning>Tempo Real · {currentTime || "--:--:--"}</span>
         </div>
       </motion.div>
 
+      {/* ── CONTENT ── */}
       <motion.div 
-        className={styles.secondaryChartsGrid}
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.5 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className={styles.content}
       >
-        <div className={styles.chartCard}>
-          <div className={styles.chartHeader}>
-            <h2 className={styles.chartTitle}>Funil de Vendas (Real)</h2>
-            <p className={styles.chartSubtitle}>Volume de leads por progressão de etapa</p>
-          </div>
-          <div className={styles.chartBody}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.funnel} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={true} vertical={false} />
-                <XAxis type="number" stroke="#64748b" tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis dataKey="name" type="category" stroke="#64748b" tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} width={100} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]}>
-                  {stats.funnel.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
 
-        <div className={styles.chartCard}>
-          <div className={styles.chartHeader}>
-            <h2 className={styles.chartTitle}>Origem de Aquisição</h2>
-            <p className={styles.chartSubtitle}>Distribuição real por canal de origem</p>
+        {/* ═══════════ SEÇÃO 1 — TABELAS ═══════════ */}
+        <motion.section
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <SectionHeader
+            icon={<TableProperties size={15} />}
+            title="Indicadores por Unidade"
+            subtitle={
+              <span suppressHydrationWarning>
+                {`${MONTHS[Number(filterMonth) - 1]} ${filterYear} · atualizado às ${lastUpdate || "--:--:--"}`}
+              </span>
+            }
+          />
+
+          {/* Tabela 1 — Vendas Diárias */}
+          <div style={{ marginBottom: "1.5rem" }}>
+            <DailyTable title="Quantidade de Vendas Diárias" rows={salesGrid} />
           </div>
-          <div className={styles.chartBody}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats.sources.length > 0 ? stats.sources : [{ name: 'Sem Dados', value: 1 }]}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {stats.sources.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+
+          {/* Tabela 2 — Desfiliação */}
+          <div style={{ marginBottom: "1.5rem" }}>
+            <DailyTable title="Desfiliação" rows={unfilGrid} />
           </div>
-        </div>
+
+          {/* Tabelas 3, 4, 5 — Row trio */}
+          <div className={styles.tripleTableRow}>
+            <DiscountTable data={discounts} />
+            <QualityTable  data={quality} />
+            <BalanceTable  data={balance} />
+          </div>
+        </motion.section>
+
+        {/* ═══════════ SEÇÃO 2 — GRÁFICOS ═══════════ */}
+        <motion.section
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
+          <SectionHeader
+            icon={<BarChart2 size={15} />}
+            title="Análise Gráfica"
+            subtitle="Comparativos por unidade e forma de pagamento"
+          />
+
+          <div className={styles.chartsRow}>
+            {/* Charts components stay as they are, but their container is animated */}
+            {/* Gráfico 1 — QIA Mês (barras horizontais) */}
+            <div className={styles.chartCard}>
+              <div className={styles.chartCardHeader}>
+                <LayoutGrid size={14} color="#818cf8" />
+                <h3 className={styles.chartTitle}>QIA Mês</h3>
+              </div>
+              <div className={styles.chartBody}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={qiaData} layout="vertical" margin={{ top: 4, right: 20, left: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
+                    <XAxis type="number" stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="unit" type="category" stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" name="QIA" radius={[0, 4, 4, 0]}>
+                      {qiaData.map((_, i) => <Cell key={i} fill={COLORS_CHART[i % COLORS_CHART.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Gráfico 2 — App Baixado */}
+            <div className={styles.chartCard}>
+              <div className={styles.chartCardHeader}>
+                <TrendingUp size={14} color="#818cf8" />
+                <h3 className={styles.chartTitle}>App Baixado</h3>
+              </div>
+              <div className={styles.chartBody}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={appData} margin={{ top: 4, right: 8, left: -16, bottom: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="unit" stroke="#475569" tick={{ fill: "#64748b", fontSize: 10, angle: -30, textAnchor: "end" }} axisLine={false} tickLine={false} />
+                    <YAxis stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+                    <Bar dataKey="sim" name="Sim" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="nao" name="Não" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Gráfico 3 — Forma de Pagamento */}
+            <div className={styles.chartCard}>
+              <div className={styles.chartCardHeader}>
+                <CreditCard size={14} color="#818cf8" />
+                <h3 className={styles.chartTitle}>Forma de Pagamento</h3>
+              </div>
+              <div className={styles.chartBody}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={paymentData} margin={{ top: 4, right: 8, left: -16, bottom: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="unit" stroke="#475569" tick={{ fill: "#64748b", fontSize: 10, angle: -30, textAnchor: "end" }} axisLine={false} tickLine={false} />
+                    <YAxis stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />
+                    <Bar dataKey="credito" name="Crédito"  fill="#6366f1" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="debito"  name="Débito"   fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="boleto"  name="Boleto"   fill="#14b8a6" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="energia" name="Energia"  fill="#f59e0b" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </motion.section>
       </motion.div>
     </div>
   );

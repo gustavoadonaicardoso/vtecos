@@ -1,23 +1,46 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLeads } from '@/context/LeadContext';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
 import styles from './NewLeadModal.module.css';
 import { X, Plus, Terminal } from 'lucide-react';
 
 const NewLeadModal = () => {
   const { isModalOpen, closeModal, addLead, pipelineStages } = useLeads();
+  const { user } = useAuth();
+  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
     cpfCnpj: '',
     email: '',
     phone: '',
-    pipelineStage: pipelineStages[0]?.id || 'new'
+    pipelineStage: pipelineStages[0]?.id || 'new',
+    assignedTo: ''
   });
 
   const [currentTag, setCurrentTag] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (user?.role === 'SELLER') {
+      setFormData(prev => ({ ...prev, assignedTo: user.id }));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (!supabase) return;
+      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').order('name');
+      if (data) setProfiles(data);
+    };
+
+    if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
+      fetchProfiles();
+    }
+  }, [user]);
 
   if (!isModalOpen) return null;
 
@@ -56,7 +79,8 @@ const NewLeadModal = () => {
       email: formData.email,
       phone: formData.phone,
       pipelineStage: formData.pipelineStage,
-      tags: tags
+      tags: tags,
+      assignedTo: formData.assignedTo || null
     });
 
     // Reset Form
@@ -65,7 +89,8 @@ const NewLeadModal = () => {
       cpfCnpj: '',
       email: '',
       phone: '',
-      pipelineStage: pipelineStages[0]?.id || 'new'
+      pipelineStage: pipelineStages[0]?.id || 'new',
+      assignedTo: user?.role === 'SELLER' ? user?.id : ''
     });
     setTags([]);
     closeModal();
@@ -179,6 +204,25 @@ const NewLeadModal = () => {
               ))}
             </select>
           </div>
+
+          {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+            <div className={styles.formGroup}>
+              <label>Responsável pelo Lead</label>
+              <select 
+                name="assignedTo"
+                className={styles.select}
+                value={formData.assignedTo}
+                onChange={handleInputChange}
+              >
+                <option value="">Sem responsável</option>
+                {profiles.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className={styles.footer}>
             <button type="button" className={styles.cancelBtn} onClick={closeModal}>Cancelar</button>

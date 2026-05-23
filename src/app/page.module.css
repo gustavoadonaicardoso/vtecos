@@ -984,6 +984,21 @@
   border-radius: 50%;
 }
 
+.sourcePercent {
+  font-size: 0.85rem;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.noData {
+  font-size: 0.85rem;
+  opacity: 0.4;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+
+
 .registrationForm {
   display: flex;
   flex-direction: column;

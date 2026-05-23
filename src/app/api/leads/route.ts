@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { fetchLeadsAndStages, createLead } from '@/services/leads.service';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const data = await fetchLeadsAndStages();
+    const userId = request.headers.get('x-user-id') || undefined;
+    const role = request.headers.get('x-user-role') || undefined;
+
+    const data = await fetchLeadsAndStages({ userId, role });
     if (!data) return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
     return NextResponse.json({ data }, { status: 200 });
   } catch (error: any) {

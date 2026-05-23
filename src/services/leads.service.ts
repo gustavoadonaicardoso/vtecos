@@ -8,8 +8,13 @@
  * ============================================================
  */
 
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { Lead, PipelineStage, ServiceResult } from '@/types';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ─── Mapeamento de dados do banco → tipo Lead ─────────────────
 
@@ -31,6 +36,7 @@ function mapDbRowToLead(row: any): Lead {
     source: row.source || 'Site',
     waitTime: row.wait_time_minutes || 0,
     handlingTime: row.handling_time_minutes || 0,
+    assignedTo: row.assigned_to || null,
   };
 }
 
@@ -43,6 +49,7 @@ function mapLeadUpdateToDb(updates: Partial<Lead>): Record<string, any> {
   if (updates.phone !== undefined) db.phone = updates.phone;
   if (updates.cpfCnpj !== undefined) db.cpf_cnpj = updates.cpfCnpj;
   if (updates.pipelineStage !== undefined) db.stage_id = updates.pipelineStage;
+  if (updates.assignedTo !== undefined) db.assigned_to = updates.assignedTo;
   if (updates.value !== undefined) {
     const raw = String(updates.value || '0');
     db.value = parseFloat(raw.replace(/[^0-9,-]+/g, '').replace(',', '.') || '0');
@@ -56,14 +63,23 @@ function mapLeadUpdateToDb(updates: Partial<Lead>): Record<string, any> {
  * Busca todos os leads e stages do banco.
  * Retorna dados mapeados para o formato da aplicação.
  */
-export async function fetchLeadsAndStages(): Promise<{
+export async function fetchLeadsAndStages(filters?: {
+  userId?: string;
+  role?: string;
+}): Promise<{
   leads: Lead[];
   stages: PipelineStage[];
 } | null> {
   try {
+    let leadsQuery = supabase.from('leads').select('*').order('created_at', { ascending: false });
+
+    if (filters?.role === 'SELLER' && filters?.userId) {
+      leadsQuery = leadsQuery.eq('assigned_to', filters.userId);
+    }
+
     const [stagesRes, leadsRes] = await Promise.all([
       supabase.from('pipeline_stages').select('*').order('position'),
-      supabase.from('leads').select('*').order('created_at', { ascending: false }),
+      leadsQuery,
     ]);
 
     if (stagesRes.error || leadsRes.error) return null;
@@ -104,6 +120,7 @@ export async function createLead(
         cpf_cnpj: leadData.cpfCnpj,
         value: numericValue,
         stage_id: leadData.pipelineStage,
+        assigned_to: leadData.assignedTo || null,
       }])
       .select()
       .single();
@@ -120,6 +137,7 @@ export async function createLead(
       color: '#10b981',
       channels: ['whatsapp'],
       lastMsg: 'Agora mesmo',
+      assignedTo: data.assigned_to || null,
     };
 
     return { success: true, data: newLead };

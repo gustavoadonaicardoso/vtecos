@@ -54,7 +54,17 @@ export default function LeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
   const { user } = useAuth();
+
+  React.useEffect(() => {
+    const fetchProfiles = async () => {
+      if (!supabase) return;
+      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').order('name');
+      if (data) setProfiles(data);
+    };
+    fetchProfiles();
+  }, []);
 
   const filteredLeads = leads.filter(lead => {
     const matchesSearch = 
@@ -108,8 +118,12 @@ export default function LeadsPage() {
     <div className={styles.container}>
       <header className={styles.header}>
         <div>
-          <h1>Gestão de Leads</h1>
-          <p>Visualize e gerencie todos os contatos da sua base em um só lugar.</p>
+          <h1>{user?.role === 'SELLER' ? 'Meus Leads' : 'Gestão de Leads'}</h1>
+          <p>
+            {user?.role === 'SELLER' 
+              ? 'Visualize e gerencie seus contatos e leads atribuídos.' 
+              : 'Visualize e gerencie todos os contatos da sua base em um só lugar.'}
+          </p>
         </div>
         <div className={styles.headerActions}>
 
@@ -322,6 +336,24 @@ export default function LeadsPage() {
                         onChange={(e) => setEditForm({...editForm, value: parseFloat(e.target.value)})}
                       />
                     </div>
+                    {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+                      <div className={styles.editInputGroup}>
+                        <label>Responsável</label>
+                        <select 
+                          className={styles.editInput}
+                          value={editForm?.assignedTo || ''}
+                          onChange={(e) => setEditForm({...editForm, assignedTo: e.target.value || null})}
+                          style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px', color: 'var(--text-primary)' }}
+                        >
+                          <option value="">Sem responsável</option>
+                          {profiles.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -340,6 +372,14 @@ export default function LeadsPage() {
                     <div className={styles.infoItem}>
                       <label>Valor</label>
                       <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedLead.value || 0)}</span>
+                    </div>
+                    <div className={styles.infoItem}>
+                      <label>Responsável</label>
+                      <span>
+                        {selectedLead.assignedTo 
+                          ? (profiles.find(p => p.id === selectedLead.assignedTo)?.name || 'Carregando...') 
+                          : 'Sem responsável'}
+                      </span>
                     </div>
                   </>
                 )}

@@ -22,7 +22,8 @@ import {
   Ticket,
   MessageCircle,
   FileText,
-  Megaphone
+  Megaphone,
+  Phone
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import { useSidebar } from '@/components/SidebarProvider';
@@ -59,6 +60,7 @@ const Sidebar = () => {
     { name: 'Senhas', icon: Ticket, path: '/queue', permission: 'integrations.view' },
     { name: 'Notas Fiscais', icon: FileText, path: '/fiscal', permission: 'integrations.view' },
     { name: 'Disparos', icon: Megaphone, path: '/disparos', permission: 'messages.send' },
+    { name: 'Discador', icon: Phone, path: '/discador', permission: 'leads.view' },
     
     { name: 'Equipe', icon: UserCog, path: '/users', permission: 'team.view' },
     { name: 'Automações', icon: Zap, path: '/automations', permission: 'automations.view' },

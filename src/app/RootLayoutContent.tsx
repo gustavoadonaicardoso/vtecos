@@ -10,6 +10,8 @@ import NewLeadModal from "@/components/NewLeadModal";
 import { LeadProvider, useLeads } from "@/context/LeadContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SidebarProvider } from "@/components/SidebarProvider";
+import { TwilioProvider, useTwilio } from "@/context/TwilioContext";
+import Dialer from "@/components/Dialer";
 // FIX #7: hook centralizado de permissões — sem duplicação
 import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
 
@@ -18,6 +20,7 @@ function AppGuard({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const { isModalOpen } = useLeads();
+  const { isDialerOpen, closeDialer } = useTwilio();
   // FIX #7: usa hook centralizado
   const { hasPermission } = usePermissions();
 
@@ -95,6 +98,7 @@ function AppGuard({ children }: { children: React.ReactNode }) {
           <HelpFAB />
           {/* FIX #6: modal só montado quando está aberto */}
           {isModalOpen && <NewLeadModal />}
+          {isDialerOpen && <Dialer onClose={closeDialer} />}
         </div>
       )}
     </>
@@ -106,11 +110,13 @@ export default function RootLayoutContent({ children }: { children: React.ReactN
     <AuthProvider>
       <ThemeProvider>
         <SidebarProvider>
-          <LeadProvider>
-            <AppGuard>
-              {children}
-            </AppGuard>
-          </LeadProvider>
+          <TwilioProvider>
+            <LeadProvider>
+              <AppGuard>
+                {children}
+              </AppGuard>
+            </LeadProvider>
+          </TwilioProvider>
         </SidebarProvider>
       </ThemeProvider>
     </AuthProvider>

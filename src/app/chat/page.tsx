@@ -289,16 +289,21 @@ function ChatContent() {
     if (!inputText.trim() || !selectedProfileId || !user || !supabase) return;
 
     const textToSubmit = inputText;
-
     const isGroup = selectedProfile?.isGroup;
-    const table = isGroup ? 'chat_group_messages' : 'internal_chat';
+    const msgType = isGroup ? 'group' : 'direct';
 
+    // Edição de mensagem
     if (editingMsgId) {
-      const { error } = await supabase.from(table).update({ text: textToSubmit, is_edited: true }).eq('id', editingMsgId);
-      if (!error) {
+      const res = await fetch('/api/chat/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: msgType, id: editingMsgId, text: textToSubmit }),
+      });
+      if (res.ok) {
         setMessages(prev => prev.map(m => m.id === editingMsgId ? { ...m, text: textToSubmit, is_edited: true } : m));
       } else {
-        alert('Erro ao editar mensagem: ' + error.message);
+        const r = await res.json();
+        alert('Erro ao editar mensagem: ' + r.error);
       }
       setEditingMsgId(null);
       setInputText('');
@@ -311,34 +316,44 @@ function ChatContent() {
       ? { sender_id: user.id, group_id: selectedProfileId, text: textToSubmit }
       : { sender_id: user.id, receiver_id: selectedProfileId, text: textToSubmit };
 
-    const { error } = await supabase.from(table).insert([payload]);
+    const res = await fetch('/api/chat/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: msgType, payload }),
+    });
 
-    if (error) {
-      console.error('Error sending message:', JSON.stringify(error, null, 2));
+    if (!res.ok) {
+      const r = await res.json();
+      console.error('Error sending message:', r.error);
       alert('Erro ao enviar mensagem.');
-    } else {
-      if (supabase && !isGroup) {
-        await supabase.from('system_notifications').insert([{
-          user_id: selectedProfileId,
-          type: 'chat',
-          title: 'Nova mensagem interna',
-          content: `${user.name} enviou uma mensagem no chat interno.`,
-          link: `/chat?userId=${user.id}`
-        }]);
-      }
+    } else if (!isGroup && supabase) {
+      // Notificação para mensagens diretas
+      await supabase.from('system_notifications').insert([{
+        user_id: selectedProfileId,
+        type: 'chat',
+        title: 'Nova mensagem interna',
+        content: `${user.name} enviou uma mensagem no chat interno.`,
+        link: `/chat?userId=${user.id}`
+      }]);
     }
   };
 
   const handleDeleteMessage = async () => {
     if (!deletingMsgId || !user || !supabase) return;
     const isGroup = selectedProfile?.isGroup;
-    const table = isGroup ? 'chat_group_messages' : 'internal_chat';
+    const msgType = isGroup ? 'group' : 'direct';
 
-    const { error } = await supabase.from(table).delete().eq('id', deletingMsgId);
-    if (!error) {
+    const res = await fetch('/api/chat/messages', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: msgType, id: deletingMsgId }),
+    });
+
+    if (res.ok) {
       setMessages(prev => prev.filter(m => m.id !== deletingMsgId));
     } else {
-      alert('Erro ao excluir mensagem: ' + error.message);
+      const r = await res.json();
+      alert('Erro ao excluir mensagem: ' + r.error);
     }
     setDeletingMsgId(null);
   };
@@ -464,29 +479,28 @@ function ChatContent() {
   const handleCreateGroup = async () => {
     if (!newGroupName.trim() || newGroupMembers.size === 0 || !user || !supabase) return;
 
-    const { data: groupData, error: groupError } = await supabase
-      .from('chat_groups')
-      .insert([{ name: newGroupName, created_by: user.id }])
-      .select()
-      .single();
+    const response = await fetch('/api/chat/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newGroupName.trim(),
+        created_by: user.id,
+        members: Array.from(newGroupMembers),
+      }),
+    });
 
-    if (groupError || !groupData) {
-      const errStr = JSON.stringify(groupError, null, 2);
-      console.error('Erro detalhado ao criar grupo:', errStr !== '{}' ? errStr : groupError);
-      alert('Erro ao criar grupo. ' + (groupError?.message || errStr));
+    const result = await response.json();
+
+    if (!response.ok || !result.group) {
+      console.error('Erro ao criar grupo:', result.error);
+      alert('Erro ao criar grupo: ' + (result.error || 'Tente novamente.'));
       return;
     }
 
-    const membersToInsert = Array.from(newGroupMembers).map(memberId => ({
-      group_id: groupData.id,
-      user_id: memberId
-    }));
-    membersToInsert.push({ group_id: groupData.id, user_id: user.id });
+    const groupData = result.group;
 
-    const { error: membersError } = await supabase.from('chat_group_members').insert(membersToInsert);
-    if (membersError) {
-      console.error('Erro ao adicionar membros:', membersError);
-      alert('Grupo criado, mas falhou ao adicionar membros: ' + membersError.message);
+    if (result.warning) {
+      console.warn('Grupo criado, mas houve problema nos membros:', result.warning);
     }
 
     setProfiles(prev => [...prev, {
@@ -505,6 +519,7 @@ function ChatContent() {
     setSelectedProfileId(groupData.id);
   };
 
+
   const fetchGroupInfo = async () => {
     if (!selectedProfileId || !supabase) return;
     const { data } = await supabase
@@ -514,7 +529,7 @@ function ChatContent() {
     if (data) {
       setGroupMembers(data.map(d => ({
         id: d.user_id,
-        name: (Array.isArray(d.profiles) ? d.profiles[0]?.name : d.profiles?.name) || 'Desconhecido',
+        name: (d.profiles as any)?.[0]?.name || 'Desconhecido',
         isAdmin: d.is_admin || d.user_id === selectedProfile?.createdBy
       })));
     }
