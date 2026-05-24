@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   display: flex;
   flex: 1;
   background: var(--background);
@@ -8,7 +8,7 @@
 
 .sidebar {
   width: 320px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.02);
@@ -18,7 +18,7 @@
 .sidebarHeader {
   height: var(--header-height);
   padding: 0 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -42,7 +42,7 @@
   background: rgba(0, 0, 0, 0.05);
   padding: 8px 12px;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   transition: all 0.2s ease;
   flex: 1;
 }
@@ -145,12 +145,12 @@
 .chatHeader {
   height: var(--header-height);
   padding: 0 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: rgba(255, 255, 255, 0.01);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
 }
 
 .systemTools {
@@ -235,7 +235,7 @@
 
 .received {
   background: var(--card-bg, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-bottom-left-radius: 4px;
 }
 
@@ -259,7 +259,7 @@
 }
 
 .dateDivider span {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
   font-size: 0.75rem;
   padding: 4px 12px;
@@ -272,7 +272,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--glass-bg-strong);
   border-radius: 8px;
   margin-top: 4px;
   text-decoration: none;
@@ -295,7 +295,7 @@
 
 .inputArea {
   padding: 20px 24px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   background: rgba(255, 255, 255, 0.02);
   position: relative;
 }
@@ -307,7 +307,7 @@
   background: rgba(0, 0, 0, 0.05);
   padding: 8px 12px;
   border-radius: 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 .inputContainer textarea {
@@ -454,8 +454,8 @@
 
 .modalContent {
   background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   padding: 32px;
   max-width: 400px;
   width: 100%;
@@ -503,7 +503,7 @@
   flex: 1;
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -563,7 +563,7 @@
 .infoSidebar {
   width: 350px;
   background: var(--background);
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -589,7 +589,7 @@
   top: 0;
   z-index: 2;
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .infoSection {

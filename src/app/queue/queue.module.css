@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   padding: 2.5rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -14,9 +14,11 @@
   align-items: center;
   margin-bottom: 2.5rem;
   height: var(--header-height);
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 0 24px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   margin: -2.5rem -2.5rem 2.5rem -2.5rem;
   backdrop-filter: blur(12px);
   position: sticky;
@@ -36,7 +38,7 @@
   gap: 1.5rem;
   margin-right: 0.5rem;
   padding-right: 1.5rem;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--glass-border);
 }
 
 .systemIcon {
@@ -91,11 +93,13 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 .linkBtn {
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--foreground);
 }
 
@@ -134,10 +138,12 @@
   display: flex;
   align-items: center;
   gap: 15px;
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 10px 20px;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 .deskSelector label {
@@ -148,8 +154,8 @@
 }
 
 .deskSelector select {
-  background: rgba(128, 128, 128, 0.1);
-  border: 1px solid var(--border);
+  background: var(--glass-bg-hover);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 8px 15px;
   border-radius: 8px;
@@ -172,9 +178,11 @@
 }
 
 .currentSection, .manualSection, .queueSection {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 24px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius-lg);
   padding: 30px;
   display: flex;
   flex-direction: column;
@@ -195,7 +203,7 @@
 
 .ticketCardLarge {
   background: linear-gradient(135deg, var(--accent), #1d4ed8);
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   padding: 40px;
   text-align: center;
   color: white;
@@ -287,7 +295,7 @@
 .emptyState {
   background: rgba(128, 128, 128, 0.05);
   border: 2px dashed var(--border);
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   padding: 60px 40px;
   text-align: center;
   display: flex;
@@ -310,7 +318,7 @@
 
 .manualForm input {
   background: rgba(128, 128, 128, 0.05);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 14px 18px;
   color: var(--foreground);
@@ -352,7 +360,7 @@
 }
 
 .ticketList::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--glass-border);
   border-radius: 10px;
 }
 
@@ -361,8 +369,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
   transition: all 0.2s;
 }

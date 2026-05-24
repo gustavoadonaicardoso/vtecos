@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 120px);
@@ -29,7 +29,7 @@
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   font-weight: 800;
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -44,8 +44,10 @@
 }
 
 .moduleCard {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: 28px;
   padding: 2rem;
   cursor: pointer;
@@ -57,7 +59,7 @@
 
 .moduleCard:hover {
   transform: translateY(-8px);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--glass-border-hover);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
 }
 
@@ -101,8 +103,8 @@
 /* System Status */
 .systemStatus {
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
-  border-radius: 24px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius-lg);
   padding: 2rem;
   margin-top: auto;
 }
@@ -203,7 +205,7 @@
 
   .moduleCard {
     padding: 1.5rem;
-    border-radius: 20px;
+    border-radius: var(--glass-radius);
     gap: 1rem;
   }
 
@@ -223,7 +225,7 @@
 
   .systemStatus {
     padding: 1.5rem;
-    border-radius: 20px;
+    border-radius: var(--glass-radius);
   }
 
   .statusHeader {

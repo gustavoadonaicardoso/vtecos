@@ -1,4 +1,4 @@
-.section {
+﻿.section {
   margin-bottom: 2.5rem;
 }
 
@@ -39,8 +39,10 @@
 .card {
   padding: 1.4rem;
   border-radius: 18px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   transition: var(--transition);
   cursor: default;
   position: relative;
@@ -97,7 +99,7 @@
 }
 
 .trendNeutral {
-  background: rgba(128, 128, 128, 0.1);
+  background: var(--glass-bg-hover);
   color: var(--foreground);
   opacity: 0.7;
 }

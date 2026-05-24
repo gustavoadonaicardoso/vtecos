@@ -1,4 +1,4 @@
-.overlay {
+﻿.overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -13,8 +13,8 @@
   right: 0;
   width: 380px;
   background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   z-index: 1200;
   overflow: hidden;
@@ -24,7 +24,7 @@
 
 .header {
   padding: 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -162,7 +162,7 @@
   padding: 1rem;
   text-align: center;
   background: rgba(128, 128, 128, 0.02);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
 }
 
 .seeAll {
@@ -182,7 +182,7 @@
     left: 0;
     right: 0;
     width: 100%;
-    border-radius: 20px 20px 0 0;
+    border-radius: var(--glass-radius) 20px 0 0;
     border-bottom: none;
   }
 }

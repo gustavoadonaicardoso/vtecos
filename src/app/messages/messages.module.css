@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   display: flex;
   height: 100vh;
   width: 100%;
@@ -15,17 +15,21 @@
 .sidebar {
   width: 350px;
   min-width: 350px;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .sidebarHeader {
   height: var(--header-height);
   padding: 0 20px;
-  background: var(--panel-bg);
-  border-bottom: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -54,7 +58,9 @@
 }
 .searchBar:focus-within {
   border-color: var(--accent);
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
@@ -72,8 +78,10 @@
   gap: 8px;
   overflow-x: auto;
   padding: 16px 20px;
-  background: var(--panel-bg);
-  border-bottom: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
 }
 .tabs::-webkit-scrollbar {
   height: 4px;
@@ -96,7 +104,7 @@
   padding: 8px 16px;
   background: rgba(128, 128, 128, 0.08);
   border: none;
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   color: var(--foreground);
   opacity: 0.6;
   font-size: 0.85rem;
@@ -258,8 +266,10 @@
   position: absolute;
   width: 36px;
   height: 36px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -313,7 +323,7 @@
   align-items: center;
   gap: 1.25rem;
   padding-right: 1.25rem;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--glass-border);
 }
 
 .userSection {
@@ -392,8 +402,8 @@
   align-items: center;
   justify-content: space-between;
   background: #f0f2f5;
-  border-left: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   position: sticky;
@@ -507,11 +517,11 @@
   gap: 12px;
   background: rgba(255, 255, 255, 0.4);
   padding: 8px 12px;
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
 }
 
 [data-theme='dark'] .audioRow {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--glass-bg-medium);
 }
 
 .audioControls {
@@ -534,7 +544,7 @@
 .audioTrack {
   flex: 1;
   height: 3px;
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--glass-bg);
   border-radius: 2px;
   position: relative;
 }
@@ -565,7 +575,7 @@
 .inputArea, .premiumInputArea {
   padding: 12px 20px;
   background: #f0f2f5;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   position: relative;
 }
 
@@ -584,7 +594,7 @@
 .textareaWrapper {
   flex: 1;
   background: #ffffff;
-  border-radius: 24px;
+  border-radius: var(--glass-radius-lg);
   padding: 8px 16px;
   display: flex;
   align-items: center;
@@ -642,7 +652,7 @@
 }
 
 [data-theme='dark'] .actionBtn:hover {
-  background: rgba(255,255,255,0.05);
+  background: var(--glass-bg-medium);
 }
 
 .activeTool {
@@ -659,7 +669,7 @@
   bottom: calc(100% + 15px);
   right: -50px;
   background: var(--background);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   box-shadow: var(--shadow-xl);
   z-index: 1000;
@@ -680,7 +690,7 @@
   text-transform: uppercase;
   color: #8696a0;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .popoverList button {
@@ -812,7 +822,7 @@
   width: 380px;
   height: 100%;
   background: var(--background);
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--glass-border);
   z-index: 2001;
   display: flex;
   flex-direction: column;
@@ -822,7 +832,7 @@
 .drawerHeader {
   padding: 16px 20px;
   background: #f0f2f5;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -913,7 +923,7 @@
   align-items: center;
   gap: 6px;
   padding: 12px 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
   background: none;
   cursor: pointer;
@@ -939,7 +949,7 @@
 
 .actionPanel {
   padding: 20px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   background: #f0f2f5;
   display: flex;
   flex-direction: column;
@@ -974,7 +984,7 @@
   width: 100%;
   padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   background: var(--background);
   color: var(--foreground);
   font-size: 0.95rem;
@@ -990,7 +1000,7 @@
   width: 100%;
   padding: 14px;
   background: none;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   border-radius: 12px;
   font-weight: 600;
@@ -1047,9 +1057,11 @@
 }
 
 .newContactModal {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   width: 100%;
   max-width: 420px;
   display: flex;
@@ -1062,7 +1074,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .modalTitleRow {
@@ -1107,7 +1119,7 @@
   display: flex;
   gap: 0.75rem;
   padding: 1rem 1.5rem 1.25rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
 }
 .modalFooter .secondaryBtn { width: auto; flex: 1; padding: 10px; font-size: 0.88rem; }
 .modalFooter .transferBtn  { flex: 1.5; }

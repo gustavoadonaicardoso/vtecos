@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 120px);
@@ -52,9 +52,11 @@
 
 /* Sidebar Section */
 .sidebarSection {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -62,7 +64,7 @@
 
 .searchBlock {
   padding: 1rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -100,7 +102,7 @@
 }
 
 .userCard:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg);
 }
 
 .userCardActive {
@@ -140,9 +142,11 @@
 
 /* Main Editor Section */
 .mainEditorSection {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -215,7 +219,7 @@
   padding: 0 2rem;
   display: flex;
   gap: 20px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .tabBtn {
@@ -273,8 +277,8 @@
 
 .input, .select {
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   color: var(--foreground);
   font-size: 1rem;
@@ -283,7 +287,7 @@
 .input:focus, .select:focus {
   outline: none;
   border-color: #3b82f6;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-medium);
 }
 
 /* Permissions Layout */
@@ -297,7 +301,7 @@
 
 .permissionCardSection {
   background: var(--card-bg, rgba(255, 255, 255, 0.02));
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 10px; /* More rectangular */
   padding: 1.25rem 1.75rem; /* Wider horizontal padding */
   transition: all 0.2s ease;
@@ -315,7 +319,7 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   padding-bottom: 0.5rem;
 }
 
@@ -348,7 +352,7 @@
 }
 
 .cyberLabel:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg);
 }
 
 .cyberLabel span {
@@ -370,9 +374,9 @@
   position: absolute;
   inset: 0;
   background: rgba(128, 128, 128, 0.2);
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 .cyberSlider:before {
@@ -406,8 +410,8 @@ input:checked + .cyberSlider:before {
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -415,9 +419,11 @@ input:checked + .cyberSlider:before {
 }
 
 .modalContent {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 24px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius-lg);
   width: 95%;
   max-width: 850px; /* Increased to fit permissions grid */
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
@@ -452,7 +458,7 @@ input:checked + .cyberSlider:before {
 .permissionSectionTitle {
   margin-top: 2rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
 }
 
 .permissionSectionTitle h4 {
@@ -476,7 +482,7 @@ input:checked + .cyberSlider:before {
 
 .miniPermissionCard {
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 1rem;
 }
@@ -486,7 +492,7 @@ input:checked + .cyberSlider:before {
   align-items: center;
   gap: 8px;
   margin-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   padding-bottom: 0.5rem;
 }
 
@@ -524,14 +530,14 @@ input:checked + .cyberSlider:before {
   gap: 1rem;
   margin-top: 1rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
 }
 
 .cancelBtn {
   flex: 1;
   padding: 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-medium);
   color: var(--foreground);
   font-weight: 700;
   cursor: pointer;
@@ -602,7 +608,7 @@ input:checked + .cyberSlider:before {
 .updatesFormCard {
   background: rgba(59, 130, 246, 0.05);
   border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   padding: 1.5rem;
 }
 
@@ -639,8 +645,8 @@ input:checked + .cyberSlider:before {
 
 .inputGroup input {
   padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   color: var(--foreground);
 }
@@ -680,7 +686,7 @@ input:checked + .cyberSlider:before {
   align-items: center;
   padding: 1rem;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
 }
 
@@ -732,8 +738,8 @@ input:checked + .cyberSlider:before {
   gap: 1.5rem;
   background: rgba(255, 255, 255, 0.02);
   padding: 2rem;
-  border-radius: 20px;
-  border: 1px solid var(--border);
+  border-radius: var(--glass-radius);
+  border: 1px solid var(--glass-border);
 }
 
 .colorRow {
@@ -754,8 +760,8 @@ input:checked + .cyberSlider:before {
 .colorRow input[type="text"] {
   flex: 1;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   color: var(--foreground);
   font-family: monospace;
@@ -781,8 +787,8 @@ input:checked + .cyberSlider:before {
   align-items: center;
   background: rgba(255, 255, 255, 0.02);
   padding: 3rem;
-  border-radius: 20px;
-  border: 1px solid var(--border);
+  border-radius: var(--glass-radius);
+  border: 1px solid var(--glass-border);
   min-height: 200px;
 }
 
@@ -792,7 +798,7 @@ input:checked + .cyberSlider:before {
   align-items: center;
   justify-content: center;
   border: 2px dashed rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   height: 120px;
   padding: 20px;
   background: rgba(255, 255, 255, 0.01);
@@ -815,9 +821,9 @@ input:checked + .cyberSlider:before {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-medium);
   padding: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 .faviconPreviewArea span {
@@ -924,8 +930,10 @@ input:checked + .cyberSlider:before {
 /* Templates Visíveis */
 .templatesVisSection {
   margin-top: 1.5rem;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 1rem 1.25rem;
 }
@@ -955,7 +963,7 @@ input:checked + .cyberSlider:before {
   flex-direction: column;
   gap: 0.4rem;
   margin-top: 0.5rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   padding-top: 0.75rem;
 }
 

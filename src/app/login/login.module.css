@@ -1,7 +1,11 @@
 .loginPage {
   min-height: 100vh;
   width: 100vw;
-  background-color: #0f172a;
+  background-color: #0a0e1a;
+  background-image: 
+    radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -14,11 +18,19 @@
 
 .loginCard {
   width: 100%;
-  max-width: 400px;
-  background: transparent;
-  padding: 40px;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 48px 40px;
   z-index: 2;
   text-align: center;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: fadeInScale 0.5s ease-out;
 }
 
 .logoSection {
@@ -64,20 +76,23 @@
 
 .inputWrapper input {
   width: 100%;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 12px 12px 12px 48px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 14px 14px 48px;
   color: #f8fafc;
   font-size: 1rem;
   transition: all 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .inputWrapper input:focus {
   outline: none;
-  border-color: #3b82f6;
-  background: #0f172a;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .inputWrapper input::placeholder {
@@ -99,11 +114,12 @@
 }
 
 .loginBtn {
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
   color: #0f172a;
   border: none;
   padding: 14px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -113,11 +129,13 @@
   gap: 8px;
   transition: all 0.2s;
   margin-top: 12px;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
 }
 
 .loginBtn:hover {
-  background: #f8fafc;
-  transform: translateY(-1px);
+  background: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 255, 255, 0.15);
 }
 
 .loginBtn:disabled {
@@ -127,22 +145,24 @@
 }
 
 .errorMessage {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.08);
+  backdrop-filter: blur(8px);
   color: #ef4444;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 0.85rem;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.15);
   margin-bottom: 8px;
 }
 
 .successMessage {
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.08);
+  backdrop-filter: blur(8px);
   color: #10b981;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 0.85rem;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.15);
   margin-bottom: 8px;
 }
 
@@ -158,6 +178,11 @@
 @keyframes rotation {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .loginBranding {
@@ -180,21 +205,27 @@
 }
 
 .backBtn {
-  background: none;
-  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: #94a3b8;
   cursor: pointer;
   margin-top: 16px;
   font-size: 0.9rem;
-  transition: color 0.2s;
+  padding: 10px 20px;
+  border-radius: 10px;
+  transition: all 0.2s;
 }
 
 .backBtn:hover {
   color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 @media (max-width: 480px) {
   .loginCard {
-    padding: 24px;
+    padding: 32px 24px;
+    margin: 0 16px;
   }
 }

@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   padding: 2.5rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -12,10 +12,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 1.5rem 2rem;
-  border-radius: 20px;
-  border: 1px solid var(--border);
+  border-radius: var(--glass-radius);
+  border: 1px solid var(--glass-border);
 }
 
 .titleSection h1 {
@@ -66,9 +68,11 @@
   align-items: center;
   gap: 1rem;
   padding: 80px 20px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   color: var(--foreground);
   opacity: 0.7;
   text-align: center;
@@ -83,8 +87,10 @@
 }
 
 .card {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: 18px;
   padding: 1.5rem;
   display: flex;
@@ -146,7 +152,7 @@
 .progressBar {
   flex: 1;
   height: 6px;
-  background: var(--border);
+  background: var(--glass-border);
   border-radius: 99px;
   overflow: hidden;
   position: relative;
@@ -195,7 +201,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   padding-top: 0.75rem;
   margin-top: 0.25rem;
 }
@@ -226,7 +232,7 @@
   width: 32px;
   height: 32px;
   background: none;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   color: #ef4444;
   cursor: pointer;

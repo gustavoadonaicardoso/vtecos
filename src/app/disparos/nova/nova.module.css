@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   padding: 2.5rem;
   max-width: 860px;
   margin: 0 auto;
@@ -25,7 +25,7 @@
   align-items: center;
   gap: 0.4rem;
   background: none;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 0.5rem 1rem;
   border-radius: 10px;
@@ -42,9 +42,11 @@
   justify-content: center;
   gap: 0;
   padding: 1.5rem 2rem;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
 }
 
 .stepDot {
@@ -59,7 +61,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--border);
+  background: var(--glass-border);
   color: var(--foreground);
   opacity: 0.4;
   display: flex;
@@ -95,7 +97,7 @@
 .stepLine {
   flex: 1;
   height: 2px;
-  background: var(--border);
+  background: var(--glass-border);
   margin: 0 0.5rem;
   margin-bottom: 18px;
   transition: background 0.3s;
@@ -105,9 +107,11 @@
 
 /* --- Body --- */
 .body {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   padding: 2rem;
   flex: 1;
   min-height: 400px;
@@ -187,10 +191,10 @@
 
 /* --- Preview table --- */
 .previewTable h4 { margin: 0 0 0.75rem; font-size: 0.9rem; opacity: 0.7; }
-.tableWrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+.tableWrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--glass-border); }
 .tableWrap table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 .tableWrap th {
-  background: var(--border);
+  background: var(--glass-border);
   padding: 0.6rem 0.9rem;
   text-align: left;
   font-weight: 700;
@@ -198,7 +202,7 @@
 }
 .tableWrap td {
   padding: 0.5rem 0.9rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   white-space: nowrap;
   max-width: 180px;
   overflow: hidden;
@@ -207,13 +211,13 @@
 .moreRows { font-size: 0.8rem; opacity: 0.5; margin: 0.5rem 0 0; }
 
 /* --- Columns table --- */
-.columnsTable { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.columnsTable { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--glass-border); border-radius: 12px; overflow: hidden; }
 
 .colHeader {
   display: grid;
   grid-template-columns: 1.5fr 2fr 1fr 1.2fr;
   padding: 0.65rem 1rem;
-  background: var(--border);
+  background: var(--glass-border);
   font-size: 0.78rem;
   font-weight: 700;
   opacity: 0.7;
@@ -225,7 +229,7 @@
   grid-template-columns: 1.5fr 2fr 1fr 1.2fr;
   padding: 0.65rem 1rem;
   align-items: center;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   gap: 0.5rem;
   transition: background 0.15s;
 }
@@ -235,7 +239,7 @@
 
 .colLabelInput {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 0.35rem 0.6rem;
   border-radius: 8px;
@@ -254,7 +258,7 @@
   font-weight: 600;
   padding: 0.3rem 0.7rem;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   background: none;
   color: var(--foreground);
   opacity: 0.5;
@@ -288,7 +292,7 @@
 
 .input {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 0.6rem 0.9rem;
   border-radius: 10px;
@@ -325,7 +329,7 @@
 
 .textarea {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 0.8rem 1rem;
   border-radius: 12px;
@@ -366,7 +370,7 @@
   align-items: center;
   padding: 1.25rem;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   gap: 0.2rem;
 }
@@ -375,7 +379,7 @@
 
 .summaryTemplate {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 1rem;
 }
@@ -411,7 +415,7 @@
   gap: 0.35rem;
   padding: 0.4rem 0.9rem;
   border-radius: 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   background: none;
   color: var(--foreground);
   font-size: 0.8rem;
@@ -439,7 +443,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.9rem 1rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   background: rgba(24,119,242,0.04);
 }
 
@@ -486,7 +490,7 @@
   width: 28px;
   height: 28px;
   background: none;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   cursor: pointer;
   color: var(--foreground);
@@ -507,8 +511,10 @@
 
 .metaSearch {
   margin: 0.75rem 1rem 0.5rem;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 0.5rem 0.85rem;
   border-radius: 8px;
@@ -536,7 +542,7 @@
 }
 
 .metaCard {
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
   padding: 0.75rem;
   cursor: pointer;
@@ -544,7 +550,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 .metaCard:hover { border-color: #1877f2; }
 .metaCardSelected { border-color: #1877f2; background: rgba(24,119,242,0.06); }
@@ -636,7 +644,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   background: rgba(24,119,242,0.03);
   flex-wrap: wrap;
 }
@@ -678,7 +686,7 @@
   flex-direction: column;
   gap: 0.75rem;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   border-radius: 14px;
   padding: 1.25rem;
 }
@@ -710,7 +718,7 @@
   gap: 0.35rem;
   padding: 0.45rem 1rem;
   border-radius: 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   background: none;
   color: var(--foreground);
   font-size: 0.85rem;
@@ -731,8 +739,10 @@
 
 .select {
   width: 100%;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 0.6rem 0.9rem;
   border-radius: 10px;
@@ -757,9 +767,11 @@
   align-items: center;
   gap: 1rem;
   padding: 1.25rem 2rem;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
 }
 
 .prevBtn {
@@ -767,7 +779,7 @@
   align-items: center;
   gap: 0.4rem;
   background: none;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 0.65rem 1.2rem;
   border-radius: 12px;

@@ -1,16 +1,18 @@
 .header {
   height: var(--header-height);
   width: 100%;
-  background: var(--panel-bg);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset), 0 4px 20px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1.5rem;
   z-index: 900;
   transition: var(--transition);
-  flex-shrink: 0; /* Impede que a barra encolha */
+  flex-shrink: 0;
 }
 
 .leftSection {
@@ -31,7 +33,7 @@
 }
 
 .hamburger:hover {
-  background: rgba(128, 128, 128, 0.1);
+  background: var(--glass-bg-hover);
 }
 
 @media (max-width: 1024px) {
@@ -55,11 +57,11 @@
   }
   .leftSection {
     flex: 1;
-    min-width: 0; /* Allow shrinking */
+    min-width: 0;
   }
   .searchArea {
     width: 100%;
-    max-width: 180px; /* Limit search width on mobile */
+    max-width: 180px;
     padding: 6px 10px;
     gap: 6px;
   }
@@ -91,6 +93,7 @@
     justify-content: center;
     border: none;
     background: none;
+    backdrop-filter: none;
   }
   .searchArea input {
     display: none;
@@ -102,19 +105,25 @@
 }
 
 
-
-
-
-
 .searchArea {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--panel-bg);
+  background: var(--glass-bg-input);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
   padding: 8px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
+  border-radius: var(--glass-radius-sm);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset);
   width: 400px;
+  transition: var(--transition);
+}
+
+.searchArea:focus-within {
+  border-color: var(--glass-border-focus);
+  background: var(--glass-bg-hover);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08), var(--glass-inset);
 }
 
 .searchIcon {
@@ -155,13 +164,17 @@
   cursor: pointer;
   background: none;
   border: none;
+  padding: 6px;
+  border-radius: 8px;
 }
 
 
 
 .actionButton:hover {
   color: var(--accent);
+  opacity: 1;
   transform: scale(1.1);
+  background: var(--glass-bg);
 }
 
 .badge {
@@ -183,21 +196,22 @@
 
 
 .newLeadBtn {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
   padding: 10px 20px;
-  border-radius: 12px;
+  border-radius: var(--glass-radius-sm);
   font-weight: 600;
   font-size: 0.9rem;
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3), var(--glass-inset);
   transition: all 0.3s ease;
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .newLeadBtn:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
 }

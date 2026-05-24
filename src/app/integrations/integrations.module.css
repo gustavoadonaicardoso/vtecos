@@ -1,4 +1,4 @@
-.container {
+﻿.container {
   padding: 2.5rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -35,10 +35,12 @@
 .stats {
   display: flex;
   gap: 1.5rem;
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 0.75rem 1.5rem;
   border-radius: 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 
@@ -88,8 +90,10 @@
 
 .searchInput {
   width: 100%;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 0.75rem 1rem 0.75rem 2.8rem;
   color: var(--foreground);
@@ -100,7 +104,7 @@
 
 .searchInput:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-strong);
   border-color: #3b82f6;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
@@ -108,10 +112,12 @@
 .filterList {
   display: flex;
   gap: 0.5rem;
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   padding: 0.3rem;
   border-radius: 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 
@@ -131,7 +137,9 @@
 
 .filterBtn:hover {
   color: var(--accent);
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 
@@ -150,9 +158,11 @@
 }
 
 .card {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   padding: 1.5rem;
 
   display: flex;
@@ -165,7 +175,9 @@
 
 .card:hover {
   transform: translateY(-5px);
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-color: var(--accent);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
 }
@@ -236,7 +248,7 @@
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  background: rgba(128, 128, 128, 0.1);
+  background: var(--glass-bg-hover);
   padding: 2px 8px;
   border-radius: 4px;
   color: var(--foreground);
@@ -247,7 +259,7 @@
 .cardFooter {
   margin-top: auto;
   padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
 }
 
 
@@ -287,12 +299,14 @@
 .configureBtn {
   background: transparent;
   color: var(--foreground);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 
 .configureBtn:hover {
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-color: var(--accent);
 }
 
@@ -300,7 +314,7 @@
 .customRequest {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
   border: 1px dashed rgba(59, 130, 246, 0.3);
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   padding: 2rem;
   display: flex;
   justify-content: space-between;
@@ -343,7 +357,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(5px);
   z-index: 1000;
   display: flex;
@@ -354,13 +368,13 @@
 
 .modalContent {
   background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
   animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -369,7 +383,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.5rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .modalTitle {
@@ -396,7 +410,9 @@
 
 .closeBtn:hover {
   opacity: 1;
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .modalBody {
@@ -408,18 +424,20 @@
 
 .modalFooter {
   padding: 1.5rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: 0 0 20px 20px;
 }
 
 .btnCancel {
   padding: 10px 20px;
   border-radius: 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   background: transparent;
   color: var(--foreground);
   font-weight: 600;
@@ -453,8 +471,10 @@
 .formGroup input {
   padding: 12px 16px;
   border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--panel-bg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--foreground);
   font-size: 0.95rem;
 }
@@ -516,8 +536,10 @@
   padding: 12px 16px;
   padding-right: 2.5rem;
   border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--panel-bg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--foreground);
   font-size: 0.95rem;
   transition: all 0.2s;
@@ -530,7 +552,7 @@
 }
 
 .btnTest:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: var(--glass-bg-strong) !important;
   border-color: var(--foreground) !important;
 }
 
@@ -609,7 +631,7 @@
   bottom: 0;
   background-color: rgba(255, 255, 255, 0.1);
   transition: .3s;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 .slider:before {
@@ -637,7 +659,7 @@
 }
 
 .slider.round {
-  border-radius: 24px;
+  border-radius: var(--glass-radius-lg);
 }
 
 .slider.round:before {

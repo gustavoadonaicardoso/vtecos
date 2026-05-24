@@ -1,4 +1,4 @@
-.section {
+﻿.section {
   margin-bottom: 2.5rem;
   width: 100%;
 }
@@ -31,7 +31,7 @@
 .card {
   flex: 0 0 340px;
   position: relative;
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   padding: 1.5rem;
   color: white;
   scroll-snap-align: start;
@@ -131,7 +131,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
   z-index: 1000;
   display: flex;
@@ -147,14 +147,16 @@
 }
 
 .modal {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: 28px;
   width: 100%;
   max-width: 480px;
   padding: 2.5rem;
   position: relative;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -187,7 +189,7 @@
 .modalIconWrapper {
   width: 72px;
   height: 72px;
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -200,7 +202,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  background: rgba(128, 128, 128, 0.1);
+  background: var(--glass-bg-hover);
   padding: 4px 12px;
   border-radius: 100px;
   color: var(--foreground);
@@ -243,8 +245,8 @@
 }
 
 .field input {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
+  background: var(--glass-bg-medium);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
   padding: 10px 14px;
   color: var(--foreground);
@@ -312,6 +314,6 @@
   }
   .modal {
     padding: 2rem 1.5rem;
-    border-radius: 20px;
+    border-radius: var(--glass-radius);
   }
 }

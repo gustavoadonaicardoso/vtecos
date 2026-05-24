@@ -1,4 +1,4 @@
-.orchestratorContainer {
+﻿.orchestratorContainer {
   position: fixed;
   inset: 0;
   top: 72px; /* Stay below the main CRM Navbar */
@@ -73,7 +73,7 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,7 +85,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg);
   padding: 10px 18px;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -281,7 +281,7 @@
   width: 260px;
   background: #111827;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   box-shadow: 0 20px 60px rgba(0,0,0,0.6);
   z-index: 100;
   overflow: hidden;
@@ -374,7 +374,7 @@
   height: 140px;
   background: rgba(11, 22, 40, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   backdrop-filter: blur(20px);
   z-index: 1000;
   box-shadow: 0 20px 60px rgba(0,0,0,0.6);

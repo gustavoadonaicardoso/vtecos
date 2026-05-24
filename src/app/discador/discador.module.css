@@ -1,4 +1,4 @@
-.pageWrapper {
+﻿.pageWrapper {
   padding: 2rem;
   display: flex;
   flex-direction: column;
@@ -36,8 +36,10 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   padding: 0.6rem 1.25rem;
   border-radius: 12px;
   font-size: 0.85rem;
@@ -48,7 +50,7 @@
 }
 
 .uploadBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--glass-bg-strong);
   border-color: rgba(255, 255, 255, 0.2);
 }
 
@@ -101,8 +103,10 @@
 }
 
 .statCard {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   padding: 1.25rem;
   border-radius: 16px;
   display: flex;
@@ -147,16 +151,18 @@
 }
 
 .card {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   overflow: hidden;
   backdrop-filter: blur(10px);
 }
 
 .cardHeader {
   padding: 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -172,7 +178,7 @@
   background: rgba(99, 102, 241, 0.1);
   color: #818cf8;
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--glass-radius);
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -201,7 +207,7 @@
 
 .table td {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
   font-size: 0.85rem;
 }
 
@@ -230,7 +236,7 @@
 }
 
 .rowBtn {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-medium);
   border: 1px solid rgba(255, 255, 255, 0.1);
   width: 28px;
   height: 28px;
@@ -264,7 +270,7 @@
   background: var(--background);
   padding: 0.75rem;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 .agentAvatar {

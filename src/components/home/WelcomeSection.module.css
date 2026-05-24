@@ -1,4 +1,4 @@
-.welcomeSection {
+﻿.welcomeSection {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -19,7 +19,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
 }
 
 .avatarInitials {
@@ -115,8 +115,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   padding: 9px 16px;
   border-radius: 12px;
   color: var(--foreground);
@@ -124,7 +126,7 @@
 }
 
 .datePicker:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--glass-border-hover);
 }
 
 .calendarIcon {
@@ -152,8 +154,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   padding: 9px 18px;
   border-radius: 12px;

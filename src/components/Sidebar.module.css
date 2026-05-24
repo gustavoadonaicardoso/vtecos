@@ -4,9 +4,11 @@
   position: fixed;
   left: 0;
   top: 0;
-  background: var(--sidebar-bg, var(--panel-bg));
-  backdrop-filter: blur(15px);
-  border-right: 1px solid var(--border);
+  background: var(--glass-bg-medium);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border-right: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   display: flex;
   flex-direction: column;
   padding: 1.5rem;
@@ -23,7 +25,7 @@
 
   .mobileOpen {
     transform: translateX(0);
-    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
+    box-shadow: 20px 0 60px rgba(0, 0, 0, 0.5);
   }
 
   .toggleBtn {
@@ -70,14 +72,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
 }
 
 .toggleBtn:hover {
   opacity: 1;
-  background: rgba(128, 128, 128, 0.1);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--glass-glow);
 }
 
 
@@ -108,22 +115,22 @@
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 4px; /* Space for scrollbar */
+  padding-right: 4px;
 }
 
 /* Hide scrollbar visually but keep functionality for cleaner UI */
 .nav::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 .nav::-webkit-scrollbar-track {
   background: transparent;
 }
 .nav::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.2);
+  background: rgba(128, 128, 128, 0.15);
   border-radius: 4px;
 }
 
@@ -131,19 +138,23 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-radius: 12px;
+  padding: 11px 16px;
+  border-radius: var(--glass-radius-sm);
   color: var(--foreground);
   opacity: 0.7;
   font-size: 0.95rem;
   transition: all 0.2s ease;
   cursor: pointer;
+  border: 1px solid transparent;
+  position: relative;
 }
 
 
 .navItem:hover {
-  background: rgba(128, 128, 128, 0.1);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border);
   opacity: 1;
+  box-shadow: var(--glass-glow);
 }
 
 
@@ -152,6 +163,9 @@
   color: #3b82f6;
   font-weight: 600;
   border: 1px solid rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.08), var(--glass-inset);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
 }
 
 .navSeparator {
@@ -172,7 +186,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--border);
+  background: linear-gradient(90deg, transparent, var(--glass-border), transparent);
 }
 
 .navItemMaster {
@@ -181,7 +195,9 @@
 
 .navItemMaster:hover {
   background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.15);
   color: #f59e0b;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.06);
 }
 
 .masterLabel {
@@ -207,7 +223,7 @@
 .sidebarFooter {
   margin-top: auto;
   padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
 }
 
 .backdrop {
@@ -217,7 +233,8 @@
   width: 100vw;
   height: 100vh;
   background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 999;
   opacity: 0;
   visibility: hidden;
@@ -233,13 +250,16 @@
 
 
 .profileCard {
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
   padding: 12px;
   border-radius: 14px;
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-inset);
   cursor: pointer;
   transition: all 0.2s ease;
   width: 100%;
@@ -249,9 +269,10 @@
 }
 
 .profileCard:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(59, 130, 246, 0.3);
+  background: var(--glass-bg-hover);
+  border-color: rgba(59, 130, 246, 0.2);
   transform: translateY(-2px);
+  box-shadow: var(--glass-shadow), var(--glass-glow);
 }
 
 .avatar {
@@ -264,6 +285,7 @@
   justify-content: center;
   color: white;
   font-weight: bold;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
 }
 
 .profileInfo p {
@@ -303,7 +325,7 @@
   width: 10px;
   height: 10px;
   background: #ef4444;
-  border: 2px solid var(--panel-bg);
+  border: 2px solid var(--glass-bg-strong);
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
 }
@@ -313,4 +335,3 @@
   50% { transform: scale(1.1); }
   100% { transform: scale(1); }
 }
-

@@ -1,6 +1,7 @@
 .layoutContainer {
   display: flex;
   min-height: 100vh;
+  position: relative;
 }
 
 .mainContent {
@@ -12,7 +13,7 @@
   background: var(--background);
   position: relative;
   transition: var(--transition);
-  overflow: hidden; /* Mantém a rolagem apenas nas áreas internas */
+  overflow: hidden;
 }
 
 /* Classe para páginas que precisam de respiro interno */
@@ -48,29 +49,31 @@
   }
 }
 
-
-
-/* Background Glows */
+/* ===== Glassmorphism Background Orbs ===== */
 .mainContent::before {
   content: '';
   position: fixed;
-  top: 10%;
-  right: -5%;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+  top: 5%;
+  right: -10%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.03) 40%, transparent 70%);
   z-index: -1;
   pointer-events: none;
+  animation: floatOrb 20s ease-in-out infinite;
+  filter: blur(40px);
 }
 
 .mainContent::after {
   content: '';
   position: fixed;
-  bottom: 10%;
-  left: -5%;
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+  bottom: 5%;
+  left: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.03) 40%, transparent 70%);
   z-index: -1;
   pointer-events: none;
+  animation: floatOrb 25s ease-in-out infinite reverse;
+  filter: blur(40px);
 }

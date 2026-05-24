@@ -38,7 +38,7 @@
   align-items: center;
   gap: 1.5rem;
   padding-right: 2rem;
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--glass-border);
 }
 
 .systemIcon {
@@ -95,11 +95,20 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  border: 1px solid var(--glass-border);
   padding: 8px 16px;
-  border-radius: 12px;
+  border-radius: var(--glass-radius-sm);
   color: var(--foreground);
+  box-shadow: var(--glass-inset);
+  transition: var(--transition);
+}
+
+.datePicker:focus-within {
+  border-color: var(--glass-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
 }
 
 .dateSelect {
@@ -113,11 +122,11 @@
 }
 
 .filterBtn {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
   border: none;
   padding: 8px 20px;
-  border-radius: 10px;
+  border-radius: var(--glass-radius-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -126,11 +135,13 @@
   gap: 8px;
   min-width: 100px;
   justify-content: center;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
 }
 
 .filterBtn:hover:not(:disabled) {
-  background: #2563eb;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.35);
 }
 
 .filterBtn:disabled {
@@ -139,11 +150,13 @@
 }
 
 .refreshBtn {
-  background: var(--panel-bg);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
   color: var(--foreground);
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
   padding: 8px 16px;
-  border-radius: 12px;
+  border-radius: var(--glass-radius-sm);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -151,12 +164,14 @@
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
+  box-shadow: var(--glass-inset);
 }
 
 .refreshBtn:hover:not(:disabled) {
-  background: var(--border);
+  background: var(--glass-bg-hover);
   border-color: var(--accent);
   color: var(--accent);
+  box-shadow: var(--glass-glow);
 }
 
 .refreshBtn.refreshing {
@@ -191,14 +206,14 @@
 }
 
 .bannersScroll::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.2);
+  background: rgba(128, 128, 128, 0.15);
   border-radius: 10px;
 }
 
 .bannerCard {
   flex: 0 0 350px;
   position: relative;
-  border-radius: 16px;
+  border-radius: var(--glass-radius);
   padding: 1.5rem;
   color: white;
   scroll-snap-align: start;
@@ -226,6 +241,7 @@
   font-weight: 700;
   letter-spacing: 1px;
   background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
   padding: 4px 8px;
   border-radius: 100px;
   display: inline-block;
@@ -267,7 +283,8 @@
   position: absolute;
   top: 1.5rem;
   right: 1.5rem;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
   color: #111;
   border: none;
   padding: 6px 12px;
@@ -276,21 +293,31 @@
   font-weight: 700;
   cursor: pointer;
   z-index: 2;
-  transition: background 0.2s;
+  transition: all 0.2s;
 }
 
 .bannerAction:hover {
   background: #ffffff;
+  transform: translateY(-1px);
 }
 
 .kpiCard {
   padding: 1.5rem;
-  border-radius: 16px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  border-radius: var(--glass-radius);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   transition: var(--transition);
 }
 
+.kpiCard:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow-hover), var(--glass-glow);
+  transform: translateY(-2px);
+}
 
 .kpiCardHeader {
   display: flex;
@@ -298,7 +325,7 @@
   justify-content: space-between;
   margin-bottom: 1.2rem;
   color: var(--foreground);
-  opacity: 1; /* Increased from 0.4 */
+  opacity: 1;
 }
 
 
@@ -306,13 +333,15 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: var(--panel-bg);
+  background: var(--glass-bg-medium);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent);
-  border: 1px solid var(--border);
-  opacity: 1; /* Ensure icon is visible */
+  border: 1px solid var(--glass-border);
+  opacity: 1;
 }
 
 .kpiValue {
@@ -324,7 +353,7 @@
 .kpiLabel {
   font-size: 0.85rem;
   color: var(--foreground);
-  opacity: 0.7; /* Increased from 0.4 */
+  opacity: 0.7;
   font-weight: 500;
 }
 
@@ -352,9 +381,12 @@
 .chartContainer {
   height: 480px;
   padding: 1.5rem;
-  border-radius: 20px;
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  border-radius: var(--glass-radius);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
   display: flex;
   flex-direction: column;
 }
@@ -379,6 +411,7 @@
   border-radius: 100px;
   font-size: 0.75rem;
   font-weight: 700;
+  border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
 .funnelWrapper {
@@ -403,7 +436,7 @@
 
 .stepBar {
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--glass-radius-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -460,11 +493,13 @@
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--foreground);
-  opacity: 1; /* Increased from 0.6 */
-  background: var(--panel-bg);
+  opacity: 1;
+  background: var(--glass-bg-medium);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
   padding: 2px 8px;
   border-radius: 6px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--glass-border);
 }
 
 .funnelSummary {
@@ -472,7 +507,7 @@
   display: flex;
   justify-content: space-around;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--glass-border);
 }
 
 .summaryItem {
@@ -484,7 +519,7 @@
 
 .summaryLabel {
   font-size: 0.75rem;
-  opacity: 0.8; /* Increased from 0.5 */
+  opacity: 0.8;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -497,17 +532,17 @@
 
 .summaryDivider {
   width: 1px;
-  background: var(--border);
+  background: var(--glass-border);
 }
 
 .activityList {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem; /* Reduced back as items were too far from each other */
-  margin-top: 2rem; /* Drastically increased to separate from title */
-  overflow-y: auto; /* Ensure it doesn't leak out */
-  max-height: 380px; /* Limit height within container */
-  padding-right: 8px; /* For scrollbar space */
+  gap: 1.25rem;
+  margin-top: 2rem;
+  overflow-y: auto;
+  max-height: 380px;
+  padding-right: 8px;
 }
 
 .activityList::-webkit-scrollbar {
@@ -532,7 +567,10 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(128, 128, 128, 0.08);
+  background: var(--glass-bg-medium);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  border: 1px solid var(--glass-border);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -559,12 +597,13 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border: 1px solid rgba(16, 185, 129, 0.15);
 }
 
 .progressBarContainer {
   width: 100%;
   height: 6px;
-  background: var(--border);
+  background: var(--glass-border);
   border-radius: 10px;
   margin: 1rem 0 0.5rem;
   overflow: hidden;
@@ -575,22 +614,26 @@
   background: linear-gradient(90deg, #3b82f6, #10b981);
   border-radius: 10px;
   transition: width 1s ease-in-out;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
 }
 
 .progressInfo {
   font-size: 0.75rem;
   color: var(--foreground);
-  opacity: 0.8; /* Increased from 0.4 */
+  opacity: 0.8;
   font-weight: 500;
 }
 
-/* Media Queries at the end to ensure they override primary styles */
+/* Performance Section */
 .performanceSection {
   margin-top: 2.5rem;
   padding: 1.5rem;
-  background: var(--panel-bg);
-  border-radius: 20px;
-  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--glass-radius);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
 }
 
 .tableWrapper {
@@ -608,15 +651,19 @@
   padding: 1rem;
   font-size: 0.85rem;
   color: var(--foreground);
-  opacity: 0.8; /* Increased from 0.5 */
+  opacity: 0.8;
   font-weight: 700;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .performanceTable td {
   padding: 1rem;
   font-size: 0.9rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.performanceTable tr:hover td {
+  background: var(--glass-bg);
 }
 
 .userNameColumn {
@@ -636,6 +683,7 @@
   justify-content: center;
   font-size: 0.75rem;
   color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .statusBadge {
@@ -648,12 +696,14 @@
 .statusOnline {
   background: rgba(16, 185, 129, 0.1);
   color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.15);
 }
 
 .statusOffline {
-  background: rgba(128, 128, 128, 0.1);
+  background: rgba(128, 128, 128, 0.08);
   color: var(--foreground);
-  opacity: 0.8; /* Increased from 0.5 */
+  opacity: 0.8;
+  border: 1px solid rgba(128, 128, 128, 0.1);
 }
 
 .salesCount {
@@ -663,6 +713,7 @@
   color: #3b82f6;
   border-radius: 6px;
   font-weight: 700;
+  border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
 @media (max-width: 1024px) {
@@ -733,8 +784,9 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -744,26 +796,29 @@
 }
 
 .modalContent {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-border);
   border-radius: 32px;
   width: 100%;
   max-width: 500px;
   padding: 3rem;
   position: relative;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  animation: fadeInScale 0.3s ease-out;
 }
 
 .closeModal {
   position: absolute;
   top: 24px;
   right: 24px;
-  background: rgba(128, 128, 128, 0.1);
-  border: none;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   color: var(--foreground);
   width: 32px;
   height: 32px;
@@ -777,7 +832,8 @@
 }
 
 .closeModal:hover {
-  background: rgba(128, 128, 128, 0.2);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
   transform: rotate(90deg);
 }
 
@@ -835,19 +891,23 @@
 }
 
 .metricCard {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   padding: 1.5rem;
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  transition: transform 0.2s;
+  transition: all 0.2s;
+  box-shadow: var(--glass-inset);
 }
 
 .metricCard:hover {
   transform: translateY(-2px);
   border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: var(--glass-shadow), var(--glass-glow);
 }
 
 .metricIcon {
@@ -888,13 +948,16 @@
 
 /* Chat Status Card */
 .chatsStatusCard {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  box-shadow: var(--glass-shadow), var(--glass-inset);
 }
 
 .chatsStatusHeader {
@@ -935,17 +998,20 @@
 .statusDivider {
   width: 1px;
   height: 30px;
-  background: var(--border);
+  background: var(--glass-border);
 }
 
 /* Sources Card */
 .sourcesCard {
-  background: var(--panel-bg);
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--glass-shadow), var(--glass-inset);
 }
 
 .sourcesHeader {
@@ -1021,8 +1087,10 @@
 }
 
 .formField input {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
+  background: var(--glass-bg-input);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  border: 1px solid var(--glass-border);
   padding: 14px 20px;
   border-radius: 14px;
   color: var(--foreground);
@@ -1030,22 +1098,18 @@
   outline: none;
   transition: all 0.2s;
   text-align: center;
+  box-shadow: var(--glass-inset);
 }
 
 .formField input:focus {
-  border-color: #3b82f6;
-  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--glass-border-focus);
+  background: var(--glass-bg-hover);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1), var(--glass-inset);
 }
 
 .formField input::placeholder {
   text-align: center;
   opacity: 0.5;
-}
-
-.formField input:focus {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.05);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
 
 .submitBtn {
@@ -1084,6 +1148,8 @@
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
 }
 
 .successEvent strong {
@@ -1120,7 +1186,3 @@
     margin: 0 auto;
   }
 }
-
-
-
-

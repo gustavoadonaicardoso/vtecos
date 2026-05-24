@@ -1,11 +1,11 @@
-.dialerWrapper {
+﻿.dialerWrapper {
   width: 320px;
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
+  border-radius: var(--glass-radius-lg);
   padding: 1.5rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -32,7 +32,7 @@
 
 .tabs {
   display: flex;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-medium);
   padding: 2px;
   border-radius: 8px;
 }
@@ -99,7 +99,7 @@
 }
 
 .display {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--glass-bg-medium);
   border-radius: 12px;
   padding: 0.75rem;
 }
@@ -127,7 +127,7 @@
 
 .key {
   height: 60px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 16px;
   color: white;
@@ -138,7 +138,7 @@
 }
 
 .key:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg-strong);
   border-color: rgba(99, 102, 241, 0.3);
 }
 
@@ -195,13 +195,13 @@
 }
 
 .controlBtn:not(.call):not(.hangup) {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-medium);
   color: #94a3b8;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .controlBtn:not(.call):not(.hangup):hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--glass-bg-strong);
   color: white;
 }
 
@@ -219,12 +219,12 @@
 }
 
 .historyList::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--glass-bg-strong);
   border-radius: 2px;
 }
 
 .historyItem {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   padding: 0.75rem;
