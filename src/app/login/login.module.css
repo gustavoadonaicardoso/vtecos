@@ -1,47 +1,84 @@
 .loginPage {
   min-height: 100vh;
-  width: 100vw;
-  background-color: #0a0e1a;
-  background-image: 
-    radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+  width: 100%;
+  background-color: var(--background);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  color: white;
-  font-family: var(--font-inter), sans-serif;
+  color: var(--foreground);
+  font-family: var(--font-family);
+  padding: 24px 16px;
+}
+
+/* Orbs flutuantes — mesma linguagem visual do layout interno */
+.loginPage::before {
+  content: '';
+  position: absolute;
+  top: -10%;
+  right: -15%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.04) 40%, transparent 70%);
+  pointer-events: none;
+  animation: floatOrb 20s ease-in-out infinite;
+  filter: blur(40px);
+}
+
+.loginPage::after {
+  content: '';
+  position: absolute;
+  bottom: -10%;
+  left: -15%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 40%, transparent 70%);
+  pointer-events: none;
+  animation: floatOrb 25s ease-in-out infinite reverse;
+  filter: blur(40px);
 }
 
 .loginCard {
   width: 100%;
   max-width: 420px;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 24px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius-lg);
   padding: 48px 40px;
   z-index: 2;
   text-align: center;
-  box-shadow: 
-    0 20px 60px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  animation: fadeInScale 0.5s ease-out;
+  box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
 }
 
 .logoSection {
-  margin-bottom: 40px;
+  margin-bottom: 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .companyLogo {
-  margin-bottom: 16px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  margin-bottom: 12px;
+}
+
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.cardSubtitle {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 .loginForm {
@@ -72,40 +109,57 @@
   position: absolute;
   left: 16px;
   color: #64748b;
+  pointer-events: none;
 }
 
 .inputWrapper input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 14px 14px 14px 48px;
+  background: var(--glass-bg-input);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius-sm);
+  padding: 14px 44px 14px 48px;
   color: #f8fafc;
   font-size: 1rem;
   transition: all 0.2s ease;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: var(--glass-inset);
 }
 
 .inputWrapper input:focus {
   outline: none;
-  border-color: rgba(59, 130, 246, 0.5);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-color: var(--glass-border-focus);
+  background: var(--glass-bg-hover);
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--glass-inset);
 }
 
 .inputWrapper input::placeholder {
   color: #475569;
 }
 
+.togglePassword {
+  position: absolute;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  color: #64748b;
+  border-radius: 8px;
+  transition: color 0.2s;
+}
+
+.togglePassword:hover {
+  color: #f8fafc;
+}
+
 .forgotPassword {
   display: block;
-  text-align: right;
+  margin-left: auto;
   font-size: 0.85rem;
   color: #94a3b8;
-  text-decoration: none;
   margin-top: 8px;
+  padding: 0;
   transition: color 0.2s;
 }
 
@@ -114,12 +168,11 @@
 }
 
 .loginBtn {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(4px);
-  color: #0f172a;
-  border: none;
+  background: linear-gradient(135deg, var(--accent) 0%, #2563eb 100%);
+  color: #ffffff;
+  border: 1px solid rgba(59, 130, 246, 0.4);
   padding: 14px;
-  border-radius: 12px;
+  border-radius: var(--glass-radius-sm);
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -127,15 +180,15 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: all 0.2s;
-  margin-top: 12px;
-  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+  transition: var(--transition);
+  margin-top: 4px;
+  box-shadow: 0 4px 20px var(--accent-glow);
 }
 
-.loginBtn:hover {
-  background: #ffffff;
+.loginBtn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 30px var(--accent-glow), var(--glass-glow-accent);
+  filter: brightness(1.1);
 }
 
 .loginBtn:disabled {
@@ -144,33 +197,74 @@
   transform: none;
 }
 
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #64748b;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--glass-border);
+}
+
+.plansBtn {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  border: 1px solid var(--glass-border);
+  color: #cbd5e1;
+  padding: 12px;
+  border-radius: var(--glass-radius-sm);
+  font-weight: 500;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: var(--transition);
+}
+
+.plansBtn:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  color: #ffffff;
+  box-shadow: var(--glass-glow);
+}
+
 .errorMessage {
   background: rgba(239, 68, 68, 0.08);
-  backdrop-filter: blur(8px);
-  color: #ef4444;
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  color: var(--danger);
   padding: 12px;
-  border-radius: 12px;
+  border-radius: var(--glass-radius-sm);
   font-size: 0.85rem;
   border: 1px solid rgba(239, 68, 68, 0.15);
-  margin-bottom: 8px;
 }
 
 .successMessage {
   background: rgba(16, 185, 129, 0.08);
-  backdrop-filter: blur(8px);
-  color: #10b981;
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  color: var(--success);
   padding: 12px;
-  border-radius: 12px;
+  border-radius: var(--glass-radius-sm);
   font-size: 0.85rem;
   border: 1px solid rgba(16, 185, 129, 0.15);
-  margin-bottom: 8px;
 }
 
 .loader {
   width: 20px;
   height: 20px;
-  border: 2px solid rgba(15, 23, 42, 0.3);
-  border-bottom-color: #0f172a;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-bottom-color: #ffffff;
   border-radius: 50%;
   animation: rotation 1s linear infinite;
 }
@@ -178,11 +272,6 @@
 @keyframes rotation {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-}
-
-@keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .loginBranding {
@@ -205,27 +294,268 @@
 }
 
 .backBtn {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   color: #94a3b8;
-  cursor: pointer;
-  margin-top: 16px;
+  margin-top: 4px;
   font-size: 0.9rem;
   padding: 10px 20px;
-  border-radius: 10px;
-  transition: all 0.2s;
+  border-radius: var(--glass-radius-sm);
+  transition: var(--transition);
 }
 
 .backBtn:hover {
   color: white;
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+}
+
+/* ===== Modal de Planos ===== */
+.plansOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 6, 8, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+
+.plansModal {
+  position: relative;
+  width: 100%;
+  max-width: 980px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  background: var(--glass-bg-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius-lg);
+  box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
+  padding: 40px;
+}
+
+.plansClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: #94a3b8;
+  transition: var(--transition);
+}
+
+.plansClose:hover {
+  color: white;
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+}
+
+.plansHeader {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.plansHeader h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.plansHeader p {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.plansGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.planCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  padding: 28px 24px;
+  transition: var(--transition);
+}
+
+.planCard:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-4px);
+  box-shadow: var(--glass-shadow-hover), var(--glass-glow);
+}
+
+.planHighlight {
+  border-color: var(--glass-border-focus);
+  box-shadow: var(--glass-glow-accent);
+}
+
+.planBadge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--accent) 0%, #2563eb 100%);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 5px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 4px 15px var(--accent-glow);
+}
+
+.planCard h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.planPrice {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.planPrice strong {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.planPrice span {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.planDesc {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.planFeatures {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex: 1;
+}
+
+.planFeatures li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.planFeatures li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--success);
+}
+
+.planCta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--glass-radius-sm);
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: var(--glass-bg-medium);
+  border: 1px solid var(--glass-border);
+  color: #f8fafc;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.planCta:hover {
+  background: var(--glass-bg-strong);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-2px);
+}
+
+.planCtaHighlight {
+  background: linear-gradient(135deg, var(--accent) 0%, #2563eb 100%);
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 20px var(--accent-glow);
+}
+
+.planCtaHighlight:hover {
+  background: linear-gradient(135deg, var(--accent) 0%, #2563eb 100%);
+  box-shadow: 0 8px 30px var(--accent-glow);
+  filter: brightness(1.1);
+}
+
+.plansFooter {
+  text-align: center;
+  margin-top: 28px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.plansFooter a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.plansFooter a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .plansGrid {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .planBadge {
+    top: -10px;
+  }
+
+  .plansModal {
+    padding: 32px 20px;
+  }
 }
 
 @media (max-width: 480px) {
   .loginCard {
     padding: 32px 24px;
-    margin: 0 16px;
+  }
+
+  .loginBranding {
+    position: static;
+    margin-top: 24px;
   }
 }
