@@ -440,7 +440,6 @@
 }
 
 .modal {
-  background: var(--glass-bg-strong);
   backdrop-filter: var(--glass-blur-strong);
   -webkit-backdrop-filter: var(--glass-blur-strong);
   border: 1px solid var(--glass-border);
@@ -454,6 +453,7 @@
 
 .modalHeader {
   padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.9);
   border-bottom: 1px solid var(--glass-border);
   display: flex;
   justify-content: space-between;
@@ -467,6 +467,7 @@
 
 .modalContent {
   padding: 2rem;
+  background: white;
 }
 
 .modalProfile {
@@ -521,6 +522,7 @@
   border-top: 1px solid var(--glass-border);
   display: flex;
   gap: 0.75rem;
+  background: white;
 }
 
 .blockBtn {
@@ -893,6 +895,8 @@
   cursor: pointer;
   transition: all 0.2s;
 }
+
+
 
 .addTagSmall:hover {
   background: var(--glass-bg-hover);
