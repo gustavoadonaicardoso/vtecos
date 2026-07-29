@@ -1,4 +1,64 @@
 .loginPage {
+  /* Cores principais */
+  --background: #070a11;
+  --foreground: #f8fafc;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(15, 23, 42, 0.72);
+  --glass-bg-medium: rgba(30, 41, 59, 0.72);
+  --glass-bg-strong: rgba(15, 23, 42, 0.94);
+  --glass-bg-input: rgba(2, 6, 23, 0.55);
+  --glass-bg-hover: rgba(51, 65, 85, 0.6);
+
+  /* Bordas */
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-hover: rgba(255, 255, 255, 0.18);
+  --glass-border-focus: rgba(59, 130, 246, 0.7);
+
+  /* Sombras */
+  --glass-shadow-elevated:
+    0 24px 70px rgba(0, 0, 0, 0.5);
+  --glass-shadow-hover:
+    0 18px 45px rgba(0, 0, 0, 0.4);
+  --glass-inset:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --glass-glow:
+    0 0 30px rgba(255, 255, 255, 0.04);
+  --glass-glow-accent:
+    0 0 35px rgba(59, 130, 246, 0.18);
+
+  /* Desfoque */
+  --glass-blur-light: blur(12px);
+  --glass-blur-strong: blur(24px);
+
+  /* Formatos */
+  --glass-radius-sm: 12px;
+  --glass-radius: 18px;
+  --glass-radius-lg: 24px;
+
+  /* Cores de ação */
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.25);
+  --danger: #f87171;
+  --success: #34d399;
+
+  --transition: all 0.2s ease;
+  --font-family: Arial, Helvetica, sans-serif;
+
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--background);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  color: var(--foreground);
+  font-family: var(--font-family);
+  padding: 24px 16px;
+}
+.loginPage {
   min-height: 100vh;
   width: 100%;
   background-color: var(--background);

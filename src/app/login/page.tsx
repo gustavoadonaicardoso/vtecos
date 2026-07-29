@@ -200,7 +200,7 @@ export default function LoginPage() {
                 <input
                   id="reset-email"
                   type="email"
-                  placeholder="nome@vortice.tech"
+                  placeholder="seunome@vorticetecnologia.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
@@ -231,7 +231,7 @@ export default function LoginPage() {
                 <input
                   id="login-email"
                   type="email"
-                  placeholder="nome@vortice.tech"
+                  placeholder="seunome@vorticetecnologia.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
