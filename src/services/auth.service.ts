@@ -8,55 +8,79 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { UserProfile, ServiceResult } from '@/types';
+import type { UserProfile, ServiceResult } from '@/types';
 
 /**
- * Realiza login via Supabase Auth (JWT).
- * Tenta auth nativo primeiro; cai no legado (password em texto) como fallback
- * enquanto a migração de usuários não for concluída.
+ * Realiza login via Supabase Auth.
  */
 export async function signIn(
   email: string,
   password: string
 ): Promise<ServiceResult<UserProfile>> {
   try {
-    // 1. Tentar Supabase Auth nativo
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!authError && authData.user) {
-      // Buscar perfil completo
-      const profile = await fetchProfileById(authData.user.id);
-      if (!profile) {
-        await supabase.auth.signOut();
-        return { success: false, error: 'Perfil não encontrado ou conta desativada.' };
-      }
-      if (profile.status === 'INACTIVE') {
-        await supabase.auth.signOut();
-        return { success: false, error: 'Conta desativada. Contate o administrador.' };
-      }
-      return { success: true, data: profile };
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+
+    if (authError) {
+      console.error('[AuthService] Supabase Auth:', {
+        message: authError.message,
+        code: authError.code,
+        status: authError.status,
+      });
+
+      return {
+        success: false,
+        error: authError.message,
+      };
     }
 
-    // 2. Fallback legado: password em texto plano (migração pendente)
-    const { data: legacyData, error: legacyError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('email', email)
-      .eq('password', password)
-      .eq('status', 'ACTIVE')
-      .single();
-
-    if (legacyError || !legacyData) {
-      return { success: false, error: 'E-mail ou senha incorretos, ou conta desativada.' };
+    if (!authData.user) {
+      return {
+        success: false,
+        error: 'Não foi possível identificar o usuário autenticado.',
+      };
     }
 
-    return { success: true, data: legacyData as UserProfile };
-  } catch (err: any) {
+    const profile = await fetchProfileById(authData.user.id);
+
+    if (!profile) {
+      await supabase.auth.signOut();
+
+      return {
+        success: false,
+        error:
+          'O login foi realizado, mas não existe um perfil correspondente na tabela profiles.',
+      };
+    }
+
+    if (profile.status === 'INACTIVE') {
+      await supabase.auth.signOut();
+
+      return {
+        success: false,
+        error: 'Conta desativada. Contate o administrador.',
+      };
+    }
+
+    return {
+      success: true,
+      data: profile,
+    };
+  } catch (err: unknown) {
     console.error('[AuthService] signIn:', err);
-    return { success: false, error: 'Falha na autenticação. Tente novamente.' };
+
+    return {
+      success: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : 'Falha na autenticação. Tente novamente.',
+    };
   }
 }
 
@@ -65,8 +89,12 @@ export async function signIn(
  */
 export async function signOut(): Promise<void> {
   try {
-    await supabase.auth.signOut();
-  } catch (err) {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error('[AuthService] signOut:', error);
+    }
+  } catch (err: unknown) {
     console.error('[AuthService] signOut:', err);
   }
 }
@@ -74,17 +102,27 @@ export async function signOut(): Promise<void> {
 /**
  * Busca o perfil completo de um usuário pelo ID.
  */
-export async function fetchProfileById(userId: string): Promise<UserProfile | null> {
+export async function fetchProfileById(
+  userId: string
+): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) return null;
+    if (error) {
+      console.error('[AuthService] fetchProfileById:', error);
+      return null;
+    }
+
+    if (!data) {
+      return null;
+    }
+
     return data as UserProfile;
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[AuthService] fetchProfileById:', err);
     return null;
   }
@@ -98,29 +136,61 @@ export async function sendPasswordResetEmail(
   redirectTo: string
 ): Promise<ServiceResult> {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    if (error) return { success: false, error: error.message };
-    return { success: true };
-  } catch (err: any) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      normalizedEmail,
+      {
+        redirectTo,
+      }
+    );
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+
+    return {
+      success: true,
+    };
+  } catch (err: unknown) {
     console.error('[AuthService] sendPasswordResetEmail:', err);
-    return { success: false, error: err.message };
+
+    return {
+      success: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível enviar o e-mail de recuperação.',
+    };
   }
 }
 
 /**
  * Busca a contagem de mensagens internas não lidas para um usuário.
  */
-export async function fetchUnreadInternalChats(userId: string): Promise<number> {
+export async function fetchUnreadInternalChats(
+  userId: string
+): Promise<number> {
   try {
     const { count, error } = await supabase
       .from('internal_chat')
-      .select('*', { count: 'exact', head: true })
+      .select('*', {
+        count: 'exact',
+        head: true,
+      })
       .eq('receiver_id', userId)
       .eq('is_read', false);
 
-    if (error) return 0;
-    return count || 0;
-  } catch (err) {
+    if (error) {
+      console.error('[AuthService] fetchUnreadInternalChats:', error);
+      return 0;
+    }
+
+    return count ?? 0;
+  } catch (err: unknown) {
     console.error('[AuthService] fetchUnreadInternalChats:', err);
     return 0;
   }

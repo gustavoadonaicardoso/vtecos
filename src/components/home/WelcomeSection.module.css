@@ -3,9 +3,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  margin-bottom: 2.5rem;
-  padding: 0 2px;
-  flex-wrap: wrap;
+
+  margin-bottom: 3.5rem;
 }
 
 /* ── Avatar ── */
@@ -42,9 +41,17 @@
 }
 
 @keyframes pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-  70%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+
+  70% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
 /* ── Left group ── */
@@ -53,21 +60,24 @@
   align-items: center;
   gap: 1.25rem;
   min-width: 0;
+  flex: 1;
 }
 
 .greetingRow {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem 0.75rem;
   flex-wrap: wrap;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.35rem;
 }
 
 .greeting {
-  font-size: 1.65rem;
+  font-size: clamp(1.3rem, 2vw, 1.65rem);
   font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
+  line-height: 1.25;
+  margin: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .name {
@@ -82,17 +92,19 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  padding: 3px 10px;
+  padding: 4px 10px;
   border-radius: 100px;
   border: 1px solid;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .subtitle {
   font-size: 0.95rem;
   color: var(--foreground);
   opacity: 0.6;
-  margin-bottom: 0.2rem;
+  margin: 0 0 0.25rem;
+  line-height: 1.45;
 }
 
 .dateLabel {
@@ -100,26 +112,29 @@
   color: var(--foreground);
   opacity: 0.4;
   text-transform: capitalize;
+  margin: 0;
 }
 
 /* ── Controls ── */
 .controls {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.75rem;
-  flex-shrink: 0;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .datePicker {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 42px;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
-  padding: 9px 16px;
+  padding: 9px 14px;
   border-radius: 12px;
   color: var(--foreground);
   transition: var(--transition);
@@ -142,7 +157,7 @@
   font-size: 0.9rem;
   outline: none;
   cursor: pointer;
-  min-width: 90px;
+  min-width: 86px;
 }
 
 .dateSelect option {
@@ -153,13 +168,15 @@
 .refreshBtn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-height: 42px;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   color: var(--foreground);
-  padding: 9px 18px;
+  padding: 9px 16px;
   border-radius: 12px;
   font-size: 0.9rem;
   font-weight: 600;
@@ -188,30 +205,85 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-/* ── Responsive ── */
-@media (max-width: 900px) {
+/* ── Tablet ── */
+@media (max-width: 1100px) {
   .welcomeSection {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
   }
+
   .controls {
+    justify-content: flex-start;
     width: 100%;
   }
 }
 
-@media (max-width: 480px) {
-  .greeting {
-    font-size: 1.35rem;
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .welcomeSection {
+    gap: 1rem;
+    margin-bottom: 1.5rem;
   }
+
+  .left {
+    align-items: flex-start;
+    gap: 0.9rem;
+  }
+
   .avatar {
     width: 48px;
     height: 48px;
   }
+
   .avatarInitials {
     font-size: 1rem;
+  }
+
+  .greetingRow {
+    align-items: flex-start;
+  }
+
+  .greeting {
+    font-size: 1.25rem;
+  }
+
+  .subtitle {
+    font-size: 0.88rem;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .datePicker,
+  .refreshBtn {
+    width: 100%;
+  }
+
+  .dateSelect {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ── Celulares pequenos ── */
+@media (max-width: 420px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .roleBadge {
+    font-size: 0.65rem;
   }
 }

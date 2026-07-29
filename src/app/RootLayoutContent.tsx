@@ -95,7 +95,6 @@ function AppGuard({ children }: { children: React.ReactNode }) {
               {children}
             </main>
           </div>
-          <HelpFAB />
           {/* FIX #6: modal só montado quando está aberto */}
           {isModalOpen && <NewLeadModal />}
           {isDialerOpen && <Dialer onClose={closeDialer} />}

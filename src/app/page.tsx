@@ -417,54 +417,57 @@ export default function HomePage() {
   const isSeller = user?.role === 'SELLER';
 
   return (
-    <div className={styles.dashboard}>
 
-      {/* 1. Seção de Boas-Vindas — Universal */}
-      <WelcomeSection
-        user={user}
-        currentFilter={currentFilter}
-        onFilterChange={setCurrentFilter}
-        onRefresh={handleRefresh}
-        isRefreshing={isRefreshing}
-      />
+  <div className={styles.dashboard}>
 
-      {/* 2. Banners — Universal, filtrado por role */}
-      <BannerCarousel banners={banners} user={user} />
+    {/* 1. Seção de Boas-Vindas — Universal */}
+    <WelcomeSection
+      user={user}
+      currentFilter={currentFilter}
+      onFilterChange={setCurrentFilter}
+      onRefresh={handleRefresh}
+      isRefreshing={isRefreshing}
+    />
 
-      {/* 3. KPI Panel — Universal, dados distintos por role */}
-      <PersonalKPIPanel
-        user={user}
-        leads={leads}
-        teamStats={teamStats}
-      />
+    {/* 2. Banners — Universal, filtrado por role */}
+    <BannerCarousel banners={banners} user={user} />
 
-      {/* 4a. Visão estendida — MANAGER e ADMIN */}
-      {canSeeTeamData && (
-        <>
-          <MetricsSection
-            realTma={realTma}
-            realTme={realTme}
-            realStatusCounts={realStatusCounts}
-            realSources={realSources}
-          />
-          <FunnelAndUpdates
-            funnel={funnel}
-            recentUpdates={recentUpdates}
-            currentFilter={currentFilter}
-            leads={leads}
-          />
-          <TeamPerformanceSection teamStats={teamStats} />
-        </>
-      )}
+    {/* 3. KPI Panel — Universal, dados distintos por role */}
+    <PersonalKPIPanel
+      user={user}
+      leads={leads}
+      teamStats={teamStats}
+    />
 
-      {/* 4b. Feed pessoal — SELLER */}
-      {isSeller && user && (
-        <PersonalActivityFeed
-          userId={user.id}
-          userName={user.name}
+    {/* 4a. Visão estendida — MANAGER e ADMIN */}
+    {canSeeTeamData && (
+      <>
+        <MetricsSection
+          realTma={realTma}
+          realTme={realTme}
+          realStatusCounts={realStatusCounts}
+          realSources={realSources}
         />
-      )}
 
-    </div>
-  );
+        <FunnelAndUpdates
+          funnel={funnel}
+          recentUpdates={recentUpdates}
+          currentFilter={currentFilter}
+          leads={leads}
+        />
+
+        <TeamPerformanceSection teamStats={teamStats} />
+      </>
+    )}
+
+    {/* 4b. Feed pessoal — SELLER */}
+    {isSeller && user && (
+      <PersonalActivityFeed
+        userId={user.id}
+        userName={user.name}
+      />
+    )}
+
+  </div>
+);
 }
