@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -16,14 +17,8 @@ import {
   X,
   Link2,
   Lock,
-  ChevronRight,
   Loader2,
   Zap,
-  Edit3,
-  Eye,
-  EyeOff,
-  Info,
-  GitBranch
 } from 'lucide-react';
 import styles from './integrations.module.css';
 import { supabase } from '@/lib/supabase';
@@ -40,9 +35,9 @@ const INTEGRATIONS = [
     color: '#25D366'
   },
   {
-    id: 'zapi',
-    name: 'Z-API (WhatsApp)',
-    description: 'Conecte sua conta Z-API para automações rápidas sem burocracia do Facebook Business Manager.',
+    id: 'whatsapp-web',
+    name: 'WhatsApp Web (Gratuito)',
+    description: 'Conecte seu WhatsApp diretamente por QR Code, sem contratar gateways ou pagar mensalidade.',
     icon: Zap,
     category: 'Comunicação',
     status: 'not_connected',
@@ -114,15 +109,7 @@ export default function Integrations() {
     instagramId: ''
   });
 
-  // Z-API Config State
-  const [zapiConfig, setZapiConfig] = useState({
-    name: '',
-    instanceId: '',
-    token: '',
-    clientToken: '',
-    receiveGroups: false,
-    initialFlow: ''
-  });
+  const [webConfig, setWebConfig] = useState({ name: 'WhatsApp principal' });
 
   // Webhook Config State
   const [webhookConfig, setWebhookConfig] = useState({
@@ -134,32 +121,79 @@ export default function Integrations() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [zapiQr, setZapiQr] = useState<string | null>(null);
   const [isFetchingQr, setIsFetchingQr] = useState(false);
+  const [zapiConnection, setZapiConnection] = useState<'idle' | 'waiting' | 'connected' | 'error'>('idle');
+  const [zapiConnectionMessage, setZapiConnectionMessage] = useState('');
+  const qrRefreshCount = React.useRef(0);
 
-  const fetchZapiQrCode = async () => {
-    if (!zapiConfig.instanceId || !zapiConfig.token) {
-      alert("Informe o Instance ID e Token primeiro.");
-      return;
-    }
-    
+  const requestWhatsAppWeb = React.useCallback(async () => {
+    const response = await fetch('/api/whatsapp/web/connection', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Erro ao conectar com o WhatsApp Web.');
+    return data;
+  }, []);
+
+  const fetchZapiQrCode = React.useCallback(async (isRefresh = false) => {
     setIsFetchingQr(true);
-    setZapiQr(null);
+    if (!isRefresh) {
+      setZapiQr(null);
+      qrRefreshCount.current = 0;
+    }
+    setZapiConnection('waiting');
+    setZapiConnectionMessage('Aguardando leitura do QR Code...');
     
     try {
-      const response = await fetch(`https://api.z-api.io/instances/${zapiConfig.instanceId}/token/${zapiConfig.token}/qr-code`);
-      const data = await response.json();
-      
-      if (data.value) {
-        setZapiQr(data.value); // Base64 image
-      } else {
-        alert("Instância já está conectada ou erro ao gerar QR.");
+      const status = await requestWhatsAppWeb();
+      if (status.connected) {
+        setZapiQr(null);
+        setZapiConnection('connected');
+        setZapiConnectionMessage('WhatsApp conectado com sucesso.');
+        return;
       }
+
+      setZapiQr(status.qrCode || null);
     } catch (err) {
       console.error(err);
-      alert("Erro ao conectar com Z-API.");
+      setZapiConnection('error');
+      setZapiConnectionMessage(err instanceof Error ? err.message : 'Erro ao conectar com WhatsApp Web.');
     } finally {
       setIsFetchingQr(false);
     }
-  };
+  }, [requestWhatsAppWeb]);
+
+  React.useEffect(() => {
+    if (activeModal !== 'whatsapp-web' || zapiConnection !== 'waiting') return;
+
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await requestWhatsAppWeb();
+        if (status.connected) {
+          setZapiQr(null);
+          setZapiConnection('connected');
+          setZapiConnectionMessage('WhatsApp conectado com sucesso. Salve a integração para ativá-la no CRM.');
+          window.clearInterval(timer);
+          return;
+        }
+
+        if (status.qrCode) setZapiQr(status.qrCode);
+
+        if (qrRefreshCount.current >= 30) {
+          setZapiQr(null);
+          setZapiConnection('idle');
+          setZapiConnectionMessage('QR Code expirado. Gere um novo código para tentar novamente.');
+          window.clearInterval(timer);
+          return;
+        }
+
+        qrRefreshCount.current += 1;
+      } catch (error) {
+        setZapiConnection('error');
+        setZapiConnectionMessage(error instanceof Error ? error.message : 'Falha ao verificar a conexão.');
+        window.clearInterval(timer);
+      }
+    }, 2_000);
+
+    return () => window.clearInterval(timer);
+  }, [activeModal, requestWhatsAppWeb, zapiConnection]);
 
   const handleTestConnection = async () => {
     if (!waConfig.token || !waConfig.phoneId) {
@@ -191,15 +225,8 @@ export default function Integrations() {
       setConnectedProviders(providers);
       
       data.forEach(item => {
-        if (item.provider === 'zapi') {
-          setZapiConfig({
-            name: item.config.name || '',
-            instanceId: item.config.instanceId || '',
-            token: item.config.token || '',
-            clientToken: item.config.clientToken || '',
-            receiveGroups: item.config.receiveGroups || false,
-            initialFlow: item.config.initialFlow || ''
-          });
+        if (item.provider === 'whatsapp_web') {
+          setWebConfig({ name: item.config.name || 'WhatsApp principal' });
         } else if (item.provider === 'whatsapp_meta') {
           setWaConfig({ token: item.config.token, phoneId: item.config.phoneId, wabaId: item.config.wabaId });
         } else if (item.provider === 'meta_ads') {
@@ -215,7 +242,7 @@ export default function Integrations() {
     fetchConfigs();
   }, []);
 
-  const handleSaveConfig = async (type: 'whatsapp' | 'meta' | 'zapi' = 'whatsapp') => {
+  const handleSaveConfig = async (type: 'whatsapp' | 'meta' | 'whatsapp-web' | 'webhook' = 'whatsapp') => {
      if (!supabase) return;
      setSaveStatus('saving');
      
@@ -223,13 +250,13 @@ export default function Integrations() {
        let configToSave = {};
        let provider = '';
 
-       if (type === 'zapi') {
-         configToSave = zapiConfig;
-         provider = 'zapi';
+       if (type === 'whatsapp-web') {
+         configToSave = webConfig;
+         provider = 'whatsapp_web';
        } else if (type === 'whatsapp') {
          configToSave = waConfig;
          provider = 'whatsapp_meta';
-       } else if (type === 'webhook' as any) {
+       } else if (type === 'webhook') {
          configToSave = webhookConfig;
          provider = 'webhook_custom';
        } else {
@@ -245,6 +272,7 @@ export default function Integrations() {
 
        if (error) throw error;
 
+       setConnectedProviders(prev => prev.includes(provider) ? prev : [...prev, provider]);
        setSaveStatus('success');
        setTimeout(() => {
          setActiveModal(null);
@@ -261,11 +289,19 @@ export default function Integrations() {
 
   const handleDisconnect = async (provider: string) => {
     const confirmed = confirm(
-      `Tem certeza que deseja remover a integração com ${provider === 'zapi' ? 'Z-API' : provider}? Esta ação irá apagar todas as credenciais salvas.`
+      `Tem certeza que deseja remover a integração com ${provider === 'whatsapp_web' ? 'WhatsApp Web' : provider}?`
     );
     if (!confirmed || !supabase) return;
 
     try {
+      if (provider === 'whatsapp_web') {
+        const response = await fetch('/api/whatsapp/web/connection', {
+          method: 'DELETE',
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Não foi possível desconectar o WhatsApp.');
+      }
+
       const { error } = await supabase
         .from('integrations_config')
         .delete()
@@ -275,9 +311,11 @@ export default function Integrations() {
 
       setConnectedProviders(prev => prev.filter(p => p !== provider));
 
-      if (provider === 'zapi') {
-        setZapiConfig({ name: '', instanceId: '', token: '', clientToken: '', receiveGroups: false, initialFlow: '' });
+      if (provider === 'whatsapp_web') {
+        setWebConfig({ name: 'WhatsApp principal' });
         setZapiQr(null);
+        setZapiConnection('idle');
+        setZapiConnectionMessage('');
       }
 
       setActiveModal(null);
@@ -289,7 +327,7 @@ export default function Integrations() {
 
   const filteredIntegrations = INTEGRATIONS.map(item => {
     let currentStatus = item.status;
-    if (item.id === 'zapi' && connectedProviders.includes('zapi')) currentStatus = 'connected';
+    if (item.id === 'whatsapp-web' && connectedProviders.includes('whatsapp_web')) currentStatus = 'connected';
     if (item.id === 'whatsapp' && connectedProviders.includes('whatsapp_meta')) currentStatus = 'connected';
     if (item.id === 'meta-ads' && connectedProviders.includes('meta_ads')) currentStatus = 'connected';
     if (item.id === 'webhook' && connectedProviders.includes('webhook_custom')) currentStatus = 'connected';
@@ -519,17 +557,17 @@ export default function Integrations() {
       );
     }
 
-    if (activeModal === 'zapi') {
+    if (activeModal === 'whatsapp-web') {
       return (
         <>
           <div className={styles.modalHeader}>
             <div className={styles.modalTitle}>
               <div className={styles.iconBox} style={{ width: 40, height: 40, background: '#11c1d922', color: '#11c1d9' }}>
-                <Edit3 size={20} />
+                <MessageCircle size={20} />
               </div>
               <div>
-                <span style={{ fontSize: '1.1rem', display: 'block', fontWeight: 600 }}>Editar Conexão</span>
-                <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Gerencie os parâmetros da sua instância Z-API</span>
+                <span style={{ fontSize: '1.1rem', display: 'block', fontWeight: 600 }}>Conectar WhatsApp Web</span>
+                <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Conexão gratuita e autogerenciada por QR Code</span>
               </div>
             </div>
             <button className={styles.closeBtn} onClick={() => setActiveModal(null)}><X size={20} /></button>
@@ -540,102 +578,37 @@ export default function Integrations() {
               <label>Nome da conexão</label>
               <input 
                 type="text" 
-                placeholder="Ex: Valéria | IA" 
+                placeholder="Ex: WhatsApp comercial" 
                 className={styles.premiumInput} 
-                value={zapiConfig.name || ''}
-                onChange={(e) => setZapiConfig({...zapiConfig, name: e.target.value})}
+                value={webConfig.name}
+                onChange={(e) => setWebConfig({ name: e.target.value })}
               />
             </div>
 
-            <div className={styles.formGroup}>
-              <label>Instance ID</label>
-              <input 
-                type="text" 
-                placeholder="ID da sua instância" 
-                className={styles.premiumInput} 
-                value={zapiConfig.instanceId || ''}
-                onChange={(e) => setZapiConfig({...zapiConfig, instanceId: e.target.value})}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-               <label>Token <span style={{ opacity: 0.5, fontWeight: 400 }}>(vazio = manter)</span></label>
-               <div className={styles.inputWrapper}>
-                 <input 
-                   type="password" 
-                   className={styles.premiumInput} 
-                   value={zapiConfig.token || ''}
-                   onChange={(e) => setZapiConfig({...zapiConfig, token: e.target.value})}
-                 />
-                 <Eye size={16} className={styles.inputIcon} style={{ cursor: 'pointer', opacity: 0.5 }} />
-               </div>
-            </div>
-
-            <div className={styles.formGroup}>
-               <label>Security Token (Client-Token) <span style={{ opacity: 0.5, fontWeight: 400 }}>(vazio = manter)</span></label>
-               <input 
-                 type="text" 
-                 placeholder="Token de segurança da instância" 
-                 className={styles.premiumInput} 
-                 value={zapiConfig.clientToken || ''}
-                 onChange={(e) => setZapiConfig({...zapiConfig, clientToken: e.target.value})}
-               />
-               <small style={{ opacity: 0.4, marginTop: '4px', display: 'block' }}>Encontre em: Painel Z-API → Sua Instância → Security Token</small>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0' }}>
-               <div>
-                 <p style={{ fontSize: '0.95rem', fontWeight: 600 }}>Receber mensagens de grupos</p>
-                 <p style={{ fontSize: '0.8rem', opacity: 0.5 }}>Mensagens de grupos do WhatsApp serão processadas como conversas</p>
-               </div>
-               <label className={styles.switch}>
-                 <input 
-                    type="checkbox" 
-                    checked={zapiConfig.receiveGroups || false}
-                    onChange={(e) => setZapiConfig({...zapiConfig, receiveGroups: e.target.checked})}
-                 />
-                 <span className={`${styles.slider} ${styles.round}`}></span>
-               </label>
-            </div>
-
-            <div style={{ padding: '1rem', background: 'rgba(168, 85, 247, 0.05)', borderRadius: '16px', border: '1px solid rgba(168, 85, 247, 0.1)', display: 'flex', gap: '12px' }}>
-               <div style={{ color: '#a855f7', marginTop: '2px' }}><Info size={18} /></div>
-               <div>
-                 <p style={{ fontSize: '0.85rem', color: '#a855f7', fontWeight: 600, marginBottom: '4px' }}>Configure o webhook no painel Z-API:</p>
-                 <code style={{ background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', display: 'block' }}>
-                   {originUrl}/api/webhooks/z-api
-                 </code>
-               </div>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Fluxo Inicial <span style={{ opacity: 0.5, fontWeight: 400 }}>(opcional)</span></label>
-              <div className={styles.inputWrapper}>
-                <input 
-                  type="text" 
-                  placeholder="Selecione um fluxo..." 
-                  className={styles.premiumInput} 
-                  value={zapiConfig.initialFlow || ''}
-                  onChange={(e) => setZapiConfig({...zapiConfig, initialFlow: e.target.value})}
-                />
-                <GitBranch size={16} className={styles.inputIcon} style={{ opacity: 0.5 }} />
-              </div>
+            <div className={styles.alertBox}>
+              <p><strong>Como conectar:</strong> abra o WhatsApp no celular, acesse Aparelhos conectados, escolha Conectar um aparelho e leia o código abaixo.</p>
+              <p style={{ marginTop: '8px', fontSize: '0.78rem', opacity: 0.75 }}>A sessão fica armazenada no servidor. Esta opção não é uma API oficial da Meta e automações excessivas podem causar bloqueio do número.</p>
             </div>
 
             <div className={styles.qrContainer} style={{ marginTop: '0.5rem', textAlign: 'center', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px solid var(--border)' }}>
+               {zapiConnectionMessage && (
+                 <p style={{ marginBottom: '1rem', fontSize: '0.85rem', color: zapiConnection === 'connected' ? '#25D366' : zapiConnection === 'error' ? '#ef4444' : 'var(--foreground)', opacity: zapiConnection === 'waiting' ? 0.7 : 1 }}>
+                   {zapiConnectionMessage}
+                 </p>
+               )}
                {zapiQr ? (
                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ background: 'white', padding: '12px', borderRadius: '12px', lineHeight: 0 }}>
-                      <img src={zapiQr} alt="Z-API QR Code" style={{ width: '150px', height: '150px' }} />
+                      <Image src={zapiQr} alt="QR Code do WhatsApp Web" width={220} height={220} unoptimized />
                     </div>
-                    <button onClick={fetchZapiQrCode} style={{ background: 'none', border: 'none', color: '#11c1d9', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}>
+                    <button onClick={() => fetchZapiQrCode()} style={{ background: 'none', border: 'none', color: '#11c1d9', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}>
                       Atualizar QR Code
                     </button>
                  </div>
                ) : (
                  <button 
                    className={styles.btnTest} 
-                   onClick={fetchZapiQrCode}
+                   onClick={() => fetchZapiQrCode()}
                    disabled={isFetchingQr}
                    style={{ margin: '0 auto', background: 'rgba(17, 193, 217, 0.1)', color: '#11c1d9', border: '1px solid #11c1d944' }}
                  >
@@ -649,9 +622,9 @@ export default function Integrations() {
           <div className={styles.modalFooter}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <button className={styles.btnCancel} onClick={() => setActiveModal(null)}>Cancelar</button>
-              {connectedProviders.includes('zapi') && (
+              {connectedProviders.includes('whatsapp_web') && (
                 <button
-                  onClick={() => handleDisconnect('zapi')}
+                  onClick={() => handleDisconnect('whatsapp_web')}
                   style={{
                     background: 'rgba(239, 68, 68, 0.1)',
                     color: '#ef4444',
@@ -675,11 +648,11 @@ export default function Integrations() {
             </div>
             <button 
                 className={styles.btnSave} 
-                onClick={() => (handleSaveConfig as any)('zapi')}
+                onClick={() => handleSaveConfig('whatsapp-web')}
                 style={{ background: '#11c1d9', color: 'black' }}
                 disabled={saveStatus !== 'idle'}
             >
-               {saveStatus === 'saving' ? 'Salvando...' : saveStatus === 'success' ? 'Salvo!' : 'Salvar Alterações'}
+               {saveStatus === 'saving' ? 'Salvando...' : saveStatus === 'success' ? 'Salvo!' : 'Salvar Conexão'}
             </button>
           </div>
         </>
@@ -744,7 +717,7 @@ export default function Integrations() {
             <button className={styles.btnCancel} onClick={() => setActiveModal(null)}>Cancelar</button>
             <button 
                 className={styles.btnSave} 
-                onClick={() => (handleSaveConfig as any)('webhook')}
+                onClick={() => handleSaveConfig('webhook')}
                 style={{ background: '#3b82f6', color: 'white' }}
                 disabled={saveStatus !== 'idle'}
             >
@@ -778,7 +751,7 @@ export default function Integrations() {
             <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem', borderRadius: '12px', marginTop: '1rem', display: 'flex', gap: '12px', alignItems: 'center' }}>
               <Link2 size={24} color="#0F9D58" opacity={0.5} />
               <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
-                Lembre-se de dar permissão de "Editor" para <strong>vortice-api@appspot.gserviceaccount.com</strong> na sua planilha.
+                Lembre-se de dar permissão de &quot;Editor&quot; para <strong>vortice-api@appspot.gserviceaccount.com</strong> na sua planilha.
               </div>
             </div>
           </div>

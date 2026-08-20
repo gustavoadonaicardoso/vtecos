@@ -58,6 +58,7 @@
   font-family: var(--font-family);
   padding: 24px 16px;
 }
+
 .loginPage {
   min-height: 100vh;
   width: 100%;

@@ -43,3 +43,6 @@ next-env.d.ts
 # build zips & scratch
 *.zip
 /scratch/
+
+# WhatsApp Web local authentication keys
+/.whatsapp-session/

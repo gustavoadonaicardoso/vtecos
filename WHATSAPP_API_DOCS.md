@@ -22,6 +22,26 @@
 
 ## 1. Visão Geral
 
+### Conexão gratuita via WhatsApp Web
+
+O conector padrão sem gateway usa Baileys e a sessão multidispositivo do WhatsApp Web.
+Ele não exige Z-API nem cobrança por mensagem. A aplicação precisa executar em um processo
+Node.js persistente e o diretório de sessão também precisa ser persistente.
+
+| Função | Endpoint |
+|---|---|
+| Iniciar conexão, consultar status e obter QR Code | `GET /api/whatsapp/web/connection` |
+| Desconectar o aparelho | `DELETE /api/whatsapp/web/connection` |
+| Enviar mensagem | `POST /api/whatsapp/web/send` |
+
+Por padrão, as chaves ficam em `.whatsapp-session/`. Em produção, configure um volume
+persistente e, se necessário, defina `WHATSAPP_WEB_SESSION_PATH=/caminho/do/volume`.
+
+> Esta conexão é gratuita e autogerenciada, mas não é uma API oficial da Meta. Evite disparos
+> abusivos e automações que violem os termos do WhatsApp.
+
+### Integrações legadas e oficiais
+
 O VTEC OS suporta **duas integrações WhatsApp** em paralelo:
 
 | Integração | Rota Webhook | Rota de Envio | Descrição |

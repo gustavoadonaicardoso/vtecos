@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { sendWhatsAppWebMessage } from '@/lib/whatsapp-web';
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -30,23 +31,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .update({ status: 'sending' })
       .eq('id', contactId);
 
-    const { data: configItem } = await supabase
-      .from('integrations_config')
-      .select('config')
-      .eq('provider', 'zapi')
-      .maybeSingle();
-
-    if (!configItem) {
-      await supabase
-        .from('blast_contacts')
-        .update({ status: 'failed', error_msg: 'Z-API não configurada' })
-        .eq('id', contactId);
-      await incrementFailed(supabase, campaignId);
-      return NextResponse.json({ success: false, error: 'Z-API não configurada' });
-    }
-
-    const { instanceId, token, clientToken } = configItem.config as any;
-
     let cleanPhone = (contact.phone ?? '').replace(/\D/g, '');
     if (cleanPhone.length < 10) {
       await supabase
@@ -60,33 +44,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const message = contact.rendered_message ?? '';
 
-    const response = await fetch(
-      `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(clientToken ? { 'Client-Token': clientToken } : {}),
-        },
-        body: JSON.stringify({ phone: cleanPhone, message }),
-      }
-    );
-
-    if (response.ok) {
+    try {
+      await sendWhatsAppWebMessage(cleanPhone, message);
       await supabase
         .from('blast_contacts')
         .update({ status: 'sent', sent_at: new Date().toISOString(), error_msg: null })
         .eq('id', contactId);
       await incrementSent(supabase, campaignId);
       return NextResponse.json({ success: true });
-    } else {
-      const errBody = await response.text();
+    } catch (sendError) {
+      const errorMessage = sendError instanceof Error ? sendError.message : 'Falha no envio pelo WhatsApp Web';
       await supabase
         .from('blast_contacts')
-        .update({ status: 'failed', error_msg: errBody.slice(0, 200) })
+        .update({ status: 'failed', error_msg: errorMessage.slice(0, 200) })
         .eq('id', contactId);
       await incrementFailed(supabase, campaignId);
-      return NextResponse.json({ success: false, error: errBody });
+      return NextResponse.json({ success: false, error: errorMessage });
     }
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

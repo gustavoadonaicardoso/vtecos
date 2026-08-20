@@ -28,17 +28,17 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sendWhatsApp } from '@/lib/zapi';
+import { getWhatsAppWebStatus, sendWhatsAppWebMessage, startWhatsAppWeb } from '@/lib/whatsapp-web';
 
 export async function POST(request: NextRequest) {
-  let body: any;
+  let body: { phone?: string; message?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: 'Body JSON inválido.' }, { status: 400 });
   }
 
-  const { phone, message, leadId, delayMessage, delayTyping } = body;
+  const { phone, message } = body;
 
   // Validação
   if (!phone || !message?.trim()) {
@@ -49,23 +49,19 @@ export async function POST(request: NextRequest) {
   }
 
   // Chama a função de envio Z-API (busca credenciais no Supabase)
-  const result = await sendWhatsApp(phone, message, leadId, {
-    delayMessage: delayMessage ?? 0,
-    delayTyping: delayTyping ?? 0,
-  });
-
-  if (!result.success) {
+  try {
+    const result = await sendWhatsAppWebMessage(phone, message);
+    return NextResponse.json({
+      success: true,
+      messageId: result?.key?.id ?? null,
+      dbMessageId: null,
+    }, { status: 200 });
+  } catch (error) {
     return NextResponse.json({
       success: false,
-      error: result.error,
+      error: error instanceof Error ? error.message : 'Falha no envio pelo WhatsApp Web.',
     }, { status: 502 });
   }
-
-  return NextResponse.json({
-    success: true,
-    messageId: result.data?.messageId ?? null,
-    dbMessageId: result.dbMessageId ?? null,
-  }, { status: 200 });
 }
 
 // ─── GET — Testa a conexão com Z-API ─────────────────────────
@@ -74,39 +70,7 @@ export async function POST(request: NextRequest) {
  * Verifica se as credenciais Z-API estão configuradas e retorna status.
  */
 export async function GET() {
-  const { createClient } = await import('@supabase/supabase-js');
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  // Verifica credenciais no Supabase
-  const { data: item, error } = await supabase
-    .from('integrations_config')
-    .select('config')
-    .eq('provider', 'zapi')
-    .maybeSingle();
-
-  if (error || !item) {
-    // Fallback: verifica env vars
-    const hasEnvVars = !!(
-      process.env.ZAPI_INSTANCE_ID &&
-      process.env.ZAPI_TOKEN
-    );
-    return NextResponse.json({
-      configured: hasEnvVars,
-      source: hasEnvVars ? 'env' : 'none',
-      message: hasEnvVars
-        ? 'Credenciais Z-API encontradas nas variáveis de ambiente.'
-        : 'Z-API não configurada. Configure via Integrações ou .env.local.',
-    });
-  }
-
-  const config = item.config as any;
-  return NextResponse.json({
-    configured: !!(config.instanceId && config.token),
-    source: 'database',
-    instanceId: config.instanceId ? `${String(config.instanceId).slice(0, 4)}****` : null,
-    message: 'Credenciais Z-API carregadas do banco de dados.',
-  });
+  await startWhatsAppWeb();
+  const status = getWhatsAppWebStatus();
+  return NextResponse.json({ configured: status.connected, source: 'whatsapp-web', ...status });
 }

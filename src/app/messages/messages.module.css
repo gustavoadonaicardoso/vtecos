@@ -227,7 +227,7 @@
   color: var(--foreground);
   gap: 20px;
   background: var(--background);
-  position: relative;
+  position: static;
   background-image: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
 }
 
@@ -302,7 +302,7 @@
 }
 
 .emptyStateTools {
-  position: absolute;
+  position: fixed;
   top: 0;
   right: 0;
   padding: 0 24px;
@@ -310,6 +310,15 @@
   display: flex;
   align-items: center;
   z-index: 100;
+}
+
+[data-theme='dark'] .emptyStateTools {
+  background: transparent;
+}
+
+.emptyStateTools .systemTools {
+  padding-right: 0;
+  border-right: 0;
 }
 
 .headerRightTools {
@@ -1091,6 +1100,145 @@
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+}
+
+/* Mantém o cabeçalho e os dois painéis utilizáveis em telas menores. */
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 300px;
+    min-width: 300px;
+  }
+
+  .headerRightTools,
+  .systemTools {
+    gap: 0.75rem;
+  }
+
+  .systemTools {
+    padding-right: 0.75rem;
+  }
+
+  .userSection {
+    gap: 6px;
+    padding-left: 0;
+  }
+
+  .userSection span {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+  }
+
+  .chatHeaderMain {
+    padding-inline: 12px;
+  }
+
+  .chatHeaderUser {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .headerRightTools {
+    flex-shrink: 0;
+    gap: 0.5rem;
+  }
+
+  .systemTools {
+    gap: 0.55rem;
+    padding-right: 0.5rem;
+  }
+
+  .emptyStateTools {
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    position: relative;
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .sidebar {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .mainChat {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hiddenOnMobile {
+    display: none;
+  }
+
+  .sidebarHeader {
+    padding-inline: 12px;
+  }
+
+  .chatHeaderMain {
+    min-height: var(--header-height);
+  }
+
+  .chatHeaderUser .avatar {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .systemTools {
+    border-right: 0;
+    padding-right: 0;
+  }
+
+  .headerRightTools .userSection,
+  .emptyStateTools .userSection {
+    display: none;
+  }
+
+  .emptyStateTools {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: auto;
+    width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebarHeader {
+    gap: 8px;
+  }
+
+  .newContactBtn span,
+  .headerRightTools .systemTools > a {
+    display: none;
+  }
+
+  .newContactBtn {
+    padding-inline: 0.55rem;
+  }
+
+  .headerRightTools,
+  .systemTools {
+    gap: 0.35rem;
+  }
+
+  .messagesArea {
+    padding-inline: 12px;
+  }
 }
 
 .modalField { display: flex; flex-direction: column; gap: 0.35rem; }

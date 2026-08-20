@@ -38,7 +38,8 @@ export async function saveChatMessage(params: {
 }
 
 /**
- * Send a text message through Z-API
+ * Envia uma mensagem pelo conector gratuito do WhatsApp Web.
+ * O nome da função foi mantido para preservar compatibilidade com as telas existentes.
  */
 export async function sendWhatsApp(
   phone: string,
@@ -49,22 +50,6 @@ export async function sendWhatsApp(
   if (!supabase) return { success: false, error: 'Supabase não inicializado' };
 
   try {
-    const { data: item, error: configError } = await supabase
-      .from('integrations_config')
-      .select('config')
-      .eq('provider', 'zapi')
-      .maybeSingle();
-
-    if (configError || !item) {
-      return { success: false, error: 'Z-API não configurada' };
-    }
-
-    const { instanceId, token, clientToken } = item.config as ZApiConfig;
-
-    if (!instanceId || !token) {
-      return { success: false, error: 'Credenciais Z-API incompletas' };
-    }
-
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length < 10) return { success: false, error: 'Número de telefone inválido' };
 
@@ -84,23 +69,12 @@ export async function sendWhatsApp(
       });
     }
 
-    // 2. Call Z-API
-    const response = await fetch(
-      `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(clientToken ? { 'Client-Token': clientToken } : {}),
-        },
-        body: JSON.stringify({
-          phone: cleanPhone,
-          message,
-          delayMessage: options?.delayMessage ?? 0,
-          delayTyping: options?.delayTyping ?? 0,
-        }),
-      }
-    );
+    // 2. Call the self-hosted WhatsApp Web route
+    const response = await fetch('/api/whatsapp/web/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: cleanPhone, message }),
+    });
 
     const result = await response.json();
 
@@ -112,10 +86,10 @@ export async function sendWhatsApp(
         .eq('id', dbMessageId);
     }
 
-    return { success: response.ok, data: result, dbMessageId };
+    return { success: response.ok, data: result, dbMessageId, error: result.error };
 
   } catch (err: any) {
-    console.error('Z-API Send Error:', err);
+    console.error('WhatsApp Web Send Error:', err);
     return { success: false, error: err.message };
   }
 }
