@@ -1,6 +1,7 @@
 .sidebar {
   width: var(--sidebar-width);
   height: 100vh;
+  height: 100dvh;
   position: fixed;
   left: 0;
   top: 0;
@@ -14,6 +15,7 @@
   padding: 1.5rem;
   z-index: 1000;
   transition: var(--transition);
+  overflow: hidden;
 }
 
 @media (max-width: 768px) {
@@ -228,10 +230,7 @@
 
 .backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);

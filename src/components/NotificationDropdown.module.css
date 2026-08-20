@@ -1,9 +1,6 @@
 ﻿.overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   z-index: 1100;
 }
 
@@ -182,7 +179,8 @@
     left: 0;
     right: 0;
     width: 100%;
-    border-radius: var(--glass-radius) 20px 0 0;
+    max-height: min(80dvh, 680px);
+    border-radius: var(--glass-radius) var(--glass-radius) 0 0;
     border-bottom: none;
   }
 }

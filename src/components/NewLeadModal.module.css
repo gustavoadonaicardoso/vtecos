@@ -1,9 +1,6 @@
 ﻿.modalOverlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   z-index: 9999;
@@ -11,6 +8,7 @@
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.2s ease-out;
+  padding: 1rem;
 }
 
 .modal {
@@ -24,8 +22,9 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  max-height: 90vh;
+  max-height: calc(100dvh - 2rem);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .header {
@@ -188,4 +187,41 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .modalOverlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: calc(100dvh - 0.5rem);
+    border-radius: var(--glass-radius) var(--glass-radius) 0 0;
+    border-bottom: 0;
+  }
+
+  .header {
+    padding: 24px 20px 18px;
+  }
+
+  .closeButton {
+    top: 18px;
+    right: 18px;
+  }
+
+  .form {
+    padding: 0 20px 20px;
+    gap: 18px;
+  }
+
+  .footer {
+    flex-direction: column-reverse;
+  }
+
+  .cancelBtn,
+  .submitBtn {
+    width: 100%;
+  }
 }

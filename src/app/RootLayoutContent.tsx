@@ -5,7 +5,6 @@ import { useAuth, AuthProvider } from '@/context/AuthContext';
 import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import styles from "./layout.module.css";
-import HelpFAB from "@/components/HelpFAB";
 import NewLeadModal from "@/components/NewLeadModal";
 import { LeadProvider, useLeads } from "@/context/LeadContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -89,7 +88,7 @@ function AppGuard({ children }: { children: React.ReactNode }) {
       ) : (
         <div className={styles.layoutContainer}>
           <Sidebar />
-          <div className={styles.mainContent}>
+          <div className={`${styles.mainContent} ${isFullPage ? styles.mainContentFullPage : ''}`}>
             {!isFullPage && <Navbar />}
             <main className={isFullPage ? styles.fullPageContent : styles.pageScrollContainer}>
               {children}

@@ -1,6 +1,7 @@
 ﻿.container {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   width: 100%;
   background: var(--background);
   overflow: hidden;
@@ -8,7 +9,7 @@
 
 @media (max-width: 768px) {
   .container {
-    height: 100vh;
+    height: 100dvh;
   }
 }
 

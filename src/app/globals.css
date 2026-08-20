@@ -82,12 +82,40 @@
   padding: 0;
 }
 
+html,
+body {
+  min-height: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-family);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+input,
+textarea,
+select,
+button {
+  min-width: 0;
+  font: inherit;
+}
+
+textarea {
+  max-width: 100%;
+}
+
+table {
+  border-collapse: collapse;
 }
 
 a {
@@ -100,6 +128,15 @@ button {
   border: none;
   background: none;
   font-family: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ===== Glassmorphism Utility Classes ===== */
@@ -198,4 +235,24 @@ button {
 ::selection {
   background: rgba(59, 130, 246, 0.3);
   color: white;
+}
+
+@media (max-width: 480px) {
+  :root {
+    --container-padding: 0.875rem;
+    --border-radius: 12px;
+    --glass-radius: 16px;
+    --glass-radius-lg: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

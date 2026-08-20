@@ -524,7 +524,7 @@ export default function DashboardPage() {
                 <h3 className={styles.chartTitle}>QIA Mês</h3>
               </div>
               <div className={styles.chartBody}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={qiaData} layout="vertical" margin={{ top: 4, right: 20, left: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
                     <XAxis type="number" stroke="#475569" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -545,7 +545,7 @@ export default function DashboardPage() {
                 <h3 className={styles.chartTitle}>App Baixado</h3>
               </div>
               <div className={styles.chartBody}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={appData} margin={{ top: 4, right: 8, left: -16, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                     <XAxis dataKey="unit" stroke="#475569" tick={{ fill: "#64748b", fontSize: 10, angle: -30, textAnchor: "end" }} axisLine={false} tickLine={false} />
@@ -566,7 +566,7 @@ export default function DashboardPage() {
                 <h3 className={styles.chartTitle}>Forma de Pagamento</h3>
               </div>
               <div className={styles.chartBody}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={paymentData} margin={{ top: 4, right: 8, left: -16, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                     <XAxis dataKey="unit" stroke="#475569" tick={{ fill: "#64748b", fontSize: 10, angle: -30, textAnchor: "end" }} axisLine={false} tickLine={false} />
