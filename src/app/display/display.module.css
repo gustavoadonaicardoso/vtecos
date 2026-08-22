@@ -1,140 +1,258 @@
-﻿.container {
+.container {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
-  background: radial-gradient(circle at top left, #1a1a2e, #0f0f1a);
-  display: flex;
-  flex-direction: column;
-  padding: 40px;
-  color: white;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(18px, 3vh, 34px);
   overflow: hidden;
+  padding: clamp(20px, 3vw, 46px);
+  color: white;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(59, 130, 246, 0.2), transparent 34%),
+    radial-gradient(circle at 92% 88%, rgba(139, 92, 246, 0.16), transparent 38%),
+    linear-gradient(145deg, #111c31 0%, #0b1220 52%, #080d18 100%);
+}
+
+.container::before {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  width: min(70vw, 900px);
+  aspect-ratio: 1;
+  left: 28%;
+  top: 8%;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.07);
+  filter: blur(110px);
+  pointer-events: none;
 }
 
 .header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 40px;
+  justify-content: space-between;
+  gap: 20px;
 }
 
 .logo {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -1px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(1.35rem, 2.5vw, 2rem);
+  font-weight: 850;
+  letter-spacing: 0.045em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.logoImage {
+  display: block;
+  width: auto;
+  height: clamp(38px, 6vh, 58px);
+  object-fit: contain;
+}
+
+.clock {
+  flex: none;
+  min-width: 112px;
+  padding: 10px clamp(18px, 2.5vw, 30px);
+  color: #cbd5e1;
+  background: rgba(3, 8, 18, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  font-size: clamp(1.05rem, 2vw, 1.45rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .mainDisplay {
-  flex: 1;
-  display: flex;
-  gap: 40px;
-  align-items: center;
-  justify-content: center;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(290px, 0.78fr);
+  gap: clamp(18px, 2.5vw, 34px);
+}
+
+.currentTicketCard,
+.history {
+  min-height: 0;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: clamp(24px, 3vw, 40px);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
 }
 
 .currentTicketCard {
-  background: var(--glass-bg-medium);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 40px;
-  padding: 60px;
-  flex: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(28px, 5vw, 70px);
   text-align: center;
-  box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
 }
 
 .label {
-  font-size: 1.5rem;
-  text-transform: uppercase;
-  letter-spacing: 4px;
-  color: #a5b4fc;
-  margin-bottom: 20px;
   display: block;
+  margin-bottom: clamp(8px, 2vh, 20px);
+  color: #a8b5c9;
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: clamp(0.14em, 0.5vw, 0.27em);
+  text-transform: uppercase;
 }
 
 .ticketNumber {
-  font-size: 15rem;
+  max-width: 100%;
+  margin: 0;
+  font-size: clamp(7rem, 20vw, 17rem);
+  line-height: 0.88;
   font-weight: 900;
-  line-height: 1;
-  margin: 20px 0;
-  color: white;
-  text-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
+  letter-spacing: -0.07em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 52px rgba(255, 255, 255, 0.18);
 }
 
 .clientName {
-  font-size: 3rem;
-  font-weight: 700;
-  color: #a5b4fc;
+  max-width: 100%;
+  margin-top: clamp(18px, 3vh, 30px);
+  overflow: hidden;
+  color: #dbeafe;
+  font-size: clamp(1.4rem, 3.5vw, 3.2rem);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  text-overflow: ellipsis;
   text-transform: uppercase;
-  margin: -10px 0 30px 0;
-  letter-spacing: 2px;
-  background: linear-gradient(to bottom, #fff, #a5b4fc);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
 }
 
 .deskInfo {
-  font-size: 4rem;
-  font-weight: 600;
-  color: #3b82f6;
-  margin-top: 20px;
+  margin-top: clamp(20px, 4vh, 38px);
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  text-wrap: balance;
 }
 
 .history {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 40px;
-  padding: 40px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 400px;
-  height: 100%;
+  gap: clamp(10px, 1.5vh, 16px);
+  overflow: hidden;
+  padding: clamp(22px, 2.7vw, 36px);
 }
 
 .historyTitle {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #94a3b8;
+  flex: none;
+  margin-bottom: 4px;
+  color: #a8b5c9;
+  font-size: clamp(0.9rem, 1.5vw, 1.15rem);
+  font-weight: 750;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-bottom: 10px;
 }
 
 .historyItem {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  background: var(--glass-bg-medium);
-  border-radius: var(--glass-radius);
-  font-size: 1.5rem;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: clamp(13px, 1.8vw, 19px);
+  background: rgba(3, 8, 18, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 16px;
 }
+
+.historyContent { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 
 .historyTicket {
-  font-weight: 700;
+  overflow: hidden;
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.historyName {
+  margin-left: 8px;
+  color: #a5b4fc;
+  font-size: 0.72em;
+  text-transform: uppercase;
+}
+
+.historyTime { color: #8190a7; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 
 .historyDesk {
-  color: #64748b;
-  font-size: 1.2rem;
+  flex: none;
+  color: #94a3b8;
+  font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+  font-weight: 650;
 }
+
+.emptyHistory { margin: auto; color: #64748b; text-align: center; }
 
 .footer {
-  margin-top: 40px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
 }
 
-.clock {
-  font-size: 1.5rem;
-  padding: 10px 30px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.footerText {
   color: #94a3b8;
+  font-size: clamp(0.92rem, 1.6vw, 1.15rem);
+  font-weight: 650;
+  letter-spacing: 0.025em;
+  text-align: center;
+  text-wrap: balance;
 }
 
-@media (max-width: 1200px) {
-  .ticketNumber { font-size: 10rem; }
-  .deskInfo { font-size: 3rem; }
-  .mainDisplay { flex-direction: column; }
-  .history { max-width: 100%; width: 100%; }
+.banner {
+  max-width: min(100%, 900px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+.bannerImage { display: block; width: 100%; max-height: 16vh; object-fit: cover; }
+
+@media (max-width: 1000px) {
+  .container { overflow: auto; }
+  .mainDisplay { grid-template-columns: 1fr; grid-template-rows: minmax(420px, 1fr) auto; }
+  .history { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .historyTitle { grid-column: 1 / -1; }
+  .ticketNumber { font-size: clamp(7rem, 30vw, 14rem); }
+}
+
+@media (max-width: 620px) {
+  .container { gap: 16px; padding: 16px; }
+  .header { gap: 12px; }
+  .clock { min-width: 92px; padding-inline: 14px; }
+  .mainDisplay { grid-template-rows: minmax(360px, 58vh) auto; }
+  .currentTicketCard { padding: 26px 18px; }
+  .clientName { white-space: normal; }
+  .history { grid-template-columns: 1fr; }
+  .historyItem:nth-of-type(n + 5) { display: none; }
+}
+
+@media (max-height: 700px) and (min-width: 1001px) {
+  .container { gap: 16px; padding-block: 20px; }
+  .currentTicketCard { padding-block: 24px; }
+  .ticketNumber { font-size: clamp(7rem, 19vh, 11rem); }
+  .deskInfo { margin-top: 16px; font-size: clamp(2rem, 6vh, 3.5rem); }
+  .clientName { margin-top: 12px; font-size: clamp(1.4rem, 4vh, 2.4rem); }
+  .history { padding-block: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .currentTicketCard,
+  .history { scroll-behavior: auto; }
 }

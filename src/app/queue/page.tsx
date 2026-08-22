@@ -64,7 +64,7 @@ export default function QueuePage() {
       ?.channel('queue_staff')
       .on(
         'postgres_changes',
-        { event: '*', table: 'queue_tickets', schema: 'public' },
+        { event: '*', table: 'attendance_queue_tickets', schema: 'public' },
         () => fetchQueue()
       )
       .subscribe();
@@ -108,7 +108,7 @@ export default function QueuePage() {
   const fetchQueue = async () => {
     if (!supabase) return;
     const { data } = await supabase
-      .from('queue_tickets')
+      .from('attendance_queue_tickets')
       .select('*')
       .order('created_at', { ascending: true });
 
@@ -127,28 +127,18 @@ export default function QueuePage() {
   };
 
   const generateTicket = async () => {
-    const nextNumber = lastTicketIssued + 1;
-    const ticketData = { 
-      number: nextNumber, 
-      name: manualName || 'Cliente (Manual)', 
-      whatsapp: manualWhatsapp,
-      document: manualDocument,
-      status: 'waiting' 
-    };
-
-    let { error: insertError } = await (supabase?.from('queue_tickets').insert([ticketData]) || { error: { message: 'Supabase não inicializado' } });
-
-    // Fallback if columns are missing
-    if (insertError && (insertError as any).code === 'PGRST204') {
-      console.warn('Fallback: Colunas whatsapp/document ausentes no DB.');
-      const fallbackData = { 
-        number: nextNumber, 
-        name: manualName || 'Cliente (Manual)', 
-        status: 'waiting' 
-      };
-      const { error: fallbackError } = await (supabase?.from('queue_tickets').insert([fallbackData]) || { error: { message: 'Supabase não inicializado' } });
-      insertError = fallbackError;
-    }
+    const response = await fetch('/api/queue/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: manualName || 'Cliente (Manual)',
+        whatsapp: manualWhatsapp,
+        document: manualDocument,
+      }),
+    });
+    const result: { number?: number; error?: string } = await response.json();
+    const insertError = response.ok ? null : new Error(result.error || 'Não foi possível gerar a senha.');
+    const nextNumber = result.number ?? lastTicketIssued + 1;
 
     if (insertError) {
       console.error('Insert error:', insertError);
@@ -203,7 +193,7 @@ export default function QueuePage() {
     
     // Mark previous current ticket (if any) as completed
     if (currentTicket) {
-      await supabase?.from('queue_tickets')
+      await supabase?.from('attendance_queue_tickets')
         .update({ status: 'completed' })
         .eq('id', currentTicket.id);
       
@@ -217,7 +207,7 @@ export default function QueuePage() {
     }
 
     // Call the next one
-    const { error } = await supabase?.from('queue_tickets')
+    const { error } = await supabase?.from('attendance_queue_tickets')
       .update({ status: 'calling', desk: desk })
       .eq('id', nextOne.id) || { error: 'Supabase client missing' };
 
@@ -238,7 +228,7 @@ export default function QueuePage() {
   const recallCurrent = async () => {
     if (!currentTicket) return;
     
-    const { error } = await supabase?.from('queue_tickets')
+    const { error } = await supabase?.from('attendance_queue_tickets')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', currentTicket.id) || { error: 'Supabase client missing' };
 
@@ -260,7 +250,7 @@ export default function QueuePage() {
       return;
     }
 
-    const { error } = await supabase?.from('queue_tickets').delete().gt('number', 0) || { error: 'Supabase client missing' };
+    const { error } = await supabase?.from('attendance_queue_tickets').delete().gt('number', 0) || { error: 'Supabase client missing' };
 
     if (!error) {
       logAudit(user, 'SETTINGS_UPDATE', 'Fila de senhas reiniciada completamente por ação administrativa.');

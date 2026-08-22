@@ -27,13 +27,15 @@ export default function DisplayPage() {
   const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
   const [history, setHistory] = useState<Ticket[]>([]);
   const [settings, setSettings] = useState<QueueSettings | null>(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  // Keep the server render and the client's first render identical. The real
+  // time is populated after hydration, when the browser has mounted the page.
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const fetchTickets = async () => {
     if (!supabase) return;
     const { data } = await supabase
-      .from('queue_tickets')
+      .from('attendance_queue_tickets')
       .select('*')
       .or('status.eq.calling,status.eq.completed')
       .order('updated_at', { ascending: false })
@@ -62,15 +64,19 @@ export default function DisplayPage() {
     // Current time clock
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
-    fetchTickets();
-    fetchSettings();
+    // Defer the initial async loads so state updates do not run synchronously
+    // inside the effect body.
+    queueMicrotask(() => {
+      void fetchTickets();
+      void fetchSettings();
+    });
 
     // Subscribe to changes
     const channel = supabase
       ?.channel('queue_changes')
       .on(
         'postgres_changes',
-        { event: '*', table: 'queue_tickets', schema: 'public' },
+        { event: '*', table: 'attendance_queue_tickets', schema: 'public' },
         (payload) => {
           console.log('Realtime update:', payload);
           // Refresh data on any change
@@ -98,7 +104,7 @@ export default function DisplayPage() {
       <header className={styles.header}>
         <div className={styles.logo}>
           {settings?.logo_url ? (
-            <img src={settings.logo_url} alt="Logo" style={{ height: '50px' }} />
+            <img src={settings.logo_url} alt="Logo" className={styles.logoImage} />
           ) : (
             <span style={{ 
               background: `linear-gradient(135deg, ${settings?.primary_color || '#3b82f6'}, ${settings?.secondary_color || '#8b5cf6'})`,
@@ -110,7 +116,9 @@ export default function DisplayPage() {
           )}
         </div>
         <div className={styles.clock}>
-          {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          {currentTime
+            ? currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            : '--:--'}
         </div>
       </header>
 
@@ -135,12 +143,12 @@ export default function DisplayPage() {
           {history.length > 0 ? (
             history.map((ticket) => (
               <div key={ticket.id} className={styles.historyItem}>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div className={styles.historyContent}>
                   <span className={styles.historyTicket}>
                     #{ticket.number.toString().padStart(2, '0')}
-                    {ticket.name && <span style={{ fontSize: '0.9rem', color: '#a5b4fc', marginLeft: '10px', textTransform: 'uppercase' }}>{ticket.name}</span>}
+                    {ticket.name && <span className={styles.historyName}>{ticket.name}</span>}
                   </span>
-                  <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                  <span className={styles.historyTime}>
                     {new Date(ticket.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
@@ -148,18 +156,18 @@ export default function DisplayPage() {
               </div>
             ))
           ) : (
-            <p style={{ color: '#64748b', textAlign: 'center' }}>Sem histórico</p>
+            <p className={styles.emptyHistory}>Sem histórico</p>
           )}
         </div>
       </main>
 
       <footer className={styles.footer}>
-        <div style={{ color: '#64748b', fontSize: '1.2rem', fontWeight: 600 }}>
+        <div className={styles.footerText}>
           {settings?.welcome_text || 'ATENÇÃO AO NÚMERO CHAMADO NO PAINEL'}
         </div>
         {settings?.banner_url && (
-          <div style={{ marginTop: '20px', borderRadius: '20px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <img src={settings.banner_url} alt="Banner" style={{ maxWidth: '100%', height: 'auto', display: 'block' }} />
+          <div className={styles.banner}>
+            <img src={settings.banner_url} alt="Banner" className={styles.bannerImage} />
           </div>
         )}
       </footer>

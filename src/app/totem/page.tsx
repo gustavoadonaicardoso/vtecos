@@ -5,6 +5,15 @@ import { supabase } from '@/lib/supabase';
 import styles from './totem.module.css';
 import { logAudit } from '@/lib/audit';
 import { sendWhatsApp } from '@/lib/zapi';
+import {
+  formatBrazilDocument,
+  formatBrazilPhone,
+  normalizeBrazilPhone,
+  parseBrazilDocumentInput,
+  parseBrazilPhoneInput,
+  validateBrazilDocument,
+  validateBrazilPhone,
+} from '@/lib/brazilian-fields';
 
 export default function TotemPage() {
   const [name, setName] = useState('');
@@ -23,40 +32,36 @@ export default function TotemPage() {
       return;
     }
 
+    const phoneError = validateBrazilPhone(whatsapp);
+    const documentError = validateBrazilDocument(document);
+    if (phoneError || documentError) {
+      alert(phoneError || documentError);
+      return;
+    }
+
+    const normalizedWhatsapp = normalizeBrazilPhone(whatsapp);
+    const normalizedDocument = parseBrazilDocumentInput(document);
+
     setIsLoading(true);
 
     try {
-      // 1. Get highest current number
-      const { data, error: fetchError } = await (supabase?.from('queue_tickets').select('number').order('number', { ascending: false }).limit(1) || { data: null });
-      
-      const lastNumber = data?.[0]?.number || 0;
-      const nextNumber = lastNumber + 1;
+      const response = await fetch('/api/queue/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, whatsapp: normalizedWhatsapp, document: normalizedDocument }),
+      });
+      const result: { number?: number; error?: string } = await response.json();
 
-      // 2. Insert new ticket
-      const ticketData = { 
-        number: nextNumber, 
-        name: name.trim(), 
-        status: 'waiting',
-        whatsapp: whatsapp.trim(),
-        document: document.trim()
-      };
-
-      let { error: insertError } = await (supabase?.from('queue_tickets').insert([ticketData]) || { error: { message: 'Supabase não inicializado' } });
-
-      // If it fails, try a fallback without the new columns (whatsapp/document)
-      if (insertError && (insertError as any).code === 'PGRST204') {
-        console.warn('Colunas whatsapp/document ausentes, tentando fallback...');
-        const fallbackData = { number: nextNumber, name: name.trim(), status: 'waiting' };
-        const { error: fallbackError } = await (supabase?.from('queue_tickets').insert([fallbackData]) || { error: { message: 'Supabase não inicializado' } });
-        insertError = fallbackError;
+      if (!response.ok || typeof result.number !== 'number') {
+        throw new Error(result.error || 'Não foi possível gerar a senha.');
       }
 
-      if (!insertError) {
+      const nextNumber = result.number;
         setIssuedTicket(nextNumber);
 
         // Zap Automation
-        if (whatsapp && whatsapp.trim()) {
-          sendWhatsApp(whatsapp.trim(), `🌟 *Estação Vórtice* 🌟\n\nSua senha foi retirada com sucesso!\n\nTicket: *#${nextNumber.toString().padStart(2, '0')}*\nCliente: *${name.trim()}*\n\nPor favor, acompanhe o telão. Você será chamado em breve!`);
+        if (normalizedWhatsapp) {
+          sendWhatsApp(normalizedWhatsapp, `🌟 *Estação Vórtice* 🌟\n\nSua senha foi retirada com sucesso!\n\nTicket: *#${nextNumber.toString().padStart(2, '0')}*\nCliente: *${name.trim()}*\n\nPor favor, acompanhe o telão. Você será chamado em breve!`);
         }
 
         // Audit Log
@@ -68,15 +73,15 @@ export default function TotemPage() {
           nextNumber.toString()
         );
 
-        // 3. Automatically create a Lead (optional/fail-safe)
+        // Automatically create a Lead (optional/fail-safe)
         try {
           const { data: stageData } = await (supabase?.from('pipeline_stages').select('id').order('position').limit(1) || { data: null });
           const stageId = stageData?.[0]?.id || 'novo';
 
           await supabase?.from('leads').insert([{
             name: name.trim(),
-            phone: whatsapp.trim(),
-            cpf_cnpj: document.trim(),
+            phone: normalizedWhatsapp,
+            cpf_cnpj: normalizedDocument,
             source: 'Totem',
             stage_id: stageId,
             tags: ['Totem', 'Presencial']
@@ -84,13 +89,10 @@ export default function TotemPage() {
         } catch (leadErr) {
           console.error('Lead sync error:', leadErr);
         }
-      } else {
-        console.error('Full Insert Error:', insertError);
-        alert(`Erro ao gerar senha: ${insertError?.message || 'Erro desconhecido'}`);
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Erro de conexão.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro de conexão.';
+      console.error('Erro ao gerar senha:', message);
+      alert(`Erro ao gerar senha: ${message}`);
     } finally {
       setIsLoading(false);
     }
@@ -115,8 +117,9 @@ export default function TotemPage() {
             
             <form onSubmit={handleSubmit} className={styles.form}>
               <div className={styles.inputGroup}>
-                <label className={styles.label}>NOME COMPLETO</label>
-                <input 
+                <label className={styles.label} htmlFor="totem-name">NOME COMPLETO</label>
+                <input
+                  id="totem-name"
                   type="text" 
                   className={styles.input} 
                   value={name} 
@@ -129,25 +132,34 @@ export default function TotemPage() {
 
               <div className={styles.gridFields}>
                 <div className={styles.inputGroup}>
-                  <label className={styles.label}>WHATSAPP</label>
-                  <input 
-                    type="tel" 
+                  <label className={styles.label} htmlFor="totem-whatsapp">WHATSAPP</label>
+                  <input
+                    id="totem-whatsapp"
+                    type="tel"
                     className={styles.input} 
-                    value={whatsapp} 
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="(00) 00000-0000"
+                    value={formatBrazilPhone(whatsapp)}
+                    onChange={(e) => setWhatsapp(parseBrazilPhoneInput(e.target.value))}
+                    placeholder="+55 (00) 90000-0000"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    maxLength={19}
                   />
+                  <small className={styles.fieldHint}>DDD + número; o prefixo +55 é automático.</small>
                 </div>
 
                 <div className={styles.inputGroup}>
-                  <label className={styles.label}>DOCUMENTO (CPF/RG)</label>
-                  <input 
+                  <label className={styles.label} htmlFor="totem-document">DOCUMENTO (CPF/RG)</label>
+                  <input
+                    id="totem-document"
                     type="text" 
                     className={styles.input} 
-                    value={document} 
-                    onChange={(e) => setDocument(e.target.value)}
-                    placeholder="Seu documento"
+                    value={formatBrazilDocument(document)}
+                    onChange={(e) => setDocument(parseBrazilDocumentInput(e.target.value))}
+                    placeholder="CPF ou RG"
+                    autoComplete="off"
+                    maxLength={14}
                   />
+                  <small className={styles.fieldHint}>CPF: 11 dígitos; RG: 7 a 9 caracteres.</small>
                 </div>
               </div>
               
@@ -166,7 +178,7 @@ export default function TotemPage() {
             <div className={styles.ticketResult}>
               #{issuedTicket.toString().padStart(2, '0')}
             </div>
-            <p className={styles.subtitle} style={{ color: '#10b981', fontWeight: 'bold' }}>
+            <p className={`${styles.subtitle} ${styles.successMessage}`}>
               AGUARDE SER CHAMADO NO PAINEL
             </p>
             
