@@ -139,6 +139,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
 }
 
 .monthDisplay {
@@ -156,6 +157,22 @@
 .navBtns {
   display: flex;
   gap: 0.5rem;
+}
+
+.todayBtn {
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--glass-bg);
+  color: var(--foreground);
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.todayBtn:hover {
+  background: var(--glass-bg-hover);
 }
 
 .iconBtn {
@@ -187,6 +204,32 @@
   border-radius: 12px;
   font-weight: 700;
   transition: all 0.3s;
+}
+
+.calendarActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.addTaskCalendarBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0.75rem 1.1rem;
+  border-radius: 12px;
+  font-weight: 700;
+  transition: all 0.3s;
+}
+
+.addTaskCalendarBtn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  transform: translateY(-2px);
 }
 
 .addEventBtn:hover {
@@ -221,6 +264,7 @@
   background: var(--background);
   min-height: 140px;
   padding: 1rem;
+  min-width: 0;
   transition: all 0.2s;
   display: flex;
   flex-direction: column;
@@ -246,6 +290,19 @@
   opacity: 0.8;
 }
 
+.today .dayNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -0.35rem 0 0.15rem -0.35rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  opacity: 1;
+}
+
 .event {
   background: var(--accent-glow);
   border: 1px solid var(--accent);
@@ -259,6 +316,20 @@
   text-overflow: ellipsis;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.event strong {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+}
+
+.event span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .event:hover {
@@ -665,6 +736,12 @@
   overflow-y: auto;
 }
 
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
 @keyframes modalIn {
   from { opacity: 0; transform: scale(0.9) translateY(10px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
@@ -810,4 +887,128 @@
   color: var(--foreground);
   opacity: 0.6;
   font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .container {
+    padding: 1.5rem;
+    gap: 1.5rem;
+  }
+
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 1.25rem;
+  }
+
+  .headerActions,
+  .tabs {
+    width: 100%;
+  }
+
+  .tabs .tab {
+    flex: 1;
+    justify-content: center;
+    padding-inline: 0.75rem;
+  }
+
+  .calendarControl {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .calendarActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .calendarGrid {
+    grid-template-columns: repeat(7, minmax(88px, 1fr));
+    overflow-x: auto;
+  }
+
+  .calendarDay {
+    min-height: 120px;
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .titleSection h1 {
+    font-size: 1.35rem;
+  }
+
+  .titleSection p {
+    line-height: 1.45;
+  }
+
+  .tabs {
+    overflow-x: auto;
+  }
+
+  .tabs .tab {
+    flex: 1 0 auto;
+    white-space: nowrap;
+  }
+
+  .calendarActions {
+    flex-direction: column;
+  }
+
+  .addTaskCalendarBtn,
+  .addEventBtn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .monthDisplay {
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .monthDisplay h2 {
+    font-size: 1.2rem;
+  }
+
+  .calendarDayHeader {
+    padding: 0.7rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .calendarDay {
+    min-height: 110px;
+  }
+
+  .modalOverlay {
+    padding: 0.75rem;
+  }
+
+  .modal {
+    max-height: calc(100dvh - 1.5rem);
+  }
+
+  .formRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+
+  .modalFooter {
+    flex-wrap: wrap;
+  }
+
+  .deleteBtn {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .cancelBtn,
+  .saveBtn {
+    flex: 1;
+  }
 }

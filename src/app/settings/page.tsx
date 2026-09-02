@@ -16,6 +16,7 @@ import {
 import styles from './settings.module.css';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 
 type TabType = 'profile' | 'company' | 'preferences' | 'integrations' | 'billing' | 'senhas';
 
@@ -58,6 +59,20 @@ export default function SettingsPage() {
   const [notifEmail, setNotifEmail] = useState(true);
   const [notifWhatsApp, setNotifWhatsApp] = useState(true);
   const [notifBrowser, setNotifBrowser] = useState(false);
+  const { permission: browserPermission, requestPermission } = useBrowserNotifications();
+
+  useEffect(() => {
+    setNotifBrowser(browserPermission === 'granted');
+  }, [browserPermission]);
+
+  const handleBrowserNotificationToggle = async () => {
+    if (browserPermission === 'granted') return;
+
+    const nextPermission = await requestPermission();
+    if (nextPermission === 'denied') {
+      alert('As notificações foram bloqueadas. Permita-as nas configurações do navegador para ativá-las.');
+    }
+  };
 
   // Integrations States
   const [zapiInstance, setZapiInstance] = useState('');
@@ -304,10 +319,24 @@ export default function SettingsPage() {
 
             <div className={styles.toggleRow} style={{ borderBottom: 'none' }}>
               <div>
-                <div className={styles.toggleLabel}>Notificações de Navegador (Push)</div>
-                <div className={styles.toggleDesc}>Pequenos popups na tela mesmo quando a aba do CRM estiver minimizada.</div>
+                <div className={styles.toggleLabel}>Notificações do Navegador (Sistema)</div>
+                <div className={styles.toggleDesc}>
+                  {browserPermission === 'granted'
+                    ? 'Ativas neste navegador para novas notificações do CRM.'
+                    : browserPermission === 'denied'
+                      ? 'Bloqueadas pelo navegador. Altere a permissão nas configurações do site.'
+                      : browserPermission === 'unsupported'
+                        ? 'Este navegador não oferece notificações do sistema.'
+                        : 'Permita popups do sistema para receber alertas mesmo com a aba minimizada.'}
+                </div>
               </div>
-              <div className={`${styles.toggleSwitch} ${notifBrowser ? styles.active : ''}`} onClick={() => setNotifBrowser(!notifBrowser)}>
+              <div
+                className={`${styles.toggleSwitch} ${notifBrowser ? styles.active : ''}`}
+                role="switch"
+                aria-checked={notifBrowser}
+                aria-label="Ativar notificações do navegador"
+                onClick={handleBrowserNotificationToggle}
+              >
                 <div className={styles.toggleSlider}></div>
               </div>
             </div>

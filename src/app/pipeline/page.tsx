@@ -575,7 +575,7 @@ export default function Pipeline() {
                    )}
                    <span className={styles.entryDate}>Registrado em {selectedLead.entryDate || 'N/A'}</span>
                 </div>
-                <div className={styles.headerActions}>
+                <div className={styles.modalActions}>
                   {!isEditing && (
                     <button className={styles.deleteLeadBtn} onClick={() => {
                       if (confirm(`Tem certeza que deseja excluir o lead ${selectedLead.name}?`)) {

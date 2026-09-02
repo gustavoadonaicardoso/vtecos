@@ -15,6 +15,7 @@ import { Bell, MessageSquare, Zap, UserPlus, CheckCircle2, Trash2 } from 'lucide
 import styles from './NotificationDropdown.module.css';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { useRouter } from 'next/navigation';
 import type { SystemNotification } from '@/types';
 
@@ -35,8 +36,23 @@ interface NotificationDropdownProps {
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose }) => {
   const router = useRouter();
   const { format: formatTime } = useRelativeTime();
+  const { permission, requestPermission, refreshPermission } = useBrowserNotifications();
   // Toda a lógica de dados vem do hook — componente fica "burro"
   const { notifications, loading, unreadCount, markAsRead, clearAll } = useNotifications(isOpen);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      // Atualiza o estado quando a permissão foi concedida em outra tela.
+      refreshPermission();
+    }
+  }, [isOpen, refreshPermission]);
+
+  const handleRequestPermission = async () => {
+    const nextPermission = await requestPermission();
+    if (nextPermission === 'denied') {
+      alert('As notificações foram bloqueadas. Permita-as nas configurações do navegador para continuar.');
+    }
+  };
 
   const handleNotificationClick = async (notif: SystemNotification) => {
     await markAsRead(notif.id);
@@ -112,6 +128,18 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
             </div>
 
             <div className={styles.footer}>
+              {permission === 'granted' ? (
+                <p className={styles.permissionStatus}>Notificações do sistema ativadas</p>
+              ) : permission === 'denied' ? (
+                <p className={styles.permissionStatus}>Notificações bloqueadas no navegador</p>
+              ) : permission === 'unsupported' ? (
+                <p className={styles.permissionStatus}>Este navegador não oferece notificações do sistema</p>
+              ) : (
+                <button className={styles.enableBtn} onClick={handleRequestPermission}>
+                  <Bell size={14} />
+                  Ativar notificações do sistema
+                </button>
+              )}
               <button className={styles.seeAll}>Ver todas as notificações</button>
             </div>
           </motion.div>

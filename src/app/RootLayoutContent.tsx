@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { SidebarProvider } from "@/components/SidebarProvider";
 import { TwilioProvider, useTwilio } from "@/context/TwilioContext";
 import Dialer from "@/components/Dialer";
+import BrowserNotificationListener from "@/components/BrowserNotificationListener";
 // FIX #7: hook centralizado de permissões — sem duplicação
 import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
 
@@ -110,6 +111,7 @@ export default function RootLayoutContent({ children }: { children: React.ReactN
         <SidebarProvider>
           <TwilioProvider>
             <LeadProvider>
+              <BrowserNotificationListener />
               <AppGuard>
                 {children}
               </AppGuard>

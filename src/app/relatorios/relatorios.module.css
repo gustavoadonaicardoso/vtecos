@@ -625,3 +625,149 @@
 :global([data-theme="light"]) .sectionDivider {
   background: linear-gradient(90deg, rgba(99, 102, 241, 0.3), transparent);
 }
+
+/* ── EMPTY DATA STATE ── */
+.dataSourceStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.dataSourceIcon,
+.emptyStateIcon,
+.emptyReportIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.dataSourceIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.dataSourceCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.dataSourceCopy strong {
+  font-size: 0.85rem;
+  color: var(--foreground);
+}
+
+.dataSourceCopy span {
+  color: #64748b;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emptyStateSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: clamp(2.5rem, 8vw, 6rem) 1.5rem;
+  border: 1px dashed rgba(129, 140, 248, 0.28);
+  border-radius: 20px;
+  background: rgba(99, 102, 241, 0.025);
+}
+
+.emptyStateIcon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1.25rem;
+  border-radius: 18px;
+}
+
+.emptyStateSection h1 {
+  font-size: clamp(1.25rem, 3vw, 1.65rem);
+  line-height: 1.25;
+  margin-bottom: 0.65rem;
+}
+
+.emptyStateSection p {
+  max-width: 620px;
+  color: #94a3b8;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.emptyReportGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.emptyReportCard {
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+:global([data-theme="light"]) .emptyReportCard {
+  background: #fff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+}
+
+.emptyReportHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.emptyReportIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.emptyReportBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.emptyReportCard h2 {
+  margin-bottom: 0.45rem;
+  color: var(--foreground);
+  font-size: 0.95rem;
+}
+
+.emptyReportCard p {
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 768px) {
+  .dataSourceCopy span {
+    white-space: normal;
+  }
+
+  .emptyReportGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .emptyStateSection {
+    padding: 3rem 1.25rem;
+  }
+}

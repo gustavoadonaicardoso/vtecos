@@ -82,7 +82,7 @@
     display: none;
   }
   .notificationBtn {
-    display: none;
+    display: flex;
   }
 }
 

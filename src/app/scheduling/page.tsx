@@ -9,16 +9,13 @@ import {
   Plus, 
   Search, 
   Clock, 
-  MoreVertical, 
   User, 
   ChevronLeft, 
   ChevronRight,
-  Filter,
   CheckCircle2,
   AlertCircle,
   X,
   Trash2,
-  Tag,
   Loader2,
   Smartphone,
   Camera,
@@ -27,8 +24,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from '@/context/AuthContext';
-import Link from 'next/link';
 
 interface UnifiedItem {
   id: string;
@@ -54,16 +49,50 @@ interface ScheduledMessage {
   status: 'pending' | 'sent' | 'failed';
 }
 
+interface LeadOption {
+  id: string;
+  name: string;
+}
+
+const LOCAL_ITEMS_KEY = "vortice_scheduling_items";
+
+const formatDateInput = (date: Date) => (
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+);
+
+const readLocalItems = (): UnifiedItem[] => {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const stored = JSON.parse(localStorage.getItem(LOCAL_ITEMS_KEY) || "[]");
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeLocalItems = (nextItems: UnifiedItem[]) => {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(nextItems));
+  }
+};
+
+const sortItems = (nextItems: UnifiedItem[]) => [...nextItems].sort((a, b) => (
+  `${a.date}T${a.time || "23:59"}`.localeCompare(`${b.date}T${b.time || "23:59"}`)
+));
+
 const SchedulingPage = () => {
   const [activeTab, setActiveTab] = useState<"calendar" | "kanban" | "messages">("calendar");
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 2, 1)); // Março 2026
+  const [currentDate, setCurrentDate] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
   
   // States
   const [items, setItems] = useState<UnifiedItem[]>([]);
   const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
-  const [leads, setLeads] = useState<any[]>([]);
+  const [leads, setLeads] = useState<LeadOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,7 +104,7 @@ const SchedulingPage = () => {
     channel: 'WhatsApp (Oficial)',
     lead_id: '',
     lead_name: '',
-    date: new Date().toISOString().split('T')[0],
+    date: formatDateInput(new Date()),
     time: '09:00',
     template: 'Boas-vindas Lead Novo',
     message: ''
@@ -83,49 +112,82 @@ const SchedulingPage = () => {
 
   // Fetch data on load
   useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  const fetchInitialData = async () => {
     setLoading(true);
-    await Promise.all([
+    void Promise.all([
       fetchItems(),
       fetchScheduledMessages(),
       fetchLeads()
-    ]);
-    setLoading(false);
-  };
+    ]).finally(() => setLoading(false));
+  }, []);
 
   const fetchItems = async () => {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from("scheduling_items")
-      .select("*")
-      .order("date", { ascending: true });
-    if (data) setItems(data as UnifiedItem[]);
+    const localItems = readLocalItems();
+    setItems(sortItems(localItems));
+
+    try {
+      const { data, error } = await supabase
+        .from("scheduling_items")
+        .select("*")
+        .order("date", { ascending: true });
+
+      if (!error && data) {
+        const remoteItems = sortItems(data as UnifiedItem[]);
+        setItems(remoteItems);
+        writeLocalItems(remoteItems);
+      }
+    } catch {
+      // A agenda continua funcionando com o armazenamento local quando a tabela
+      // ainda não foi criada ou a conexão remota não está disponível.
+    }
   };
 
   const fetchScheduledMessages = async () => {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from("scheduled_messages")
-      .select("*")
-      .order("scheduled_date", { ascending: true })
-      .order("scheduled_time", { ascending: true });
-    if (data) setScheduledMessages(data as ScheduledMessage[]);
+    try {
+      const { data, error } = await supabase
+        .from("scheduled_messages")
+        .select("*")
+        .order("scheduled_date", { ascending: true })
+        .order("scheduled_time", { ascending: true });
+
+      if (!error && data) setScheduledMessages(data as ScheduledMessage[]);
+    } catch {
+      setScheduledMessages([]);
+    }
   };
 
   const fetchLeads = async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from("leads").select("id, name").order("name");
-    if (data) setLeads(data);
+    try {
+      const { data, error } = await supabase.from("leads").select("id, name").order("name");
+      if (!error && data) setLeads(data);
+    } catch {
+      setLeads([]);
+    }
+  };
+
+  const openNewItem = (type: UnifiedItem["type"], date = new Date()) => {
+    setEditingItem(null);
+    setTempItem({
+      title: "",
+      description: "",
+      priority: "medium",
+      status: "todo",
+      time: "09:00",
+      date: formatDateInput(date),
+      type,
+      lead: ""
+    });
+    setIsModalOpen(true);
+  };
+
+  const getCalendarDefaultDate = () => {
+    const today = new Date();
+    return today.getFullYear() === currentDate.getFullYear() && today.getMonth() === currentDate.getMonth()
+      ? today
+      : currentDate;
   };
 
   const handleDayClick = (dateObj: { date: Date }) => {
-    const dateStr = `${dateObj.date.getFullYear()}-${String(dateObj.date.getMonth() + 1).padStart(2, '0')}-${String(dateObj.date.getDate()).padStart(2, '0')}`;
-    setEditingItem(null);
-    setTempItem({ title: "", description: "", priority: "medium", status: "todo", time: "09:00", date: dateStr, type: "event" });
-    setIsModalOpen(true);
+    openNewItem("event", dateObj.date);
   };
 
   const handleItemClick = (e: React.MouseEvent, item: UnifiedItem) => {
@@ -136,36 +198,63 @@ const SchedulingPage = () => {
   };
 
   const handleSaveItem = async () => {
-    if (!supabase) return;
-    setLoading(true);
+    const title = tempItem.title?.trim();
+    if (!title) {
+      alert("Informe um título para a tarefa ou evento.");
+      return;
+    }
+
     const itemData = {
-      title: tempItem.title,
-      description: tempItem.description,
-      priority: tempItem.priority,
-      status: tempItem.status,
-      date: tempItem.date,
-      time: tempItem.time,
-      type: tempItem.type,
-      lead: tempItem.lead
+      title,
+      description: tempItem.description?.trim() || "",
+      priority: tempItem.priority || "medium",
+      status: tempItem.status || "todo",
+      date: tempItem.date || formatDateInput(new Date()),
+      time: tempItem.time || "",
+      type: tempItem.type || "event",
+      lead: tempItem.lead?.trim() || ""
     };
 
-    if (editingItem) {
-      await supabase.from("scheduling_items").update(itemData).eq("id", editingItem.id);
-    } else {
-      await supabase.from("scheduling_items").insert([itemData]);
-    }
-    
-    await fetchItems();
+    const nextItem: UnifiedItem = {
+      id: editingItem?.id || `local-${Date.now()}`,
+      ...itemData
+    };
+    const nextItems = sortItems(editingItem
+      ? items.map(item => item.id === editingItem.id ? nextItem : item)
+      : [...items, nextItem]
+    );
+
+    setItems(nextItems);
+    writeLocalItems(nextItems);
     setIsModalOpen(false);
+    setLoading(true);
+
+    try {
+      if (editingItem) {
+        await supabase.from("scheduling_items").update(itemData).eq("id", editingItem.id);
+      } else {
+        await supabase.from("scheduling_items").insert([itemData]);
+      }
+    } catch {
+      // O item já foi salvo localmente e permanece disponível sem o banco.
+    }
     setLoading(false);
   };
 
   const handleDeleteItem = async () => {
-    if (!editingItem || !supabase) return;
-    setLoading(true);
-    await supabase.from("scheduling_items").delete().eq("id", editingItem.id);
-    await fetchItems();
+    if (!editingItem) return;
+
+    const nextItems = items.filter(item => item.id !== editingItem.id);
+    setItems(nextItems);
+    writeLocalItems(nextItems);
     setIsModalOpen(false);
+    setLoading(true);
+
+    try {
+      await supabase.from("scheduling_items").delete().eq("id", editingItem.id);
+    } catch {
+      // O item já foi removido localmente.
+    }
     setLoading(false);
   };
 
@@ -208,6 +297,7 @@ const SchedulingPage = () => {
     const firstDayOfMonth = new Date(year, month, 1).getDay();
     const prevMonthLastDay = new Date(year, month, 0).getDate();
     const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const todayStr = formatDateInput(new Date());
     
     const calendarDays = [];
     for (let i = firstDayOfMonth - 1; i >= 0; i--) calendarDays.push({ day: prevMonthLastDay - i, month: 'prev', date: new Date(year, month - 1, prevMonthLastDay - i) });
@@ -221,25 +311,35 @@ const SchedulingPage = () => {
           <div className={styles.monthDisplay}>
             <h2>{capitalizedMonth} {year}</h2>
             <div className={styles.navBtns}>
+              <button className={styles.todayBtn} onClick={() => {
+                const today = new Date();
+                setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
+              }}>Hoje</button>
               <button className={styles.iconBtn} onClick={() => setCurrentDate(new Date(year, month - 1, 1))}><ChevronLeft size={20} /></button>
               <button className={styles.iconBtn} onClick={() => setCurrentDate(new Date(year, month + 1, 1))}><ChevronRight size={20} /></button>
             </div>
           </div>
-          <button className={styles.addEventBtn} onClick={() => { setEditingItem(null); setTempItem({ type: 'event', status: 'todo', priority: 'medium', date: new Date().toISOString().split('T')[0] }); setIsModalOpen(true); }}>
-            <Plus size={20} /> Novo Evento
-          </button>
+          <div className={styles.calendarActions}>
+            <button className={styles.addTaskCalendarBtn} onClick={() => openNewItem("task", getCalendarDefaultDate())}>
+              <Plus size={18} /> Nova tarefa
+            </button>
+            <button className={styles.addEventBtn} onClick={() => openNewItem("event", getCalendarDefaultDate())}>
+              <Plus size={18} /> Novo evento
+            </button>
+          </div>
         </div>
         <div className={styles.calendarGrid}>
           {weekDays.map(day => <div key={day} className={styles.calendarDayHeader}>{day}</div>)}
           {calendarDays.map((dateObj, idx) => {
-            const dateStr = `${dateObj.date.getFullYear()}-${String(dateObj.date.getMonth() + 1).padStart(2, '0')}-${String(dateObj.date.getDate()).padStart(2, '0')}`;
+            const dateStr = formatDateInput(dateObj.date);
             const dayItems = items.filter(i => i.date === dateStr);
             return (
-              <div key={idx} className={`${styles.calendarDay} ${styles.clickable} ${dateObj.month !== 'current' ? styles.otherMonth : ""}`} onClick={() => handleDayClick(dateObj)}>
+              <div key={idx} className={`${styles.calendarDay} ${styles.clickable} ${dateObj.month !== 'current' ? styles.otherMonth : ""} ${dateStr === todayStr ? styles.today : ""}`} onClick={() => handleDayClick(dateObj)}>
                 <span className={styles.dayNumber}>{dateObj.day}</span>
                 {dayItems.map(item => (
                   <div key={item.id} className={`${styles.event} ${item.type === 'task' ? styles.taskItem : ''} ${item.status === 'done' ? styles.itemDone : ''}`} onClick={(e) => handleItemClick(e, item)}>
-                    <strong>{item.time ? item.time.slice(0, 5) : "--:--"}</strong> {item.title}
+                    <strong>{item.time ? item.time.slice(0, 5) : "Dia todo"}</strong>
+                    <span>{item.title}</span>
                   </div>
                 ))}
               </div>
@@ -421,14 +521,14 @@ const SchedulingPage = () => {
             <motion.div className={styles.modal} onClick={e => e.stopPropagation()} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}>
               <div className={styles.modalHeader}><h2>{editingItem ? "Editar Item" : "Novo Item"}</h2><button className={styles.closeBtn} onClick={() => setIsModalOpen(false)}><X size={24} /></button></div>
               <div className={styles.modalBody}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className={styles.formGroup}><label>Tipo</label><select className={styles.select} value={tempItem.type || "task"} onChange={e => setTempItem({...tempItem, type: e.target.value as any})}><option value="task">Tarefa</option><option value="event">Evento</option></select></div>
-                  <div className={styles.formGroup}><label>Prioridade</label><select className={styles.select} value={tempItem.priority || "medium"} onChange={e => setTempItem({...tempItem, priority: e.target.value as any})}><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option></select></div>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}><label>Tipo</label><select className={styles.select} value={tempItem.type || "task"} onChange={e => setTempItem({...tempItem, type: e.target.value as UnifiedItem["type"]})}><option value="task">Tarefa</option><option value="event">Evento</option></select></div>
+                  <div className={styles.formGroup}><label>Prioridade</label><select className={styles.select} value={tempItem.priority || "medium"} onChange={e => setTempItem({...tempItem, priority: e.target.value as UnifiedItem["priority"]})}><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option></select></div>
                 </div>
                 <div className={styles.formGroup}><label>Título</label><input type="text" className={styles.input} value={tempItem.title || ""} onChange={e => setTempItem({...tempItem, title: e.target.value})} placeholder="Título da tarefa ou evento" /></div>
                 <div className={styles.formGroup}><label>Descrição</label><textarea className={styles.textarea} value={tempItem.description || ""} onChange={e => setTempItem({...tempItem, description: e.target.value})} placeholder="Detalhes adicionais..." rows={3} /></div>
-                <div className={styles.formGroup}><label>Status</label><select className={styles.select} value={tempItem.status || "todo"} onChange={e => setTempItem({...tempItem, status: e.target.value as any})}><option value="todo">Para Fazer</option><option value="in-progress">Em Execução</option><option value="done">Concluído</option></select></div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className={styles.formGroup}><label>Status</label><select className={styles.select} value={tempItem.status || "todo"} onChange={e => setTempItem({...tempItem, status: e.target.value as UnifiedItem["status"]})}><option value="todo">Para Fazer</option><option value="in-progress">Em Execução</option><option value="done">Concluído</option></select></div>
+                <div className={styles.formRow}>
                   <div className={styles.formGroup}><label>Data</label><input type="date" className={styles.input} value={tempItem.date || ""} onChange={e => setTempItem({...tempItem, date: e.target.value})} /></div>
                   <div className={styles.formGroup}><label>Horário</label><input type="time" className={styles.input} value={tempItem.time || ""} onChange={e => setTempItem({...tempItem, time: e.target.value})} /></div>
                 </div>

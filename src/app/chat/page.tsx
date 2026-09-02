@@ -8,7 +8,6 @@ import {
   User,
   MoreVertical,
   MessageSquare,
-  Menu,
   ChevronLeft,
   X,
   Smile,
@@ -33,7 +32,6 @@ import { HelpCircle, Bell } from 'lucide-react';
 import Link from 'next/link';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import styles from './chat.module.css';
-import { useSidebar } from '@/components/SidebarProvider';
 
 interface Profile {
   id: string;
@@ -60,7 +58,6 @@ interface InternalMessage {
 
 function ChatContent() {
   const { user } = useAuth();
-  const { isMobileOpen, toggleMobileMenu } = useSidebar();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -586,43 +583,106 @@ function ChatContent() {
     });
   };
 
+  const chatHeader = (
+    <header className={styles.chatHeader}>
+      <div className={styles.headerInfo}>
+        {selectedProfileId && (
+          <button
+            className={`${styles.actionBtn} ${styles.hideOnDesktop}`}
+            onClick={() => setSelectedProfileId(null)}
+            aria-label="Voltar para a lista de conversas"
+          >
+            <ChevronLeft size={24} />
+          </button>
+        )}
+        {selectedProfile ? (
+          <>
+            <div className={styles.userAvatar} style={{ width: 40, height: 40 }}>
+              {selectedProfile.isGroup ? (
+                selectedProfile.avatar_url ? <img src={selectedProfile.avatar_url} alt="Group" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <UsersIcon size={20} />
+              ) : getInitials(selectedProfile.name)}
+              {!selectedProfile.isGroup && <div className={styles.statusIndicator} />}
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>{selectedProfile.name}</h3>
+              <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Online</span>
+            </div>
+          </>
+        ) : (
+          <h3 style={{ margin: 0, fontSize: '1.2rem', opacity: 0.8 }}>Mensagens do Sistema</h3>
+        )}
+      </div>
+
+      <div className={styles.systemTools}>
+        <ThemeToggle />
+        <Link href="/help" className={styles.systemIcon} aria-label="Central de ajuda">
+          <HelpCircle size={22} opacity={0.6} />
+        </Link>
+        <div className={styles.notificationWrapper}>
+          <button
+            className={styles.systemIcon}
+            onClick={() => setShowNotifications(!showNotifications)}
+            aria-label="Notificações"
+          >
+            <Bell size={20} opacity={unreadCount > 0 ? 1 : 0.6} />
+            {unreadCount > 0 && (
+              <span className={styles.systemBadge}>{unreadCount}</span>
+            )}
+          </button>
+          <NotificationDropdown
+            isOpen={showNotifications}
+            onClose={() => setShowNotifications(false)}
+          />
+          {selectedProfile?.isGroup && (
+            <button
+              className={styles.actionBtn}
+              onClick={() => {
+                fetchGroupInfo();
+                setShowGroupInfoModal(true);
+              }}
+              title="Informações do Grupo"
+              aria-label="Informações do grupo"
+            >
+              <MoreVertical size={20} />
+            </button>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+
   if (loading) {
     return <div className={styles.container}><div className={styles.emptyState}>Carregando usuários...</div></div>;
   }
 
   return (
     <div className={styles.container}>
-      {/* SIDEBAR */}
-      <aside className={`${styles.sidebar} ${selectedProfileId ? styles.hiddenOnMobile : ''}`}>
-        <div className={styles.sidebarHeader}>
-          <button
-            className={`${styles.actionBtn} ${styles.mobileMenuBtn}`}
-            onClick={toggleMobileMenu}
-            aria-label={isMobileOpen ? 'Fechar menu principal' : 'Abrir menu principal'}
-            title="Menu principal"
-          >
-            {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-          <h2>Chat Interno</h2>
-          <button
-            className={styles.actionBtn}
-            onClick={() => setShowNewGroupModal(true)}
-            title="Novo Grupo"
-          >
-            <UsersIcon size={20} />
-          </button>
-        </div>
-        <div className={styles.searchArea}>
-          <div className={styles.searchBar}>
-            <Search size={18} opacity={0.5} />
-            <input
-              type="text"
-              placeholder="Pesquisar..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+      {chatHeader}
+
+      <div className={styles.chatBody}>
+        {/* SIDEBAR */}
+        <aside className={`${styles.sidebar} ${selectedProfileId ? styles.hiddenOnMobile : ''}`}>
+          <div className={styles.sidebarHeader}>
+            <h2>Chat Interno</h2>
+            <button
+              className={styles.actionBtn}
+              onClick={() => setShowNewGroupModal(true)}
+              title="Novo Grupo"
+            >
+              <UsersIcon size={20} />
+            </button>
           </div>
-        </div>
+          <div className={styles.searchArea}>
+            <div className={styles.searchBar}>
+              <Search size={18} opacity={0.5} />
+              <input
+                type="text"
+                placeholder="Pesquisar..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
 
         <div className={styles.userList}>
           {filteredProfiles.length > 0 ? (
@@ -675,79 +735,6 @@ function ChatContent() {
 
       {/* MAIN CHAT AREA */}
       <main className={`${styles.mainChat} ${!selectedProfileId ? styles.hiddenOnMobile : ''}`}>
-
-        {/* UNIFIED HEADER FOR THE MODULE */}
-        <header className={styles.chatHeader}>
-          <div className={styles.headerInfo}>
-            <button
-              className={`${styles.actionBtn} ${styles.mobileMenuBtn}`}
-              onClick={toggleMobileMenu}
-              aria-label={isMobileOpen ? 'Fechar menu principal' : 'Abrir menu principal'}
-              title="Menu principal"
-            >
-              {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-            {selectedProfileId && (
-              <button
-                className={`${styles.actionBtn} ${styles.hideOnDesktop}`}
-                onClick={() => setSelectedProfileId(null)}
-              >
-                <ChevronLeft size={24} />
-              </button>
-            )}
-            {selectedProfile ? (
-              <>
-                <div className={styles.userAvatar} style={{ width: 40, height: 40 }}>
-                  {selectedProfile.isGroup ? (
-                    selectedProfile.avatar_url ? <img src={selectedProfile.avatar_url} alt="Group" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <UsersIcon size={20} />
-                  ) : getInitials(selectedProfile.name)}
-                  {!selectedProfile.isGroup && <div className={styles.statusIndicator} />}
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1rem' }}>{selectedProfile.name}</h3>
-                  <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Online</span>
-                </div>
-              </>
-            ) : (
-              <h3 style={{ margin: 0, fontSize: '1.2rem', opacity: 0.8 }}>Mensagens do Sistema</h3>
-            )}
-          </div>
-
-          <div className={styles.systemTools}>
-            <ThemeToggle />
-            <Link href="/help" className={styles.systemIcon}>
-              <HelpCircle size={22} opacity={0.6} />
-            </Link>
-            <div className={styles.notificationWrapper}>
-              <button
-                className={styles.systemIcon}
-                onClick={() => setShowNotifications(!showNotifications)}
-              >
-                <Bell size={20} opacity={unreadCount > 0 ? 1 : 0.6} />
-                {unreadCount > 0 && (
-                  <span className={styles.systemBadge}>{unreadCount}</span>
-                )}
-              </button>
-              <NotificationDropdown
-                isOpen={showNotifications}
-                onClose={() => setShowNotifications(false)}
-              />
-              {selectedProfile?.isGroup && (
-                <button
-                  className={styles.actionBtn}
-                  onClick={() => {
-                    fetchGroupInfo();
-                    setShowGroupInfoModal(true);
-                  }}
-                  title="Informações do Grupo"
-                >
-                  <MoreVertical size={20} />
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
-
         <div className={styles.chatMainWrapper}>
           {selectedProfileId && selectedProfile ? (
             <div className={styles.conversation}>
@@ -973,6 +960,7 @@ function ChatContent() {
           </AnimatePresence>
         </div>
       </main>
+      </div>
 
       <AnimatePresence>
         {deletingMsgId && (
