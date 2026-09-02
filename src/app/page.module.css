@@ -1161,6 +1161,171 @@
   opacity: 0.7;
 }
 
+.goalsSection {
+  margin-bottom: 2.5rem;
+  padding: 1.35rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+.goalsSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.goalsSectionTitle .sectionTitle {
+  margin: 0;
+}
+
+.goalsSectionTitle p {
+  margin: 0.25rem 0 0;
+  color: var(--foreground);
+  font-size: 0.72rem;
+  opacity: 0.5;
+}
+
+.goalsSectionIcon {
+  display: grid;
+  flex: 0 0 2.3rem;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 0.7rem;
+  background: rgba(139, 92, 246, 0.14);
+  color: #a78bfa;
+}
+
+.goalsManageLink,
+.goalsEmpty a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.goalsManageLink:hover,
+.goalsEmpty a:hover {
+  color: #a5b4fc;
+}
+
+.goalsDashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.goalDashboardCard {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--foreground);
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.goalDashboardCard:hover {
+  border-color: rgba(99, 102, 241, 0.55);
+  background: rgba(99, 102, 241, 0.07);
+  transform: translateY(-2px);
+}
+
+.goalDashboardHeader,
+.goalDashboardMeta,
+.goalDashboardRelation {
+  display: flex;
+  align-items: center;
+}
+
+.goalDashboardHeader,
+.goalDashboardMeta {
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.goalDashboardHeader span {
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goalDashboardHeader strong {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+}
+
+.goalDashboardTrack {
+  height: 0.4rem;
+  margin-top: 0.7rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.goalDashboardTrack span {
+  display: block;
+  height: 100%;
+  min-width: 0.2rem;
+  border-radius: inherit;
+  background: currentColor;
+}
+
+.goalProgressComplete { color: #22c55e; }
+.goalProgressNear { color: #3b82f6; }
+.goalProgressOnTrack { color: #8b5cf6; }
+.goalProgressAttention { color: #f59e0b; }
+
+.goalDashboardMeta {
+  margin-top: 0.45rem;
+  color: var(--foreground);
+  font-size: 0.63rem;
+  opacity: 0.65;
+}
+
+.goalDashboardRelation {
+  gap: 0.3rem;
+  margin-top: 0.7rem;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.61rem;
+  opacity: 0.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goalsEmpty {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border: 1px dashed var(--glass-border);
+  border-radius: 0.6rem;
+  color: var(--foreground);
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.goalsEmpty svg {
+  flex: 0 0 auto;
+  color: #a78bfa;
+}
+
+.goalsEmpty a {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

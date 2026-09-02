@@ -23,6 +23,7 @@ import styles from './users.module.css';
 
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/components/ThemeProvider';
+import { useAuth } from '@/context/AuthContext';
 
 // Real Data Types
 type Role = 'ADMIN' | 'MANAGER' | 'SELLER';
@@ -71,6 +72,7 @@ export default function UsersPage() {
   const [systemUpdates, setSystemUpdates] = useState<any[]>([]);
 
   const { config, refreshConfig } = useTheme();
+  const { user } = useAuth();
 
   // Branding states
   const [primaryColor, setPrimaryColor] = useState(config.primary_color);
@@ -236,31 +238,44 @@ export default function UsersPage() {
 
   const handleCreateMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserName || !newUserEmail || !newUserPassword || !supabase) return;
+    if (!newUserName || !newUserEmail || !newUserPassword || !user?.id) return;
 
     setLoading(true);
-    const perms = newUserPermissions;
-    
-    const { data, error } = await supabase.from('profiles').insert([{
-      name: newUserName,
-      email: newUserEmail,
-      password: newUserPassword,
-      role: newUserRole,
-      status: 'ACTIVE',
-      permissions: perms
-    }]).select();
 
-    if (!error && data) {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({
+          name: newUserName,
+          email: newUserEmail,
+          password: newUserPassword,
+          role: newUserRole,
+          permissions: newUserPermissions,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Não foi possível criar o membro.');
+      }
+
       await fetchUsers();
       setIsAddModalOpen(false);
       setNewUserName('');
       setNewUserEmail('');
       setNewUserPassword('');
       setNewUserRole('SELLER');
-    } else {
-      alert("Erro ao criar membro: " + (error?.message || "Email já cadastrado?"));
+      setNewUserPermissions(SELLER_PERMISSIONS);
+    } catch (error: unknown) {
+      alert(`Erro ao criar membro: ${error instanceof Error ? error.message : 'Tente novamente.'}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleDeleteMember = async () => {
@@ -769,7 +784,7 @@ export default function UsersPage() {
                     value={newUserPassword}
                     onChange={e => setNewUserPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={8}
                   />
                 </div>
 

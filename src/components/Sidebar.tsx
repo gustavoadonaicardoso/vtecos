@@ -18,6 +18,7 @@ import {
   UserCog,
   BarChart3,
   Briefcase,
+  Target,
   Calendar,
   Ticket,
   MessageCircle,
@@ -51,6 +52,7 @@ const Sidebar = () => {
   const navItems = React.useMemo(() => [
     { name: 'Início', icon: LayoutDashboard, path: '/', permission: 'dashboard.view' },
     { name: 'Projetos', icon: Briefcase, path: '/projetos', permission: 'admin.projects' },
+    { name: 'Metas', icon: Target, path: '/metas', permission: 'dashboard.view' },
     { name: 'Mensagens', icon: MessageSquare, path: '/messages', permission: 'messages.view' },
     { name: 'Chat Interno', icon: MessageCircle, path: '/chat', permission: 'messages.send' },
     { name: 'Pipeline', icon: Kanban, path: '/pipeline', permission: 'pipeline.view' },

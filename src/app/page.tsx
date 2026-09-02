@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   TrendingUp,
@@ -20,6 +21,7 @@ import {
   Star,
   Shield,
   Settings,
+  Target,
 } from 'lucide-react';
 
 const PRESET_ICONS_MAP: Record<string, any> = {
@@ -37,7 +39,16 @@ import styles from './page.module.css';
 import { useLeads } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import type { PlatformBanner } from '@/types';
+import type { PlatformBanner, PipelineStage } from '@/types';
+import {
+  canViewGoal,
+  formatGoalValue,
+  getGoalCurrentValue,
+  getGoalProgress,
+  getGoalProgressLabel,
+  readGoals,
+  type GoalPlan,
+} from '@/lib/goals';
 
 // ── Novos componentes modulares ──
 import {
@@ -295,12 +306,81 @@ function TeamPerformanceSection({ teamStats }: { teamStats: any[] }) {
   );
 }
 
+function GoalsProgressSection({
+  leads,
+  pipelineStages,
+  user,
+}: {
+  leads: any[];
+  pipelineStages: PipelineStage[];
+  user: any;
+}) {
+  const [goals, setGoals] = React.useState<GoalPlan[]>([]);
+
+  React.useEffect(() => {
+    const refreshGoals = () => setGoals(readGoals());
+    refreshGoals();
+    window.addEventListener('storage', refreshGoals);
+    window.addEventListener('vortice-goals-updated', refreshGoals);
+    return () => {
+      window.removeEventListener('storage', refreshGoals);
+      window.removeEventListener('vortice-goals-updated', refreshGoals);
+    };
+  }, []);
+
+  const visibleGoals = goals
+    .filter(goal => canViewGoal(goal, user?.id, user?.role === 'ADMIN'))
+    .sort((a, b) => getGoalProgress(b, leads) - getGoalProgress(a, leads))
+    .slice(0, 4);
+
+  const getProgressClass = (progress: number) => progress >= 100
+    ? styles.goalProgressComplete
+    : progress >= 75
+      ? styles.goalProgressNear
+      : progress >= 40
+        ? styles.goalProgressOnTrack
+        : styles.goalProgressAttention;
+
+  return (
+    <section className={styles.goalsSection} aria-labelledby="goals-progress-title">
+      <div className={styles.sectionHeader}>
+        <div className={styles.goalsSectionTitle}><div className={styles.goalsSectionIcon}><Target size={18} /></div><div><h3 id="goals-progress-title" className={styles.sectionTitle}>Acompanhamento de metas</h3><p>O progresso é calculado com os dados atuais do funil.</p></div></div>
+        <Link href="/metas" className={styles.goalsManageLink}>Gerenciar metas <ChevronRightIcon /></Link>
+      </div>
+
+      {visibleGoals.length === 0 ? (
+        <div className={styles.goalsEmpty}><Target size={19} /><span>Nenhuma meta visível para você ainda.</span><Link href="/metas">Criar planejamento</Link></div>
+      ) : (
+        <div className={styles.goalsDashboardGrid}>
+          {visibleGoals.map(goal => {
+            const progress = getGoalProgress(goal, leads);
+            const currentValue = getGoalCurrentValue(goal, leads);
+            const stageNames = goal.stageIds.map(stageId => pipelineStages.find(stage => stage.id === stageId)?.name).filter(Boolean);
+            return (
+              <Link href="/metas" className={styles.goalDashboardCard} key={goal.id}>
+                <div className={styles.goalDashboardHeader}><span>{goal.title}</span><strong className={getProgressClass(progress)}>{progress}%</strong></div>
+                <div className={styles.goalDashboardTrack}><span className={getProgressClass(progress)} style={{ width: `${progress}%` }} /></div>
+                <div className={styles.goalDashboardMeta}><span>{formatGoalValue(currentValue, goal.metric)} / {formatGoalValue(goal.targetValue, goal.metric)}</span><span>{getGoalProgressLabel(progress)}</span></div>
+                <div className={styles.goalDashboardRelation}><Target size={12} /> {stageNames.length ? stageNames.slice(0, 2).join(' · ') : 'Funil completo'}</div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ChevronRightIcon() {
+  return <span aria-hidden="true">→</span>;
+}
+
 // ──────────────────────────────────────────────────────────────
 // ORCHESTRATOR PRINCIPAL
 // ──────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const { leads, dbStatus, refreshDatabase } = useLeads();
+  const { leads, pipelineStages, dbStatus, refreshDatabase } = useLeads();
   const { user } = useAuth();
 
   const [mounted, setMounted] = React.useState(false);
@@ -437,6 +517,12 @@ export default function HomePage() {
       user={user}
       leads={leads}
       teamStats={teamStats}
+    />
+
+    <GoalsProgressSection
+      user={user}
+      leads={leads}
+      pipelineStages={pipelineStages}
     />
 
     {/* 4a. Visão estendida — MANAGER e ADMIN */}
