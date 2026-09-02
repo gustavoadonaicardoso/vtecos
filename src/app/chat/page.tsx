@@ -8,6 +8,7 @@ import {
   User,
   MoreVertical,
   MessageSquare,
+  Menu,
   ChevronLeft,
   X,
   Smile,
@@ -32,6 +33,7 @@ import { HelpCircle, Bell } from 'lucide-react';
 import Link from 'next/link';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import styles from './chat.module.css';
+import { useSidebar } from '@/components/SidebarProvider';
 
 interface Profile {
   id: string;
@@ -58,6 +60,7 @@ interface InternalMessage {
 
 function ChatContent() {
   const { user } = useAuth();
+  const { isMobileOpen, toggleMobileMenu } = useSidebar();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -592,6 +595,14 @@ function ChatContent() {
       {/* SIDEBAR */}
       <aside className={`${styles.sidebar} ${selectedProfileId ? styles.hiddenOnMobile : ''}`}>
         <div className={styles.sidebarHeader}>
+          <button
+            className={`${styles.actionBtn} ${styles.mobileMenuBtn}`}
+            onClick={toggleMobileMenu}
+            aria-label={isMobileOpen ? 'Fechar menu principal' : 'Abrir menu principal'}
+            title="Menu principal"
+          >
+            {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
           <h2>Chat Interno</h2>
           <button
             className={styles.actionBtn}
@@ -601,7 +612,7 @@ function ChatContent() {
             <UsersIcon size={20} />
           </button>
         </div>
-        <div style={{ padding: '0 16px 12px 16px' }}>
+        <div className={styles.searchArea}>
           <div className={styles.searchBar}>
             <Search size={18} opacity={0.5} />
             <input
@@ -636,7 +647,7 @@ function ChatContent() {
                   </span>
                   <span className={styles.userRole}>{profile.role}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <div className={styles.userActions}>
                   <button
                     className={styles.deleteBtn}
                     onClick={(e) => { e.stopPropagation(); togglePinChat(profile.id); }}
@@ -668,6 +679,14 @@ function ChatContent() {
         {/* UNIFIED HEADER FOR THE MODULE */}
         <header className={styles.chatHeader}>
           <div className={styles.headerInfo}>
+            <button
+              className={`${styles.actionBtn} ${styles.mobileMenuBtn}`}
+              onClick={toggleMobileMenu}
+              aria-label={isMobileOpen ? 'Fechar menu principal' : 'Abrir menu principal'}
+              title="Menu principal"
+            >
+              {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
             {selectedProfileId && (
               <button
                 className={`${styles.actionBtn} ${styles.hideOnDesktop}`}
@@ -731,7 +750,7 @@ function ChatContent() {
 
         <div className={styles.chatMainWrapper}>
           {selectedProfileId && selectedProfile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative' }}>
+            <div className={styles.conversation}>
               <div className={styles.messagesArea}>
                 {Object.keys(groupedMessages).length > 0 ? (
                   Object.entries(groupedMessages).map(([date, msgs]) => (
