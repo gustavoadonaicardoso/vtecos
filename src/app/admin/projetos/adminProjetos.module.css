@@ -268,3 +268,76 @@
   align-items: center;
   gap: 8px;
 }
+
+@media (max-width: 768px) {
+  .container {
+    height: auto;
+    min-height: 100%;
+    padding: 1rem;
+    gap: 1.5rem;
+  }
+
+  .header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .titleArea h1 {
+    font-size: 1.4rem;
+    line-height: 1.2;
+  }
+
+  .titleArea p {
+    font-size: 0.85rem;
+  }
+
+  .addBtn {
+    justify-content: center;
+  }
+
+  .displayGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    overflow: visible;
+  }
+
+  .displayCard {
+    min-height: 180px;
+    padding: 1.5rem;
+  }
+
+  .editModal {
+    max-height: calc(100dvh - 2rem);
+    border-radius: 20px;
+  }
+
+  .modalBackdrop {
+    padding: 1rem;
+  }
+
+  .modalHeader {
+    padding: 1rem 1.25rem;
+  }
+
+  .modalContent {
+    padding: 1.25rem;
+    gap: 1.25rem;
+  }
+
+  .inputRow {
+    grid-template-columns: 1fr;
+  }
+
+  .modalFooter {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .deleteBtn,
+  .finalSaveBtn {
+    justify-content: center;
+  }
+}

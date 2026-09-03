@@ -150,6 +150,60 @@
   color: var(--text-secondary, #64748b);
 }
 
+@media (max-width: 768px) {
+  .container {
+    width: 100%;
+    min-height: 100%;
+    padding: 1rem;
+    gap: 1.25rem;
+  }
+
+  .title {
+    font-size: 1.65rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+  }
+
+  .grid {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .cardHeader,
+  .cardBody {
+    padding: 1.25rem;
+  }
+
+  .projectName {
+    font-size: 1.35rem;
+    overflow-wrap: anywhere;
+  }
+
+  .section {
+    min-width: 0;
+    padding: 1rem;
+  }
+
+  .sectionTitle {
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .sectionContent {
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+  }
+
+  .emptyState {
+    padding: 2rem 1rem;
+  }
+}
+
 /* Light Theme overrides exclusively to Projects public page */
 :global([data-theme="light"]) .container {
   -webkit-font-smoothing: auto;

@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ClipboardList, Target, Target as GoalIcon, ShieldCheck } from 'lucide-react';
 import styles from './projetos.module.css';
-
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 interface ProjectData {
   id: string;
@@ -23,17 +22,24 @@ const DEFAULT_PROJECTS: ProjectData[] = [];
 export default function ProjetosPage() {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user) fetchProjects();
+  }, [user]);
 
   const fetchProjects = async () => {
-    if (!supabase) return;
     setLoading(true);
-    const { data } = await supabase.from('action_plans').select('*').order('created_at');
-    if (data && data.length > 0) {
-      setProjects(data.map(d => ({
+    try {
+      const response = await fetch('/api/projects', {
+        headers: { 'x-user-id': user?.id || '' },
+        cache: 'no-store',
+      });
+      const result = await response.json().catch(() => ({}));
+      const data = response.ok && Array.isArray(result.data) ? result.data : [];
+
+      if (data.length > 0) {
+        setProjects(data.map((d: any) => ({
         id: d.id,
         clientName: d.client_name,
         projectName: d.project_name,
@@ -42,12 +48,18 @@ export default function ProjetosPage() {
         weeklyGoals: d.weekly_goals,
         commercialPoints: d.commercial_points,
         color: d.color_gradient,
-      })));
-    } else {
+        })));
+      } else {
+        const saved = localStorage.getItem('vortice_projetos_data');
+        if (saved) setProjects(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar projetos:', error);
       const saved = localStorage.getItem('vortice_projetos_data');
       if (saved) setProjects(JSON.parse(saved));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
 
@@ -58,7 +70,11 @@ export default function ProjetosPage() {
         <p className={styles.subtitle}>Acompanhamento estratégico, metas semanais e foco comercial estruturado por projeto.</p>
       </header>
 
-      {projects.length === 0 ? (
+      {loading ? (
+        <div className={styles.emptyState}>
+          <p>Carregando projetos...</p>
+        </div>
+      ) : projects.length === 0 ? (
         <div className={styles.emptyState}>
           <ShieldCheck size={48} opacity={0.5} />
           <h2>Nenhum plano de ação configurado.</h2>

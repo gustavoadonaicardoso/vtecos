@@ -109,8 +109,8 @@ function ChatContent() {
         cache: 'no-store',
       });
       const profilesJson = await profilesResponse.json().catch(() => ({}));
-      const pData = profilesResponse.ok && Array.isArray(profilesJson.data)
-        ? profilesJson.data
+      const pData: Profile[] = profilesResponse.ok && Array.isArray(profilesJson.data)
+        ? profilesJson.data as Profile[]
         : [];
       const pError = profilesResponse.ok
         ? null

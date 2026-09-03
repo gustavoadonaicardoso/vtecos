@@ -6,8 +6,7 @@ import {
   Plus, Trash2, Check, X, Save, Palette, Type, ClipboardList, Flag, Target, Target as GoalIcon
 } from 'lucide-react';
 import styles from './adminProjetos.module.css';
-
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export interface ProjectData {
   id: string;
@@ -38,17 +37,24 @@ export default function AdminProjetos() {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user) fetchProjects();
+  }, [user]);
 
   const fetchProjects = async () => {
-    if (!supabase) return;
     setLoading(true);
-    const { data } = await supabase.from('action_plans').select('*').order('created_at');
-    if (data && data.length > 0) {
-      setProjects(data.map(d => ({
+    try {
+      const response = await fetch('/api/projects', {
+        headers: { 'x-user-id': user?.id || '' },
+        cache: 'no-store',
+      });
+      const result = await response.json().catch(() => ({}));
+      const data = response.ok && Array.isArray(result.data) ? result.data : [];
+
+      if (data.length > 0) {
+        setProjects(data.map((d: any) => ({
         id: d.id,
         clientName: d.client_name,
         projectName: d.project_name,
@@ -57,31 +63,38 @@ export default function AdminProjetos() {
         weeklyGoals: d.weekly_goals,
         commercialPoints: d.commercial_points,
         color: d.color_gradient,
-      })));
-    } else {
+        })));
+      } else {
+        const saved = localStorage.getItem('vortice_projetos_data');
+        if (saved) setProjects(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar projetos:', error);
       const saved = localStorage.getItem('vortice_projetos_data');
       if (saved) setProjects(JSON.parse(saved));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const saveToDisk = async (newProjects: ProjectData[]) => {
     setProjects(newProjects);
     
-    if (supabase) {
-      await supabase.from('action_plans').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      
-      const dbRows = newProjects.map(p => ({
-        client_name: p.clientName,
-        project_name: p.projectName,
-        status: p.status,
-        strategies: p.strategies,
-        weekly_goals: p.weeklyGoals,
-        commercial_points: p.commercialPoints,
-        color_gradient: p.color
-      }));
+    if (user) {
+      const response = await fetch('/api/projects', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ projects: newProjects }),
+      });
+      const result = await response.json().catch(() => ({}));
 
-      await supabase.from('action_plans').insert(dbRows);
+      if (!response.ok) {
+        alert(`Erro ao salvar projetos: ${result.error || 'Tente novamente.'}`);
+        return;
+      }
     }
 
     localStorage.setItem('vortice_projetos_data', JSON.stringify(newProjects));
