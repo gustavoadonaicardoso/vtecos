@@ -116,14 +116,31 @@ export default function UsersPage() {
   const [allowedTemplates, setAllowedTemplates] = useState<string[]>([]);
 
   const fetchUsers = async () => {
-    if (!supabase) return;
+    if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase.from('profiles').select('*').order('name');
-    if (data) {
-      setUsers(data);
-      if (data.length > 0 && !selectedUserId) {
-        setSelectedUserId(data[0].id);
-      }
+    const response = await fetch('/api/users?scope=team', {
+      headers: { 'x-user-id': user.id },
+      cache: 'no-store',
+    });
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      console.error('Erro ao carregar equipe:', result.error);
+    }
+
+    const nextUsers = response.ok && Array.isArray(result.data)
+      ? [...result.data]
+      : [];
+
+    // Garante que o administrador/usuário atual também apareça na própria equipe,
+    // mesmo quando a lista retornar incompleta.
+    if (!nextUsers.some(profile => profile.id === user.id)) {
+      nextUsers.unshift(user);
+    }
+
+    setUsers(nextUsers);
+    if (nextUsers.length > 0 && !selectedUserId) {
+      setSelectedUserId(nextUsers[0].id);
     }
     setLoading(false);
   };
@@ -141,10 +158,11 @@ export default function UsersPage() {
   };
 
   React.useEffect(() => {
+    if (!user) return;
     fetchUsers();
     fetchSystemUpdates();
     fetchAllTemplates();
-  }, []);
+  }, [user]);
 
   const selectedUser = users.find(u => u.id === selectedUserId);
 

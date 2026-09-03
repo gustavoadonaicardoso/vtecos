@@ -100,17 +100,43 @@ function ChatContent() {
     }
   }, [user]);
 
-  // Fetch profiles on mount
+  // Fetch profiles when the authenticated user is available
   useEffect(() => {
     async function fetchProfiles() {
       if (!supabase || !user) return;
-      const { data: pData, error: pError } = await supabase
-        .from('profiles')
-        .select('*')
-        .neq('id', user.id)
-        .eq('status', 'ACTIVE');
+      const profilesResponse = await fetch('/api/users?scope=chat', {
+        headers: { 'x-user-id': user.id },
+        cache: 'no-store',
+      });
+      const profilesJson = await profilesResponse.json().catch(() => ({}));
+      const pData = profilesResponse.ok && Array.isArray(profilesJson.data)
+        ? profilesJson.data
+        : [];
+      const pError = profilesResponse.ok
+        ? null
+        : new Error(profilesJson.error || 'Não foi possível carregar os usuários do chat.');
+
+      if (pError) {
+        console.error('Erro ao carregar usuários do chat:', pError);
+      }
 
       let allProfiles = pData || [];
+
+      // O usuário atual também deve aparecer na lista do chat interno.
+      // O fallback mantém o próprio perfil visível se a lista retornar incompleta.
+      if (!allProfiles.some(profile => profile.id === user.id)) {
+        allProfiles = [
+          {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            status: user.status,
+            avatar_url: user.avatar_url || undefined,
+          },
+          ...allProfiles,
+        ];
+      }
 
       const { data: gData, error: gError } = await supabase
         .from('chat_group_members')
@@ -703,6 +729,7 @@ function ChatContent() {
                 <div className={styles.userInfo}>
                   <span className={styles.userName} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {profile.name}
+                    {profile.id === user?.id && <span style={{ opacity: 0.55, fontSize: '0.7rem' }}>(Você)</span>}
                     {pinnedChats.has(profile.id) && <Pin size={12} style={{ opacity: 0.6, transform: 'rotate(45deg)' }} />}
                   </span>
                   <span className={styles.userRole}>{profile.role}</span>
@@ -715,13 +742,15 @@ function ChatContent() {
                   >
                     {pinnedChats.has(profile.id) ? <PinOff size={15} /> : <Pin size={15} />}
                   </button>
-                  <button
-                    className={styles.deleteBtn}
-                    onClick={(e) => { e.stopPropagation(); setDeletingProfileId(profile.id); }}
-                    title={profile.isGroup && profile.createdBy !== user?.id ? "Sair do grupo" : "Apagar"}
-                  >
-                    {profile.isGroup && profile.createdBy !== user?.id ? <LogOut size={15} /> : <Trash2 size={15} />}
-                  </button>
+                  {profile.id !== user?.id && (
+                    <button
+                      className={styles.deleteBtn}
+                      onClick={(e) => { e.stopPropagation(); setDeletingProfileId(profile.id); }}
+                      title={profile.isGroup && profile.createdBy !== user?.id ? "Sair do grupo" : "Apagar"}
+                    >
+                      {profile.isGroup && profile.createdBy !== user?.id ? <LogOut size={15} /> : <Trash2 size={15} />}
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))

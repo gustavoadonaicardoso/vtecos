@@ -9,6 +9,75 @@ const supabaseAdmin = createClient(
 const ALLOWED_ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
 
 /**
+ * Lista perfis pelo servidor para não depender do RLS do cliente anon.
+ * `scope=chat` retorna somente os campos necessários para o chat;
+ * `scope=team` é reservado para administradores e gerentes.
+ */
+export async function GET(request: Request) {
+  try {
+    const requesterId = request.headers.get('x-user-id');
+    const scope = new URL(request.url).searchParams.get('scope') || 'team';
+
+    if (!requesterId) {
+      return NextResponse.json(
+        { error: 'Identificação do usuário necessária.' },
+        { status: 401 }
+      );
+    }
+
+    if (scope !== 'chat' && scope !== 'team') {
+      return NextResponse.json({ error: 'Escopo inválido.' }, { status: 400 });
+    }
+
+    const { data: requester, error: requesterError } = await supabaseAdmin
+      .from('profiles')
+      .select('role, status')
+      .eq('id', requesterId)
+      .maybeSingle();
+
+    if (
+      requesterError ||
+      !requester ||
+      requester.status !== 'ACTIVE' ||
+      (scope === 'team' && !['ADMIN', 'MANAGER'].includes(requester.role))
+    ) {
+      return NextResponse.json(
+        { error: 'Usuário sem permissão para listar estes perfis.' },
+        { status: 403 }
+      );
+    }
+
+    let query = supabaseAdmin
+      .from('profiles')
+      .select(
+        scope === 'chat'
+          ? 'id, name, email, role, status, avatar_url'
+          : 'id, name, email, role, status, permissions, allowed_templates, phone, avatar_url, created_at'
+      )
+      .order('name');
+
+    if (scope === 'chat') {
+      query = query.eq('status', 'ACTIVE');
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('List profiles error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ data: data || [] }, { status: 200 });
+  } catch (error: unknown) {
+    console.error('List profiles error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Erro interno ao listar usuários.' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * Cria o usuário no Supabase Auth e o respectivo perfil na mesma operação.
  * A chave de serviço fica exclusivamente no servidor.
  */
@@ -98,14 +167,14 @@ export async function POST(request: Request) {
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .insert({
+      .upsert({
         id: authData.user.id,
         name,
         email,
         role,
         status: 'ACTIVE',
         permissions,
-      })
+      }, { onConflict: 'id' })
       .select()
       .single();
 
