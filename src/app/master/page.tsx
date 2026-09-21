@@ -162,7 +162,7 @@ export default function MasterPage() {
         date: b.date,
         type: b.type,
         color: b.color,
-        iconName: b.iconName,
+        iconName: b.icon_name,
         target_roles: b.target_roles ?? [],
       })));
     } else {
@@ -181,7 +181,7 @@ export default function MasterPage() {
         date: banner.date,
         type: banner.type,
         color: banner.color,
-        iconName: banner.iconName,
+        icon_name: banner.iconName,
         target_roles: banner.target_roles,
       }).eq('id', banner.id);
     } else {
@@ -191,7 +191,7 @@ export default function MasterPage() {
         date: banner.date,
         type: banner.type,
         color: banner.color,
-        iconName: banner.iconName,
+        icon_name: banner.iconName,
         target_roles: banner.target_roles,
       }).select().single();
       if (data) {
