@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Admin client bypassa RLS — só roda no servidor
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { sendInternalMessage, editInternalMessage, deleteInternalMessage } from '@/services/chat.service';
 
 export async function POST(request: Request) {
   try {
@@ -18,9 +12,6 @@ export async function POST(request: Request) {
     if (!type || !payload?.sender_id || !payload?.text?.trim()) {
       return NextResponse.json({ error: 'Dados inválidos.' }, { status: 400 });
     }
-
-    const table = type === 'group' ? 'chat_group_messages' : 'internal_chat';
-
     if (type === 'group' && !payload.group_id) {
       return NextResponse.json({ error: 'group_id obrigatório para mensagens de grupo.' }, { status: 400 });
     }
@@ -28,18 +19,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'receiver_id obrigatório para mensagens diretas.' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from(table)
-      .insert([payload])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    const result = await sendInternalMessage(type, payload);
+    if (!result.success) {
+      console.error('Erro ao enviar mensagem:', result.error);
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    return NextResponse.json({ message: data }, { status: 201 });
+    return NextResponse.json({ message: result.data }, { status: 201 });
   } catch (err: any) {
     console.error('Erro inesperado ao enviar mensagem:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -55,17 +41,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Dados inválidos.' }, { status: 400 });
     }
 
-    const table = type === 'group' ? 'chat_group_messages' : 'internal_chat';
-
-    const { error } = await supabaseAdmin
-      .from(table)
-      .update({ text: text.trim(), is_edited: true })
-      .eq('id', id);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
+    const result = await editInternalMessage(type, id, text);
+    if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -81,14 +58,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'id obrigatório.' }, { status: 400 });
     }
 
-    const table = type === 'group' ? 'chat_group_messages' : 'internal_chat';
-
-    const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
+    const result = await deleteInternalMessage(type, id);
+    if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

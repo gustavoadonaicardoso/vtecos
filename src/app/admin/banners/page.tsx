@@ -72,7 +72,7 @@ export default function AdminBanners() {
         iconName: b.icon_name,
         location: b.location,
         time: b.time,
-        fullInfo: b.fullInfo
+        fullInfo: b.full_info
       })));
     } else {
       const saved = localStorage.getItem('vortice_banners');
@@ -98,7 +98,7 @@ export default function AdminBanners() {
         icon_name: b.iconName,
         location: b.location,
         time: b.time,
-        fullInfo: b.fullInfo
+        full_info: b.fullInfo
       }));
 
       await supabase.from('platform_banners').insert(dbRows);

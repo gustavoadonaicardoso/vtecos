@@ -8,13 +8,8 @@
  * ============================================================
  */
 
-import { createClient } from '@supabase/supabase-js';
 import { Lead, PipelineStage, ServiceResult } from '@/types';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 // ─── Mapeamento de dados do banco → tipo Lead ─────────────────
 

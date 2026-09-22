@@ -1,7 +1,7 @@
 # 📱 WhatsApp API — Documentação Técnica Completa
 
-> **VTEC OS** — Integração WhatsApp Business  
-> Atualizado em: Maio 2025
+> **VTEC OS** — Integração WhatsApp Business
+> Atualizado em: Setembro 2026
 
 ---
 
@@ -10,23 +10,31 @@
 1. [Visão Geral](#1-visão-geral)
 2. [Pré-requisitos](#2-pré-requisitos)
 3. [Configuração — Meta Cloud API (Oficial)](#3-configuração--meta-cloud-api-oficial)
-4. [Configuração — Z-API Gateway](#4-configuração--z-api-gateway)
-5. [Variáveis de Ambiente](#5-variáveis-de-ambiente)
-6. [Configuração do Webhook](#6-configuração-do-webhook)
-7. [Endpoints Disponíveis](#7-endpoints-disponíveis)
-8. [Exemplos de Uso](#8-exemplos-de-uso)
-9. [Fluxo de Mensagens](#9-fluxo-de-mensagens)
-10. [Troubleshooting](#10-troubleshooting)
+4. [Variáveis de Ambiente](#4-variáveis-de-ambiente)
+5. [Configuração do Webhook](#5-configuração-do-webhook)
+6. [Endpoints Disponíveis](#6-endpoints-disponíveis)
+7. [Exemplos de Uso](#7-exemplos-de-uso)
+8. [Fluxo de Mensagens](#8-fluxo-de-mensagens)
+9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
 ## 1. Visão Geral
 
+O VTEC OS suporta **duas integrações WhatsApp** em paralelo:
+
+| Integração | Rota Webhook | Rota de Envio | Descrição |
+|---|---|---|---|
+| **Meta Cloud API** (oficial) | `POST /api/webhooks/meta` | `POST /api/whatsapp/send` | API oficial da Meta. Requer aprovação de número e conta WABA. |
+| **WhatsApp Web** (gratuito) | — (listener interno) | `POST /api/whatsapp/web/send` | Conector via Baileys, conectado por QR Code, sem gateway pago. |
+
+> **Recomendação:** Use a **Meta Cloud API** para produção (estável, sem risco de ban).
+
 ### Conexão gratuita via WhatsApp Web
 
-O conector padrão sem gateway usa Baileys e a sessão multidispositivo do WhatsApp Web.
-Ele não exige Z-API nem cobrança por mensagem. A aplicação precisa executar em um processo
-Node.js persistente e o diretório de sessão também precisa ser persistente.
+O conector sem gateway usa Baileys e a sessão multidispositivo do WhatsApp Web. A aplicação
+precisa executar em um processo Node.js persistente e o diretório de sessão também precisa
+ser persistente.
 
 | Função | Endpoint |
 |---|---|
@@ -39,17 +47,6 @@ persistente e, se necessário, defina `WHATSAPP_WEB_SESSION_PATH=/caminho/do/vol
 
 > Esta conexão é gratuita e autogerenciada, mas não é uma API oficial da Meta. Evite disparos
 > abusivos e automações que violem os termos do WhatsApp.
-
-### Integrações legadas e oficiais
-
-O VTEC OS suporta **duas integrações WhatsApp** em paralelo:
-
-| Integração | Rota Webhook | Rota de Envio | Descrição |
-|---|---|---|---|
-| **Meta Cloud API** (oficial) | `POST /api/webhooks/meta` | `POST /api/whatsapp/send` | API oficial da Meta. Requer aprovação de número e conta WABA. |
-| **Z-API Gateway** (não-oficial) | `POST /api/webhooks/z-api` | `POST /api/whatsapp/zapi/send` | Gateway via instância WhatsApp conectada por QR Code. |
-
-> **Recomendação:** Use a **Meta Cloud API** para produção (estável, sem risco de ban). Use o **Z-API** para testes ou volumes menores.
 
 ---
 
@@ -64,11 +61,10 @@ O VTEC OS suporta **duas integrações WhatsApp** em paralelo:
 - [ ] App Meta do tipo **Business** criado
 - [ ] URL pública com HTTPS (necessária para webhook)
 
-### Para Z-API
+### Para WhatsApp Web
 
-- [ ] Conta em [z-api.io](https://z-api.io)
-- [ ] Instância criada e conectada via QR Code
 - [ ] Número WhatsApp ativo no celular (não pode ser desconectado)
+- [ ] Processo Node.js persistente com volume de sessão gravável
 
 ---
 
@@ -120,53 +116,7 @@ WHATSAPP_APP_SECRET=xxxxxxxxxxxxxxxx
 
 ---
 
-## 4. Configuração — Z-API Gateway
-
-### Passo 1: Criar Instância
-
-1. Acesse [app.z-api.io](https://app.z-api.io) e faça login
-2. Clique em **"Nova Instância"**
-3. Aguarde a criação e copie:
-   - **Instance ID** (ex: `3DG123456ABC`)
-   - **Token** (ex: `F8D0A2B1C3E4...`)
-4. Clique em **"Conectar"** e escaneie o QR Code com seu WhatsApp
-
-### Passo 2: Obter Client Token (Security Token)
-
-1. Clique no seu avatar no canto superior direito
-2. Vá em **"Conta"** → **"Security Token"**
-3. Copie o token exibido
-
-### Passo 3: Configurar no Supabase (preferível)
-
-As credenciais Z-API são armazenadas no banco de dados para facilitar a troca sem redeploy:
-
-```sql
-INSERT INTO integrations_config (provider, config) VALUES (
-  'zapi',
-  '{
-    "instanceId": "SEU_INSTANCE_ID",
-    "token": "SEU_TOKEN",
-    "clientToken": "SEU_CLIENT_TOKEN",
-    "receiveGroups": false
-  }'
-) ON CONFLICT (provider) DO UPDATE SET config = EXCLUDED.config;
-```
-
-Ou configure via interface em **Configurações > Integrações > WhatsApp**.
-
-### Passo 4: Configurar Webhook no Z-API
-
-1. No painel Z-API, acesse sua instância
-2. Vá em **"Webhooks"**
-3. Configure:
-   - **On Message Received:** `https://SEU_DOMINIO/api/webhooks/z-api`
-   - **On Message Status Change:** (opcional)
-   - Habilite **"Receive in Group"** se quiser grupos
-
----
-
-## 5. Variáveis de Ambiente
+## 4. Variáveis de Ambiente
 
 ### Tabela Completa
 
@@ -177,16 +127,14 @@ Ou configure via interface em **Configurações > Integrações > WhatsApp**.
 | `WHATSAPP_BUSINESS_ACCOUNT_ID` | ✅ Meta | WABA ID | Meta Developers > WhatsApp > Accounts |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | ✅ Meta | Token secreto de verificação (você define) | Definido por você |
 | `WHATSAPP_APP_SECRET` | ✅ Meta | App Secret para HMAC-SHA256 | Meta Developers > Basic Settings |
-| `ZAPI_INSTANCE_ID` | ⚠️ Z-API | ID da instância Z-API | z-api.io > Instância |
-| `ZAPI_TOKEN` | ⚠️ Z-API | Token da instância Z-API | z-api.io > Instância |
-| `ZAPI_CLIENT_TOKEN` | ⚠️ Z-API | Security Token da conta Z-API | z-api.io > Conta > Security |
+| `WHATSAPP_WEB_SESSION_PATH` | ⚠️ WhatsApp Web | Diretório persistente da sessão Baileys | Definido por você (padrão: `.whatsapp-session/`) |
 | `NEXT_PUBLIC_APP_URL` | ✅ Geral | URL pública da aplicação | Seu domínio de produção |
 
 > ⚠️ **Nunca commite o `.env.local` no Git!** O `.gitignore` já o exclui.
 
 ---
 
-## 6. Configuração do Webhook
+## 5. Configuração do Webhook
 
 ### Meta Cloud API
 
@@ -267,23 +215,9 @@ GET /api/webhooks/meta?hub.mode=subscribe&hub.verify_token=SEU_TOKEN&hub.challen
 }
 ```
 
-### Z-API Webhook
-
-Payload recebido no `POST /api/webhooks/z-api`:
-
-```json
-{
-  "phone": "5511999887766",
-  "isGroup": false,
-  "senderName": "João Silva",
-  "text": { "message": "Olá!" },
-  "audio": null
-}
-```
-
 ---
 
-## 7. Endpoints Disponíveis
+## 6. Endpoints Disponíveis
 
 ### Envio — Meta Cloud API
 
@@ -307,24 +241,27 @@ POST /api/whatsapp/send
 | `buttonLabel` | string | Tipo `list` | Rótulo do botão da lista |
 | `sections` | array | Tipo `list` | Seções com linhas |
 
-### Envio — Z-API
+### Envio — WhatsApp Web
 
 ```
-POST /api/whatsapp/zapi/send
-GET  /api/whatsapp/zapi/send  → Verifica configuração
+POST /api/whatsapp/web/send
 ```
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `phone` | string | ✅ | Telefone (com código país) |
+| `message` | string | ✅ | Texto da mensagem |
 
 ### Webhooks
 
 ```
 GET  /api/webhooks/meta       → Verificação do webhook (Meta handshake)
 POST /api/webhooks/meta       → Recebe eventos (mensagens + status)
-POST /api/webhooks/z-api      → Recebe mensagens via Z-API
 ```
 
 ---
 
-## 8. Exemplos de Uso
+## 7. Exemplos de Uso
 
 ### Enviar Texto (Meta API)
 
@@ -390,19 +327,6 @@ curl -X POST https://SEU_DOMINIO/api/whatsapp/send \
   }'
 ```
 
-### Enviar via Z-API
-
-```bash
-curl -X POST https://SEU_DOMINIO/api/whatsapp/zapi/send \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone": "5511999887766",
-    "message": "Olá! Como posso ajudar?",
-    "leadId": "uuid-do-lead",
-    "delayTyping": 2000
-  }'
-```
-
 ### Testar Webhook Localmente (ngrok)
 
 ```bash
@@ -412,12 +336,11 @@ ngrok http 3000
 
 # 3. Use a URL gerada (ex: https://abc123.ngrok.io) como:
 #    URL Webhook Meta: https://abc123.ngrok.io/api/webhooks/meta
-#    URL Webhook Z-API: https://abc123.ngrok.io/api/webhooks/z-api
 ```
 
 ---
 
-## 9. Fluxo de Mensagens
+## 8. Fluxo de Mensagens
 
 ### Recebimento (Inbound)
 
@@ -471,11 +394,11 @@ Frontend VTEC OS
 
 ---
 
-## 10. Troubleshooting
+## 9. Troubleshooting
 
 ### ❌ Erro: "Configuração WhatsApp incompleta"
 
-**Causa:** Variáveis de ambiente não configuradas.  
+**Causa:** Variáveis de ambiente não configuradas.
 **Solução:** Verifique se todas as 5 variáveis `WHATSAPP_*` estão no `.env.local` e reinicie o servidor.
 
 ```bash
@@ -484,31 +407,31 @@ npm run dev
 
 ### ❌ Erro: "Assinatura HMAC inválida" (HTTP 401 no webhook)
 
-**Causa:** `WHATSAPP_APP_SECRET` incorreto ou body foi modificado em trânsito.  
-**Solução:**  
+**Causa:** `WHATSAPP_APP_SECRET` incorreto ou body foi modificado em trânsito.
+**Solução:**
 1. Verifique o `WHATSAPP_APP_SECRET` no painel Meta.
 2. Certifique-se de que nenhum middleware está modificando o body antes da rota.
 
 ### ❌ Webhook não recebe eventos
 
-**Causa 1:** URL não acessível publicamente.  
+**Causa 1:** URL não acessível publicamente.
 → Use ngrok para testes locais.
 
-**Causa 2:** Campo `messages` não assinado no Meta.  
+**Causa 2:** Campo `messages` não assinado no Meta.
 → Meta Developers > WhatsApp > Configuração > Webhook Fields > marque `messages`.
 
-**Causa 3:** Token de verificação não bate.  
+**Causa 3:** Token de verificação não bate.
 → Confirme que `WHATSAPP_WEBHOOK_VERIFY_TOKEN` é idêntico ao que foi cadastrado na Meta.
 
 ### ❌ Mensagens não aparecem no lead
 
-**Causa:** Tabela `chat_messages` não tem coluna `external_id`, `provider` ou `phone_number_id`.  
+**Causa:** Tabela `chat_messages` não tem coluna `external_id`, `provider` ou `phone_number_id`.
 **Solução:** Execute no Supabase:
 
 ```sql
 ALTER TABLE chat_messages
   ADD COLUMN IF NOT EXISTS external_id TEXT,
-  ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'zapi',
+  ADD COLUMN IF NOT EXISTS provider TEXT,
   ADD COLUMN IF NOT EXISTS phone_number_id TEXT,
   ADD COLUMN IF NOT EXISTS raw_payload JSONB,
   ADD COLUMN IF NOT EXISTS error_details JSONB;
@@ -516,17 +439,10 @@ ALTER TABLE chat_messages
 CREATE INDEX IF NOT EXISTS idx_chat_messages_external_id ON chat_messages(external_id);
 ```
 
-### ❌ Z-API: "Z-API não configurada"
-
-**Causa:** Credenciais não encontradas no Supabase nem no `.env.local`.  
-**Solução:**  
-1. Configure via interface: Configurações > Integrações > WhatsApp.  
-2. Ou adicione ao `.env.local`: `ZAPI_INSTANCE_ID`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`.
-
 ### ❌ Template rejeitado (erro 132001)
 
-**Causa:** Template não aprovado ou nome incorreto.  
-**Solução:**  
+**Causa:** Template não aprovado ou nome incorreto.
+**Solução:**
 1. Verifique os templates em Meta Business > WhatsApp Manager > Templates.
 2. O status deve ser **"Aprovado"**.
 3. O nome no código deve ser idêntico (case-sensitive).
@@ -538,7 +454,6 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_external_id ON chat_messages(extern
 - 📚 [Meta Cloud API Docs](https://developers.facebook.com/docs/whatsapp/cloud-api)
 - 📚 [Webhooks Reference](https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks)
 - 📚 [Template Messages](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/send-message-templates)
-- 📚 [Z-API Docs](https://developer.z-api.io/)
 - 🔧 [Meta Business Manager](https://business.facebook.com)
 - 🔧 [Meta for Developers](https://developers.facebook.com)
 - 🧪 [ngrok — Túnel HTTPS local](https://ngrok.com)

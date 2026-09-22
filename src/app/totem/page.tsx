@@ -4,7 +4,7 @@ import { useState, FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import styles from './totem.module.css';
 import { logAudit } from '@/lib/audit';
-import { sendWhatsApp } from '@/lib/zapi';
+import { sendWhatsApp } from '@/lib/messaging';
 import {
   formatBrazilDocument,
   formatBrazilPhone,

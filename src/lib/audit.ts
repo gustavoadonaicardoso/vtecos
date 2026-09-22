@@ -13,16 +13,19 @@ export async function logAudit(
   action: AuditAction,
   details: string,
   entityType?: string,
-  entityId?: string
+  entityId?: string,
+  // Chamadas do navegador usam a sessão do usuário (client anon); chamadas
+  // de rotas de API/webhooks (sem sessão) devem passar o client admin.
+  dbClient: any = supabase
 ) {
-  if (!supabase || isTableMissing) return;
+  if (!dbClient || isTableMissing) return;
 
   try {
     // System/visitor events have no user UUID. audit_logs.user_id is nullable,
     // so null is the correct representation instead of a textual sentinel.
     const userId = user?.id && UUID_PATTERN.test(user.id) ? user.id : null;
 
-    const { error } = await supabase.from('audit_logs').insert([{
+    const { error } = await dbClient.from('audit_logs').insert([{
       user_id: userId,
       user_name: user?.name || 'Sistema/Visitante',
       action,

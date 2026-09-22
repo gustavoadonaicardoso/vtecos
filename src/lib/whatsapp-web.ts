@@ -57,14 +57,14 @@ export async function startWhatsAppWeb() {
     socket.ev.on('creds.update', saveCreds);
     socket.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') return;
-      const { handleZapiWebhook } = await import('@/lib/zapi');
+      const { processInboundWhatsAppMessage } = await import('@/lib/messaging');
 
       for (const item of messages) {
         if (item.key.fromMe || !item.key.remoteJid || item.key.remoteJid.endsWith('@g.us')) continue;
         const text = item.message?.conversation || item.message?.extendedTextMessage?.text;
         if (!text) continue;
 
-        await handleZapiWebhook({
+        await processInboundWhatsAppMessage({
           phone: item.key.remoteJid.replace('@s.whatsapp.net', ''),
           isGroup: false,
           senderName: item.pushName || 'Cliente WhatsApp',

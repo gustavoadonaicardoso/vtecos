@@ -46,15 +46,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { WhatsAppService, getWhatsAppConfig } from '@/lib/whatsapp';
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createOutboundMessageRecord, markMessageFailed, markMessageResult } from '@/services/whatsapp-send.service';
 
 export async function POST(request: NextRequest) {
   let body: any;
@@ -73,7 +67,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Campos obrigatórios: phone, type.' }, { status: 400 });
   }
 
-  const supabase = getSupabase();
+  const supabase = supabaseAdmin;
   let service: WhatsAppService;
 
   try {
@@ -90,22 +84,7 @@ export async function POST(request: NextRequest) {
   let dbMessageId: string | null = null;
   if (leadId) {
     const messageText = text || (template ? `[Template: ${template}]` : '') || url || bodyText || '';
-    const { data: msg, error: msgErr } = await supabase
-      .from('chat_messages')
-      .insert([{
-        lead_id: leadId,
-        text: messageText,
-        sent_by_me: true,
-        type: type === 'text' ? 'text' : (type === 'audio' ? 'audio' : type),
-        status: 'sending',
-        provider: 'meta',
-      }])
-      .select('id')
-      .single();
-
-    if (!msgErr && msg) {
-      dbMessageId = msg.id;
-    }
+    dbMessageId = await createOutboundMessageRecord({ leadId, text: messageText, type });
   }
 
   // 2. Envia via Meta Cloud API
@@ -159,20 +138,14 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     // Atualiza status para 'failed' se havia registro
     if (dbMessageId) {
-      await supabase.from('chat_messages').update({ status: 'failed' }).eq('id', dbMessageId);
+      await markMessageFailed(dbMessageId);
     }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 
   // 3. Atualiza status no banco
   if (dbMessageId) {
-    await supabase
-      .from('chat_messages')
-      .update({
-        status: result.success ? 'sent' : 'failed',
-        external_id: result.success ? (result as any).messageId : undefined,
-      })
-      .eq('id', dbMessageId);
+    await markMessageResult(dbMessageId, result.success, (result as any).messageId);
   }
 
   if (!result.success) {

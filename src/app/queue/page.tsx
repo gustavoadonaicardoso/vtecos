@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import styles from './queue.module.css';
 import { logAudit } from '@/lib/audit';
 import { useAuth } from '@/context/AuthContext';
-import { sendWhatsApp } from '@/lib/zapi';
+import { sendWhatsApp } from '@/lib/messaging';
 import { 
   Monitor, 
   UserPlus, 

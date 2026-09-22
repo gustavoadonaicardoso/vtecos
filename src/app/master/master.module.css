@@ -1,4 +1,4 @@
-﻿.container {
+.container {
   padding: var(--container-padding, 32px); /* Mantém variável para recuo padrão se necessário */
   flex: 1;
   display: flex;

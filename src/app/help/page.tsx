@@ -121,47 +121,6 @@ export default function HelpCenter() {
             </div>
             <button className={styles.tutorialBtn}>Abrir Documentação Meta <ExternalLink size={14} /></button>
           </motion.div>
-
-          {/* Tutorial Z-API */}
-          <motion.div 
-            className={styles.tutorialCard}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            <div className={styles.tutorialHeader}>
-              <div className={styles.zapiIcon}>
-                <Zap size={24} />
-              </div>
-              <div>
-                <h4>Z-API (WhatsApp Gateway)</h4>
-                <span>Conexão Rápida e Simples</span>
-              </div>
-            </div>
-            <div className={styles.tutorialSteps}>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>1</span>
-                <p>Acesse sua conta no painel da <strong>z-api.io</strong> e selecione sua instância ativa.</p>
-              </div>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>2</span>
-                <p>Garanta que o status esteja como <strong>CONNECTED</strong> após ler o QR Code com seu WhatsApp.</p>
-              </div>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>3</span>
-                <p>Localize o <strong>ID da Instância</strong> e o <strong>Token</strong> na aba de Configurações da Z-API.</p>
-              </div>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>4</span>
-                <p>No Hub de Integrações do Vórtice, escolha a opção <strong>Z-API</strong>.</p>
-              </div>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>5</span>
-                <p>Insira os dados, salve e o sistema começará a operar instantaneamente!</p>
-              </div>
-            </div>
-            <button className={styles.tutorialBtn}>Visitar Painel Z-API <ExternalLink size={14} /></button>
-          </motion.div>
         </div>
       </section>
 

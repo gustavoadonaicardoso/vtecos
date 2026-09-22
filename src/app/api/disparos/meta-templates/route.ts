@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key);
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const GRAPH_VERSION = 'v21.0';
 
@@ -26,7 +20,7 @@ export interface MetaTemplateComponent {
 }
 
 export async function GET() {
-  const supabase = getSupabase();
+  const supabase = supabaseAdmin;
 
   const { data: item, error } = await supabase
     .from('integrations_config')
