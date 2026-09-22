@@ -1,146 +1,36 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { 
-  ShieldCheck, 
-  Upload, 
-  Palette, 
-  Type, 
-  Image as ImageIcon,
-  Save,
-  RotateCcw,
-  Eye,
-  CheckCircle2,
-  Layout,
-  ClipboardList,
-  ShieldAlert,
-  Activity,
-  Settings,
-  ChevronRight,
-  Menu,
-  Check,
-  Zap,
-  Users as UsersIcon,
-  MessageSquare,
-  MessageCircle,
-  BarChart3,
-  Lock,
-  Blocks,
-  Calendar,
-  Ticket,
-  Bell,
-  HelpCircle,
-  Building2,
-  Plus,
-  Trash2,
-  X,
-  Flame,
-  Rocket,
-  Star,
-  Shield,
-  Globe,
-  Award,
-  Sparkles,
-  MapPin,
-  Clock,
-  Info,
-} from 'lucide-react';
-import Link from 'next/link';
-import ThemeToggle from '@/components/ThemeToggle';
-import NotificationDropdown from '@/components/NotificationDropdown';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/components/ThemeProvider';
 import styles from './master.module.css';
 import { supabase } from '@/lib/supabase';
-import { motion, AnimatePresence } from 'framer-motion';
-
-const DEFAULT_SETTINGS = {
-  siteName: 'Vórtice CRM',
-  primaryColor: '#3b82f6',
-  accentColor: '#8b5cf6',
-  bgColor: '#0a0a0f',
-  logoText: 'Vórtice CRM',
-  logoUrl: '',
-  faviconUrl: '',
-  sidebarBg: '',
-};
-
-const SIDEBAR_PRESETS = [
-  { label: 'Padrão (Sistema)', value: '' },
-  { label: 'Azul Escuro', value: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)' },
-  { label: 'Roxo Profundo', value: 'linear-gradient(180deg, #1a0533 0%, #2d1b69 100%)' },
-  { label: 'Verde Flóresta', value: 'linear-gradient(180deg, #052e16 0%, #14532d 100%)' },
-  { label: 'Carvão', value: 'linear-gradient(180deg, #111111 0%, #1c1c1c 100%)' },
-  { label: 'Azul Céu', value: 'linear-gradient(180deg, #0c1445 0%, #1d3b8a 100%)' },
-  { label: 'Rosa/Violâ', value: 'linear-gradient(180deg, #4a0e3f 0%, #7b1d6c 100%)' },
-  { label: 'Cobre/Ouro', value: 'linear-gradient(180deg, #1c0e00 0%, #3d2000 100%)' },
-  { label: 'Branco Puro', value: '#ffffff' },
-  { label: 'Cinza Claro', value: 'linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%)' },
-  { label: 'Personalizado', value: '__custom__' },
-];
+import { AnimatePresence } from 'framer-motion';
+import { DEFAULT_ROLE_PERMISSIONS, DEFAULT_SETTINGS } from './constants';
+import type { BannerItem, MasterSettings, Role, RolePermissions, TabId, Tenant } from './types';
+import MasterHeader from './components/MasterHeader';
+import ModulesTab from './components/ModulesTab';
+import PermissionsTab from './components/PermissionsTab';
+import BannersTab from './components/BannersTab';
+import TenantsTab from './components/TenantsTab';
+import BrandingTab from './components/BrandingTab';
 
 export default function MasterPage() {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<MasterSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'branding' | 'modules' | 'permissions' | 'tenants' | 'banners'>('modules');
-  const [tenants, setTenants] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<TabId>('modules');
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [newTenantName, setNewTenantName] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'ADMIN' | 'MANAGER' | 'SELLER'>('SELLER');
+  const [selectedRole, setSelectedRole] = useState<Role>('SELLER');
   const [loading, setLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [customSidebarColor, setCustomSidebarColor] = useState('#1e293b');
   const { user } = useAuth();
   const { refreshConfig, config: themeConfig } = useTheme();
-  const [rolePermissions, setRolePermissions] = useState<any>({
-    ADMIN: { dashboard: { view: true, kpis: true }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: true }, team: { view: true }, automations: { view: true }, integrations: { view: true }, admin: { projects: true, settings: true } },
-    MANAGER: { dashboard: { view: true, kpis: true }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: true }, team: { view: true }, automations: { view: false }, integrations: { view: true }, admin: { projects: true, settings: false } },
-    SELLER: { dashboard: { view: true, kpis: false }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: false }, team: { view: false }, automations: { view: false }, integrations: { view: false }, admin: { projects: false, settings: false } }
-  });
-  const router = useRouter();
+  const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_ROLE_PERMISSIONS);
 
   // ── Banner Management State ──────────────────────────────────
-  const BANNER_PRESET_COLORS = [
-    'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-    'linear-gradient(135deg, #10b981, #059669)',
-    'linear-gradient(135deg, #f59e0b, #d97706)',
-    'linear-gradient(135deg, #ef4444, #991b1b)',
-    'linear-gradient(135deg, #8b5cf6, #d946ef)',
-    'linear-gradient(135deg, #1e293b, #0f172a)',
-    'linear-gradient(135deg, #06b6d4, #0891b2)',
-    'linear-gradient(135deg, #6366f1, #4f46e5)',
-  ];
-
-  const BANNER_PRESET_ICONS = [
-    { id: 'zap', icon: Zap },
-    { id: 'flame', icon: Flame },
-    { id: 'rocket', icon: Rocket },
-    { id: 'star', icon: Star },
-    { id: 'shield', icon: Shield },
-    { id: 'globe', icon: Globe },
-    { id: 'award', icon: Award },
-    { id: 'sparkles', icon: Sparkles },
-  ];
-
-  const BANNER_ROLE_OPTIONS = [
-    { value: '', label: 'Todos os usuários' },
-    { value: 'ADMIN', label: 'Apenas Admins' },
-    { value: 'MANAGER', label: 'Apenas Gerentes' },
-    { value: 'SELLER', label: 'Apenas Vendedores' },
-  ];
-
-  interface BannerItem {
-    id?: string;
-    title: string;
-    description: string;
-    date: string;
-    type: string;
-    color: string;
-    iconName?: string;
-    target_roles: string[];
-  }
-
   const [banners, setBanners] = useState<BannerItem[]>([]);
   const [editingBannerIdx, setEditingBannerIdx] = useState<number | null>(null);
   const [bannerSaved, setBannerSaved] = useState(false);
@@ -224,7 +114,7 @@ export default function MasterPage() {
       description: 'Descreva aqui o conteúdo do banner.',
       date: new Date().toLocaleDateString('pt-BR'),
       type: 'Comunicado',
-      color: BANNER_PRESET_COLORS[0],
+      color: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
       iconName: 'sparkles',
       target_roles: [],
     };
@@ -245,57 +135,14 @@ export default function MasterPage() {
       : [...current, role];
     updateBannerField(idx, 'target_roles', next);
   };
-  
+
   const logoRef = useRef<HTMLInputElement>(null);
   const faviconRef = useRef<HTMLInputElement>(null);
-
-  const masterModules = [
-    {
-      id: 'banners',
-      title: 'Gestão de Banners',
-      desc: 'Altere os destaques e avisos exibidos na página inicial para todos os usuários.',
-      icon: Layout,
-      color: '#3b82f6',
-      path: '/admin/banners'
-    },
-    {
-      id: 'projetos',
-      title: 'Planos de Ação',
-      desc: 'Formule as estratégias, metas e projetos em andamento dos seus clientes.',
-      icon: ClipboardList,
-      color: '#8b5cf6',
-      path: '/admin/projetos'
-    },
-    {
-      id: 'permissions',
-      title: 'Níveis de Permissão',
-      desc: 'Configure papéis de acesso e permissões granulares de toda a estação.',
-      icon: ShieldAlert,
-      color: '#ef4444',
-      path: '/users'
-    },
-    {
-      id: 'logs',
-      title: 'Audit Logs',
-      desc: 'Veja o histórico completo de ações de todos os atendentes e robôs.',
-      icon: Activity,
-      color: '#10b981',
-      path: '/admin/logs'
-    },
-    {
-      id: 'automations',
-      title: 'Configurações Master',
-      desc: 'Ajuste tempos globais de expiração e limites de API.',
-      icon: Settings,
-      color: '#f59e0b',
-      path: '/automations'
-    }
-  ];
 
   useEffect(() => {
     const stored = localStorage.getItem('vortice-master-settings');
     if (stored) setSettings(JSON.parse(stored));
-    
+
     // Initial CSS apply
     if (stored) {
       const s = JSON.parse(stored);
@@ -322,11 +169,11 @@ export default function MasterPage() {
     // Fetch actual permissions from DB to sync UI
     const fetchPermissions = async () => {
       if (!supabase) return;
-      
+
       const { data, error } = await supabase
         .from('profiles')
         .select('role, permissions');
-      
+
       if (data && !error) {
         const perms: any = { ...rolePermissions };
         data.forEach(profile => {
@@ -374,7 +221,6 @@ export default function MasterPage() {
     setLoading(false);
   };
 
-
   // Realtime System Notifications
   useEffect(() => {
     if (!user || !supabase) return;
@@ -385,7 +231,7 @@ export default function MasterPage() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('is_read', false);
-      
+
       if (!error) setUnreadCount(count || 0);
     };
 
@@ -393,9 +239,9 @@ export default function MasterPage() {
 
     const channel = supabase
       .channel('master_system_notifications')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'system_notifications',
         filter: `user_id=eq.${user.id}`
       }, () => fetchCount())
@@ -413,7 +259,7 @@ export default function MasterPage() {
   const handleFileUpload = (key: 'logoUrl' | 'faviconUrl', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const b64 = event.target?.result as string;
@@ -431,7 +277,7 @@ export default function MasterPage() {
     // Persiste no Supabase (incluindo todos os campos para não perder dados)
     if (supabase) {
       const sidebarBgValue = settings.sidebarBg === '__custom__' ? customSidebarColor : settings.sidebarBg;
-      
+
       const { error } = await supabase
         .from('system_config')
         .upsert({
@@ -456,7 +302,7 @@ export default function MasterPage() {
       } else {
         document.documentElement.style.removeProperty('--sidebar-bg');
       }
-      
+
       // Atualiza o contexto global para que todos os componentes reflitam a mudança
       await refreshConfig();
     }
@@ -466,7 +312,7 @@ export default function MasterPage() {
   };
 
   const toggleRolePermission = (category: string, field: string) => {
-    setRolePermissions((prev: any) => ({
+    setRolePermissions((prev) => ({
       ...prev,
       [selectedRole]: {
         ...prev[selectedRole],
@@ -483,7 +329,7 @@ export default function MasterPage() {
       alert("Configuração do Supabase não encontrada.");
       return;
     }
-    
+
     setLoading(true);
     const { error } = await supabase
       .from('profiles')
@@ -495,7 +341,7 @@ export default function MasterPage() {
     } else {
       alert(`As permissões para ${selectedRole} foram salvas e aplicadas a todos os usuários deste nível com sucesso.`);
     }
-    
+
     setSaved(true);
     setLoading(false);
     setTimeout(() => setSaved(false), 3000);
@@ -508,615 +354,59 @@ export default function MasterPage() {
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <div className={styles.headerIcon}>
-            <ShieldCheck size={28} />
-          </div>
-          <div>
-            <h1>Painel Master</h1>
-            <p>Controle total sobre a infraestrutura e identidade do sistema.</p>
-          </div>
-        </div>
-        
-        <div className={styles.tabNav}>
-          <button 
-            className={`${styles.tabBtn} ${activeTab === 'modules' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('modules')}
-          >
-            Módulo de Comando
-          </button>
-          <button 
-            className={`${styles.tabBtn} ${activeTab === 'branding' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('branding')}
-          >
-            Identidade Visual
-          </button>
-          <button 
-            className={`${styles.tabBtn} ${activeTab === 'permissions' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('permissions')}
-          >
-            Gestão de Menu
-          </button>
-          <button 
-            className={`${styles.tabBtn} ${activeTab === 'tenants' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('tenants')}
-          >
-            Múltiplas Empresas
-          </button>
-          <button 
-            className={`${styles.tabBtn} ${activeTab === 'banners' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('banners')}
-          >
-            Banners
-          </button>
-        </div>
-
-        <div className={styles.headerActions}>
-
-           {(activeTab === 'branding' || activeTab === 'permissions') && (
-             <div className={styles.actionButtons}>
-               {activeTab === 'branding' && (
-                 <button className={styles.resetBtn} onClick={handleReset}>
-                  <RotateCcw size={16} /> Padrões
-                 </button>
-               )}
-               <button 
-                className={`${styles.saveBtn} ${saved ? styles.saveBtnSuccess : ''}`} 
-                onClick={activeTab === 'branding' ? handleSave : applyToAll}
-               >
-                {saved ? <><CheckCircle2 size={16} /> Salvo!</> : <><Save size={16} /> {activeTab === 'permissions' ? 'Salvar e Aplicar' : 'Salvar'}</>}
-               </button>
-             </div>
-           )}
-           {activeTab === 'banners' && (
-             <div className={styles.actionButtons}>
-               {bannerSaved && (
-                 <span style={{ display:'flex', alignItems:'center', gap:6, color:'#10b981', fontWeight:700, fontSize:'0.9rem' }}>
-                   <CheckCircle2 size={16} /> Salvo!
-                 </span>
-               )}
-               <button className={styles.saveBtn} onClick={addBanner}>
-                 <Plus size={16} /> Novo Banner
-               </button>
-             </div>
-           )}
-        </div>
-      </header>
+      <MasterHeader
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        saved={saved}
+        bannerSaved={bannerSaved}
+        onSave={activeTab === 'branding' ? handleSave : applyToAll}
+        onReset={handleReset}
+        onAddBanner={addBanner}
+      />
 
       <AnimatePresence mode="wait">
         {activeTab === 'modules' ? (
-          <motion.div 
-            key="modules"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            className={styles.modulesGrid}
-          >
-            {masterModules.map((mod, idx) => (
-              <div 
-                key={mod.id} 
-                className={styles.moduleCard}
-                onClick={() => router.push(mod.path)}
-              >
-                <div className={styles.cardHeaderSmall}>
-                  <div className={styles.iconBox} style={{ color: mod.color, background: `${mod.color}15` }}>
-                    <mod.icon size={22} />
-                  </div>
-                  <ChevronRight size={18} className={styles.arrowIcon} />
-                </div>
-                <div className={styles.cardBodySmall}>
-                  <h3>{mod.title}</h3>
-                  <p>{mod.desc}</p>
-                </div>
-              </div>
-            ))}
-
-          </motion.div>
+          <ModulesTab key="modules" />
         ) : activeTab === 'permissions' ? (
-          <motion.div
+          <PermissionsTab
             key="permissions"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className={styles.permissionsContainer}
-          >
-            <div className={styles.roleSelectorCard}>
-              <h3>Configurar Navbar por Função</h3>
-              <p>Selecione uma função para decidir quais módulos estarão visíveis no menu lateral.</p>
-              
-              <div className={styles.roleTabs}>
-                {['ADMIN', 'MANAGER', 'SELLER'].map((r) => (
-                  <button
-                    key={r}
-                    className={`${styles.roleTabBtn} ${selectedRole === r ? styles.roleTabActive : ''}`}
-                    onClick={() => setSelectedRole(r as any)}
-                  >
-                    {r === 'ADMIN' && <ShieldCheck size={16} />}
-                    {r === 'MANAGER' && <UsersIcon size={16} />}
-                    {r === 'SELLER' && <Zap size={16} />}
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.menuItemsGrid}>
-              {[
-                { id: 'dashboard.view', label: 'Dashboard (Início)', icon: Layout, cat: 'dashboard', field: 'view' },
-                { id: 'admin.projects', label: 'Projetos', icon: ClipboardList, cat: 'admin', field: 'projects' },
-                { id: 'messages.view', label: 'Mensagens (WhatsApp)', icon: MessageSquare, cat: 'messages', field: 'view' },
-                { id: 'messages.send', label: 'Chat Interno', icon: MessageCircle, cat: 'messages', field: 'send' },
-                { id: 'pipeline.view', label: 'Pipeline/Kanban', icon: RotateCcw, cat: 'pipeline', field: 'view' },
-                { id: 'leads.view', label: 'Gestão de Leads', icon: UsersIcon, cat: 'leads', field: 'view' },
-                { id: 'dashboard.kpis', label: 'Relatórios/KPIs', icon: BarChart3, cat: 'dashboard', field: 'kpis' },
-                { id: 'integrations.view', label: 'Integrações e Agendamento', icon: Blocks, cat: 'integrations', field: 'view' },
-                { id: 'team.view', label: 'Gestão de Equipe', icon: Settings, cat: 'team', field: 'view' },
-                { id: 'automations.view', label: 'Automações', icon: Zap, cat: 'automations', field: 'view' },
-                { id: 'admin.settings', label: 'Configurações', icon: Lock, cat: 'admin', field: 'settings' },
-              ].map((item) => {
-                const isEnabled = rolePermissions[selectedRole][item.cat]?.[item.field];
-                return (
-                  <div 
-                    key={item.id} 
-                    className={`${styles.menuConfigCard} ${isEnabled ? styles.menuEnabled : ''}`}
-                    onClick={() => toggleRolePermission(item.cat, item.field)}
-                  >
-                    <div className={styles.menuIconBox}>
-                      <item.icon size={20} />
-                    </div>
-                    <div className={styles.menuText}>
-                      <h4>{item.label}</h4>
-                      <span>{isEnabled ? 'Visível na Sidebar' : 'Oculto para esta função'}</span>
-                    </div>
-                    <div className={styles.toggleSwitch}>
-                      <div className={`${styles.switchBall} ${isEnabled ? styles.switchOn : ''}`} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
+            selectedRole={selectedRole}
+            onSelectRole={setSelectedRole}
+            rolePermissions={rolePermissions}
+            onTogglePermission={toggleRolePermission}
+          />
         ) : activeTab === 'banners' ? (
-          <motion.div
+          <BannersTab
             key="banners"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            style={{ width: '100%' }}
-          >
-            {/* Banner List */}
-            {bannerLoading ? (
-              <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>Carregando banners...</div>
-            ) : banners.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
-                <Layout size={40} style={{ margin: '0 auto 1rem', display: 'block' }} />
-                <p>Nenhum banner criado ainda.</p>
-                <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Clique em "Novo Banner" para começar.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
-                {banners.map((banner, idx) => {
-                  const IconComp = BANNER_PRESET_ICONS.find(i => i.id === banner.iconName)?.icon || Sparkles;
-                  const audienceLabel = banner.target_roles?.length === 0
-                    ? 'Todos'
-                    : banner.target_roles?.join(', ');
-                  return (
-                    <motion.div
-                      key={banner.id ?? idx}
-                      style={{
-                        background: banner.color,
-                        borderRadius: 16,
-                        padding: '1.5rem',
-                        position: 'relative',
-                        color: 'white',
-                        cursor: 'pointer',
-                        overflow: 'hidden',
-                        minHeight: 160,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                      }}
-                      whileHover={{ scale: 1.02, y: -4 }}
-                      onClick={() => setEditingBannerIdx(idx)}
-                    >
-                      <div style={{ position: 'absolute', right: -10, bottom: -16, opacity: 0.12, transform: 'rotate(-12deg)' }}>
-                        <IconComp size={100} />
-                      </div>
-                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom: 10 }}>
-                        <span style={{ fontSize:'0.65rem', fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', background:'rgba(255,255,255,0.2)', padding:'3px 10px', borderRadius:100 }}>
-                          {banner.type}
-                        </span>
-                        <span style={{ fontSize:'0.7rem', opacity:0.85, fontWeight:600 }}>{banner.date}</span>
-                      </div>
-                      <h3 style={{ fontWeight:700, marginBottom:6, fontSize:'1.1rem' }}>{banner.title}</h3>
-                      <p style={{ fontSize:'0.82rem', opacity:0.88, marginBottom:12, lineHeight:1.4 }}>{banner.description}</p>
-                      <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:'0.72rem', background:'rgba(0,0,0,0.2)', padding:'3px 10px', borderRadius:100, width:'fit-content' }}>
-                        <UsersIcon size={11} />
-                        <span>{audienceLabel}</span>
-                      </div>
-                      <button
-                        style={{ position:'absolute', top:12, right:12, background:'rgba(255,255,255,0.9)', border:'none', borderRadius:8, padding:'5px 10px', fontSize:'0.72rem', fontWeight:700, color:'#111', cursor:'pointer' }}
-                        onClick={(e) => { e.stopPropagation(); setEditingBannerIdx(idx); }}
-                      >
-                        Editar
-                      </button>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Edit Modal */}
-            <AnimatePresence>
-              {editingBannerIdx !== null && banners[editingBannerIdx] && (
-                <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(10px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'1.5rem' }}>
-                  <motion.div
-                    initial={{ opacity:0, scale:0.92, y:20 }}
-                    animate={{ opacity:1, scale:1, y:0 }}
-                    exit={{ opacity:0, scale:0.92, y:20 }}
-                    style={{ background:'var(--panel-bg)', border:'1px solid var(--border)', borderRadius:24, width:'100%', maxWidth:540, maxHeight:'90vh', overflowY:'auto', padding:'2rem', position:'relative' }}
-                  >
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem' }}>
-                      <h2 style={{ fontWeight:700, fontSize:'1.15rem' }}>Editar Banner</h2>
-                      <button style={{ background:'rgba(128,128,128,0.1)', border:'none', borderRadius:'50%', width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--foreground)' }} onClick={() => setEditingBannerIdx(null)}>
-                        <X size={18} />
-                      </button>
-                    </div>
-
-                    <div style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
-                      {/* Título e Tipo */}
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                        <div>
-                          <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:6 }}>Título</label>
-                          <input
-                            value={banners[editingBannerIdx].title}
-                            onChange={e => updateBannerField(editingBannerIdx, 'title', e.target.value)}
-                            className={styles.input}
-                            placeholder="Título do banner"
-                          />
-                        </div>
-                        <div>
-                          <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:6 }}>Tipo / Badge</label>
-                          <input
-                            value={banners[editingBannerIdx].type}
-                            onChange={e => updateBannerField(editingBannerIdx, 'type', e.target.value)}
-                            className={styles.input}
-                            placeholder="Ex: Comunicado"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Descrição */}
-                      <div>
-                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:6 }}>Descrição</label>
-                        <textarea
-                          value={banners[editingBannerIdx].description}
-                          onChange={e => updateBannerField(editingBannerIdx, 'description', e.target.value)}
-                          className={styles.input}
-                          rows={3}
-                          style={{ resize:'vertical', width:'100%' }}
-                          placeholder="Descrição curta para o card..."
-                        />
-                      </div>
-
-                      {/* Data */}
-                      <div>
-                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:6 }}>Data de Exibição</label>
-                        <input
-                          value={banners[editingBannerIdx].date}
-                          onChange={e => updateBannerField(editingBannerIdx, 'date', e.target.value)}
-                          className={styles.input}
-                          placeholder="Ex: 23 Mai 2026"
-                        />
-                      </div>
-
-                      {/* Audiência (target_roles) */}
-                      <div>
-                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:10 }}>Audiência (quem vê este banner)</label>
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-                          {(['ADMIN', 'MANAGER', 'SELLER'] as const).map(role => {
-                            const isSelected = (banners[editingBannerIdx].target_roles ?? []).includes(role);
-                            return (
-                              <button
-                                key={role}
-                                type="button"
-                                onClick={() => toggleBannerRole(editingBannerIdx, role)}
-                                style={{
-                                  padding:'6px 16px', borderRadius:100, border:'1px solid',
-                                  fontSize:'0.8rem', fontWeight:700, cursor:'pointer',
-                                  transition:'all 0.15s',
-                                  background: isSelected ? 'var(--accent)' : 'rgba(128,128,128,0.08)',
-                                  borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
-                                  color: isSelected ? 'white' : 'var(--foreground)',
-                                }}
-                              >
-                                {role}
-                              </button>
-                            );
-                          })}
-                          <span style={{ fontSize:'0.78rem', opacity:0.45, alignSelf:'center' }}>
-                            {(banners[editingBannerIdx].target_roles ?? []).length === 0 ? '→ Nenhum selecionado = todos verão' : ''}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Cores */}
-                      <div>
-                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:10 }}>Cor do Card</label>
-                        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-                          {BANNER_PRESET_COLORS.map(c => (
-                            <div
-                              key={c}
-                              onClick={() => updateBannerField(editingBannerIdx, 'color', c)}
-                              style={{
-                                width:36, height:36, borderRadius:10, background:c, cursor:'pointer',
-                                border: banners[editingBannerIdx].color === c ? '3px solid white' : '3px solid transparent',
-                                boxShadow: banners[editingBannerIdx].color === c ? '0 0 0 2px var(--accent)' : 'none',
-                                transition:'all 0.15s',
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Ícones */}
-                      <div>
-                        <label style={{ fontSize:'0.75rem', fontWeight:700, opacity:0.6, display:'block', marginBottom:10 }}>Ícone</label>
-                        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-                          {BANNER_PRESET_ICONS.map(({ id, icon: Ico }) => (
-                            <div
-                              key={id}
-                              onClick={() => updateBannerField(editingBannerIdx, 'iconName', id)}
-                              style={{
-                                width:40, height:40, borderRadius:10,
-                                display:'flex', alignItems:'center', justifyContent:'center',
-                                cursor:'pointer', transition:'all 0.15s',
-                                background: banners[editingBannerIdx].iconName === id ? 'var(--accent)' : 'rgba(128,128,128,0.08)',
-                                border: banners[editingBannerIdx].iconName === id ? '1px solid var(--accent)' : '1px solid var(--border)',
-                                color: banners[editingBannerIdx].iconName === id ? 'white' : 'var(--foreground)',
-                              }}
-                            >
-                              <Ico size={18} />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Preview */}
-                      <div style={{ borderRadius:16, padding:'1.25rem', background: banners[editingBannerIdx].color, color:'white', position:'relative', overflow:'hidden' }}>
-                        <div style={{ position:'absolute', right:-8, bottom:-12, opacity:0.12, transform:'rotate(-12deg)' }}>
-                          {(() => { const Ico = BANNER_PRESET_ICONS.find(i => i.id === banners[editingBannerIdx].iconName)?.icon || Sparkles; return <Ico size={80} />; })()}
-                        </div>
-                        <span style={{ fontSize:'0.65rem', fontWeight:800, textTransform:'uppercase', background:'rgba(255,255,255,0.2)', padding:'3px 10px', borderRadius:100 }}>{banners[editingBannerIdx].type}</span>
-                        <h3 style={{ marginTop:10, marginBottom:6, fontWeight:700 }}>{banners[editingBannerIdx].title}</h3>
-                        <p style={{ fontSize:'0.82rem', opacity:0.9 }}>{banners[editingBannerIdx].description}</p>
-                      </div>
-                    </div>
-
-                    <div style={{ display:'flex', justifyContent:'space-between', marginTop:'1.5rem', paddingTop:'1.25rem', borderTop:'1px solid var(--border)' }}>
-                      <button
-                        onClick={() => removeBanner(editingBannerIdx)}
-                        style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 18px', borderRadius:10, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', color:'#ef4444', cursor:'pointer', fontWeight:700 }}
-                      >
-                        <Trash2 size={16} /> Remover
-                      </button>
-                      <button
-                        onClick={() => saveBanner(editingBannerIdx)}
-                        style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 22px', borderRadius:10, background:'var(--accent)', border:'none', color:'white', cursor:'pointer', fontWeight:700 }}
-                      >
-                        <Save size={16} /> Salvar Banner
-                      </button>
-                    </div>
-                  </motion.div>
-                </div>
-              )}
-            </AnimatePresence>
-          </motion.div>
+            banners={banners}
+            bannerLoading={bannerLoading}
+            editingBannerIdx={editingBannerIdx}
+            onEditBanner={setEditingBannerIdx}
+            onUpdateField={updateBannerField}
+            onToggleRole={toggleBannerRole}
+            onSaveBanner={saveBanner}
+            onRemoveBanner={removeBanner}
+          />
         ) : activeTab === 'tenants' ? (
-          <motion.div
+          <TenantsTab
             key="tenants"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className={styles.grid}
-          >
-            <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
-              <div className={styles.cardHeader}>
-                <Building2 size={20} />
-                <h2>Gestão de Empresas (Multi-Tenant)</h2>
-              </div>
-              <p style={{ opacity: 0.7, marginBottom: '20px', fontSize: '0.9rem' }}>
-                Crie e gerencie ambientes isolados para diferentes clientes (empresas).
-                Cada empresa criada ganha sua própria base de Leads, Configurações e Pipeline.
-              </p>
-
-              <form onSubmit={handleCreateTenant} style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
-                <input 
-                  type="text" 
-                  value={newTenantName}
-                  onChange={(e) => setNewTenantName(e.target.value)}
-                  placeholder="Nome do novo Tenant (Empresa)"
-                  className={styles.input}
-                  style={{ flex: 1 }}
-                  required
-                />
-                <button type="submit" className={styles.saveBtn} disabled={loading} style={{ display:'flex', gap:'8px', alignItems:'center'}}>
-                  <Plus size={18} /> Criar Empresa
-                </button>
-              </form>
-
-              <div className={styles.tableWrapper}>
-                <table className={styles.performanceTable}>
-                  <thead>
-                    <tr>
-                      <th>ID da Empresa</th>
-                      <th>Nome</th>
-                      <th>Status</th>
-                      <th>Criado Em</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tenants.map((t) => (
-                      <tr key={t.id}>
-                        <td style={{ opacity: 0.6, fontSize: '0.8rem' }}>{t.id}</td>
-                        <td><strong>{t.name}</strong></td>
-                        <td>
-                          <span className={styles.statusBadge} style={{ background: t.status === 'ACTIVE' ? '#10b98120' : '#ef444420', color: t.status === 'ACTIVE' ? '#10b981' : '#ef4444' }}>
-                            {t.status}
-                          </span>
-                        </td>
-                        <td>{new Date(t.created_at).toLocaleDateString('pt-BR')}</td>
-                      </tr>
-                    ))}
-                    {tenants.length === 0 && (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', opacity: 0.5 }}>Nenhuma empresa encontrada</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </motion.div>
+            tenants={tenants}
+            newTenantName={newTenantName}
+            onNewTenantNameChange={setNewTenantName}
+            onCreateTenant={handleCreateTenant}
+            loading={loading}
+          />
         ) : (
-          <motion.div 
+          <BrandingTab
             key="branding"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            className={styles.grid}
-          >
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <Type size={20} />
-                <h2>Identidade do Sistema</h2>
-              </div>
-              <div className={styles.field}>
-                <label>Nome do Sistema</label>
-                <input
-                  type="text"
-                  value={settings.siteName}
-                  onChange={e => handleChange('siteName', e.target.value)}
-                  className={styles.input}
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Texto do Logo (Fallback)</label>
-                <input
-                  type="text"
-                  value={settings.logoText}
-                  onChange={e => handleChange('logoText', e.target.value)}
-                  className={styles.input}
-                />
-              </div>
-            </div>
-
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <ImageIcon size={20} />
-                <h2>Logo & Favicon</h2>
-              </div>
-              <div className={styles.uploadArea}>
-                <div className={styles.uploadBox} onClick={() => logoRef.current?.click()}>
-                  {settings.logoUrl ? <img src={settings.logoUrl} alt="Logo" className={styles.previewImg} /> : <Upload size={24} />}
-                </div>
-                <input ref={logoRef} type="file" hidden onChange={e => handleFileUpload('logoUrl', e)} />
-                <div className={styles.uploadBoxSmall} onClick={() => faviconRef.current?.click()}>
-                   {settings.faviconUrl ? <img src={settings.faviconUrl} alt="Favicon" style={{width:24}} /> : <ImageIcon size={20} />}
-                </div>
-                <input ref={faviconRef} type="file" hidden onChange={e => handleFileUpload('faviconUrl', e)} />
-              </div>
-            </div>
-
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <Palette size={20} />
-                <h2>Paleta de Cores</h2>
-              </div>
-              <div className={styles.colorGrid}>
-                {['primaryColor', 'accentColor', 'bgColor'].map(key => (
-                  <div key={key} className={styles.colorItem}>
-                    <div className={styles.colorPreview} style={{ background: settings[key as keyof typeof settings] }}>
-                      <input type="color" value={settings[key as keyof typeof settings]} onChange={e => handleChange(key, e.target.value)} className={styles.colorInput} />
-                    </div>
-                    <span>{key === 'primaryColor' ? 'Primária' : key === 'accentColor' ? 'Destaque' : 'Fundo'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <Palette size={20} />
-                <h2>Background da Sidebar</h2>
-              </div>
-              <p style={{ fontSize: '0.83rem', opacity: 0.5, marginBottom: '1rem' }}>
-                Escolha um preset ou defina uma cor personalizada para o fundo do menu lateral.
-              </p>
-              <div className={styles.sidebarPresets}>
-                {SIDEBAR_PRESETS.map((preset) => {
-                  const isCustom = preset.value === '__custom__';
-                  const isActive = settings.sidebarBg === preset.value;
-                  return (
-                    <button
-                      key={preset.label}
-                      className={`${styles.presetBtn} ${isActive ? styles.presetBtnActive : ''}`}
-                      onClick={() => handleChange('sidebarBg', preset.value)}
-                      title={preset.label}
-                    >
-                      <span
-                        className={styles.presetSwatch}
-                        style={{
-                          background: isCustom ? customSidebarColor : (preset.value || 'var(--panel-bg)'),
-                          border: preset.value === '' ? '2px dashed rgba(255,255,255,0.25)' : undefined,
-                        }}
-                      />
-                      <span className={styles.presetLabel}>{preset.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {settings.sidebarBg === '__custom__' && (
-                <div className={styles.customColorRow}>
-                  <label>Cor personalizada</label>
-                  <div className={styles.colorPreview} style={{ background: customSidebarColor }}>
-                    <input
-                      type="color"
-                      value={customSidebarColor}
-                      onChange={e => setCustomSidebarColor(e.target.value)}
-                      className={styles.colorInput}
-                    />
-                  </div>
-                  <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>{customSidebarColor}</span>
-                </div>
-              )}
-              {/* Live preview strip */}
-              <div className={styles.sidebarPreviewStrip}>
-                <div
-                  className={styles.sidebarPreviewBox}
-                  style={{
-                    background: settings.sidebarBg === '__custom__'
-                      ? customSidebarColor
-                      : (settings.sidebarBg || 'var(--panel-bg)')
-                  }}
-                >
-                  <div className={styles.previewNavItem} />
-                  <div className={styles.previewNavItem} style={{ opacity: 0.4 }} />
-                  <div className={styles.previewNavItem} style={{ opacity: 0.4 }} />
-                  <div className={styles.previewNavItemActive} />
-                  <div className={styles.previewNavItem} style={{ opacity: 0.4 }} />
-                </div>
-                <span style={{ fontSize: '0.75rem', opacity: 0.4 }}>Pré-visualização do menu</span>
-              </div>
-            </div>
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <Eye size={20} />
-                <h2>Pré-visualização</h2>
-              </div>
-              <div className={styles.preview} style={{ background: settings.bgColor }}>
-                 <div style={{ padding: '20px', color: settings.primaryColor }}>{settings.siteName}</div>
-                 <div style={{ marginLeft: '20px', padding: '10px 20px', borderRadius: '8px', background: settings.primaryColor, color: '#fff', width: 'fit-content' }}>Botão de Exemplo</div>
-              </div>
-            </div>
-          </motion.div>
+            settings={settings}
+            onChange={handleChange}
+            onFileUpload={handleFileUpload}
+            logoRef={logoRef}
+            faviconRef={faviconRef}
+            customSidebarColor={customSidebarColor}
+            onCustomSidebarColorChange={setCustomSidebarColor}
+          />
         )}
       </AnimatePresence>
     </div>
