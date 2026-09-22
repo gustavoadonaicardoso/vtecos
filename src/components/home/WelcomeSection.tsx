@@ -102,7 +102,11 @@ export default function WelcomeSection({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 20 }}
         >
-          <span className={styles.avatarInitials}>{getInitials(user?.name)}</span>
+          {user?.avatar_url ? (
+            <img src={user.avatar_url} alt={user?.name || 'Usuário'} className={styles.avatarPhoto} />
+          ) : (
+            <span className={styles.avatarInitials}>{getInitials(user?.name)}</span>
+          )}
           <span className={styles.onlineDot} />
         </motion.div>
 
