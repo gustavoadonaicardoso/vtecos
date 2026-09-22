@@ -85,8 +85,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Background sync: atualiza permissões e verifica status
         fetch(`/api/auth/refresh?id=${parsedUser.id}`)
-          .then(r => r.json())
-          .then(({ data, error }) => {
+          .then(async (r) => {
+            if (r.status === 404) {
+              // Sessão órfã: o id salvo neste dispositivo não existe mais no
+              // servidor (perfil recriado/removido). Continuar usando o
+              // cache local aqui manteria o usuário preso com permissões
+              // que o backend nunca mais reconhece — força novo login.
+              logoutRef.current();
+              return;
+            }
+            const { data, error } = await r.json();
             if (data && !error) {
               localStorage.setItem('vortice_user', JSON.stringify(data));
               setUser(data);
