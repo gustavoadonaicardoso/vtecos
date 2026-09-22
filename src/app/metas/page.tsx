@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
+  AlertTriangle,
   CalendarDays,
   Check,
   ChevronRight,
@@ -33,14 +34,19 @@ import {
   getGoalProgressLabel,
   goalMetricLabel,
   goalTypeLabel,
-  GOALS_STORAGE_KEY,
-  readGoals,
   type GoalMetric,
   type GoalPlan,
   type GoalTask,
   type GoalType,
   type GoalVisibility,
 } from '@/lib/goals';
+import {
+  createGoalOnServer,
+  deleteGoalOnServer,
+  fetchGoalsFromServer,
+  migrateLocalGoalsIfAny,
+  updateGoalOnServer,
+} from '@/lib/goals-client';
 
 interface GoalUser {
   id: string;
@@ -125,6 +131,7 @@ export default function MetasPage() {
   const [goals, setGoals] = useState<GoalPlan[]>([]);
   const [users, setUsers] = useState<GoalUser[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
@@ -134,21 +141,24 @@ export default function MetasPage() {
   const [formError, setFormError] = useState('');
   const isAdmin = user?.role === 'ADMIN';
 
-  useEffect(() => {
-    const storedGoals = readGoals();
-    // Browser localStorage is the source for this module until a goals table is connected.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setGoals(storedGoals);
-    setHydrated(true);
+  const loadGoals = async () => {
+    if (!user) return;
+    try {
+      await migrateLocalGoalsIfAny(user.id);
+      const serverGoals = await fetchGoalsFromServer(user.id);
+      setGoals(serverGoals);
+      setLoadError('');
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Não foi possível carregar as metas.');
+    } finally {
+      setHydrated(true);
+    }
+  };
 
-    const refreshGoals = () => setGoals(readGoals());
-    window.addEventListener('storage', refreshGoals);
-    window.addEventListener('vortice-goals-updated', refreshGoals);
-    return () => {
-      window.removeEventListener('storage', refreshGoals);
-      window.removeEventListener('vortice-goals-updated', refreshGoals);
-    };
-  }, []);
+  useEffect(() => {
+    loadGoals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,12 +175,6 @@ export default function MetasPage() {
     fetchUsers();
     return () => { cancelled = true; };
   }, [user]);
-
-  const persistGoals = (nextGoals: GoalPlan[]) => {
-    setGoals(nextGoals);
-    localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(nextGoals));
-    window.dispatchEvent(new Event('vortice-goals-updated'));
-  };
 
   const visibleGoals = useMemo(() => goals
     .filter(goal => canViewGoal(goal, user?.id, isAdmin))
@@ -206,7 +210,7 @@ export default function MetasPage() {
     setShowForm(true);
   };
 
-  const submitGoal = (event: React.FormEvent) => {
+  const submitGoal = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) return;
     const title = form.title.trim();
@@ -215,65 +219,83 @@ export default function MetasPage() {
     if (!Number.isFinite(targetValue) || targetValue <= 0) return setFormError('Informe um valor-alvo maior que zero.');
     if (form.metric === 'stage_leads' && form.stageIds.length === 0) return setFormError('Escolha ao menos uma etapa do funil.');
 
-    const now = new Date().toISOString();
-    if (editingGoalId) {
-      persistGoals(goals.map(goal => goal.id === editingGoalId ? {
-        ...goal,
-        title,
-        description: form.description.trim(),
-        type: form.type,
-        metric: form.metric,
-        targetValue,
-        deadline: form.deadline,
-        stageIds: form.stageIds,
-        visibility: form.visibility,
-        viewerIds: form.visibility === 'public' ? [] : form.viewerIds,
-        updatedAt: now,
-      } : goal));
-      setSelectedGoalId(editingGoalId);
-    } else {
-      const newGoal: GoalPlan = {
-        id: makeId('goal'),
-        title,
-        description: form.description.trim(),
-        type: form.type,
-        metric: form.metric,
-        targetValue,
-        deadline: form.deadline,
-        stageIds: form.stageIds,
-        visibility: form.visibility,
-        viewerIds: form.visibility === 'public' ? [] : form.viewerIds,
-        ownerId: user.id,
-        tasks: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      persistGoals([newGoal, ...goals]);
-      setSelectedGoalId(newGoal.id);
+    try {
+      if (editingGoalId) {
+        const updated = await updateGoalOnServer(user.id, editingGoalId, {
+          title,
+          description: form.description.trim(),
+          type: form.type,
+          metric: form.metric,
+          targetValue,
+          deadline: form.deadline,
+          stageIds: form.stageIds,
+          visibility: form.visibility,
+          viewerIds: form.visibility === 'public' ? [] : form.viewerIds,
+        });
+        setGoals(current => current.map(goal => goal.id === editingGoalId ? updated : goal));
+        setSelectedGoalId(editingGoalId);
+      } else {
+        const newGoal: GoalPlan = {
+          id: makeId('goal'),
+          title,
+          description: form.description.trim(),
+          type: form.type,
+          metric: form.metric,
+          targetValue,
+          deadline: form.deadline,
+          stageIds: form.stageIds,
+          visibility: form.visibility,
+          viewerIds: form.visibility === 'public' ? [] : form.viewerIds,
+          ownerId: user.id,
+          tasks: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        const created = await createGoalOnServer(user.id, newGoal);
+        setGoals(current => [created, ...current]);
+        setSelectedGoalId(created.id);
+      }
+      setShowForm(false);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Não foi possível salvar o planejamento.');
     }
-    setShowForm(false);
   };
 
-  const deleteGoal = (goal: GoalPlan) => {
+  const deleteGoal = async (goal: GoalPlan) => {
     if (!window.confirm(`Excluir “${goal.title}”?`)) return;
-    persistGoals(goals.filter(item => item.id !== goal.id));
-    setSelectedGoalId(null);
+    if (!user) return;
+    try {
+      await deleteGoalOnServer(user.id, goal.id);
+      setGoals(current => current.filter(item => item.id !== goal.id));
+      setSelectedGoalId(null);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Não foi possível excluir o planejamento.');
+    }
   };
 
-  const toggleTask = (goal: GoalPlan, taskId: string) => {
-    persistGoals(goals.map(item => item.id === goal.id ? {
-      ...item,
-      tasks: item.tasks.map(task => task.id === taskId ? { ...task, completed: !task.completed } : task),
-      updatedAt: new Date().toISOString(),
-    } : item));
+  const toggleTask = async (goal: GoalPlan, taskId: string) => {
+    if (!user) return;
+    const nextTasks = goal.tasks.map(task => task.id === taskId ? { ...task, completed: !task.completed } : task);
+    try {
+      const updated = await updateGoalOnServer(user.id, goal.id, { tasks: nextTasks });
+      setGoals(current => current.map(item => item.id === goal.id ? updated : item));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Não foi possível atualizar a tarefa.');
+    }
   };
 
-  const addTask = (goal: GoalPlan) => {
+  const addTask = async (goal: GoalPlan) => {
     const title = taskTitle.trim();
-    if (!title) return;
+    if (!title || !user) return;
     const task: GoalTask = { id: makeId('task'), title, completed: false };
-    persistGoals(goals.map(item => item.id === goal.id ? { ...item, tasks: [...item.tasks, task], updatedAt: new Date().toISOString() } : item));
-    setTaskTitle('');
+    const nextTasks = [...goal.tasks, task];
+    try {
+      const updated = await updateGoalOnServer(user.id, goal.id, { tasks: nextTasks });
+      setGoals(current => current.map(item => item.id === goal.id ? updated : item));
+      setTaskTitle('');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Não foi possível adicionar a tarefa.');
+    }
   };
 
   const toggleStage = (stageId: string) => setForm(current => ({
@@ -300,6 +322,12 @@ export default function MetasPage() {
         </div>
         <button type="button" className={styles.primaryButton} onClick={startCreate}><Plus size={17} /> Novo planejamento</button>
       </header>
+
+      {loadError && (
+        <div className={styles.formError} role="alert">
+          <AlertTriangle size={14} /> {loadError} <button type="button" onClick={loadGoals}>Tentar novamente</button>
+        </div>
+      )}
 
       <section className={styles.summaryGrid} aria-label="Resumo das metas">
         <div className={styles.summaryCard}><div className={styles.summaryIcon}><Target size={18} /></div><div><span>Visíveis para você</span><strong>{visibleGoals.length}</strong></div></div>
