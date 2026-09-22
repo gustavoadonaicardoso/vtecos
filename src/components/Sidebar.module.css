@@ -119,9 +119,15 @@
   flex-direction: column;
   gap: 6px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
+  padding-bottom: 0.5rem;
+  /* Sinaliza visualmente que há mais itens abaixo quando a lista não cabe
+     inteira na altura disponível (ex: usuário ADMIN com todos os módulos). */
+  mask-image: linear-gradient(to bottom, black calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 20px), transparent 100%);
 }
 
 /* Hide scrollbar visually but keep functionality for cleaner UI */
