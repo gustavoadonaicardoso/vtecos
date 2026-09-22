@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ClipboardList, Target, Target as GoalIcon, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Target, Target as GoalIcon, ShieldCheck } from 'lucide-react';
 import styles from './projetos.module.css';
 import { useAuth } from '@/context/AuthContext';
 
@@ -22,6 +22,7 @@ const DEFAULT_PROJECTS: ProjectData[] = [];
 export default function ProjetosPage() {
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const { user } = useAuth();
 
   useEffect(() => {
@@ -29,14 +30,23 @@ export default function ProjetosPage() {
   }, [user]);
 
   const fetchProjects = async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const response = await fetch('/api/projects', {
-        headers: { 'x-user-id': user?.id || '' },
+        headers: { 'x-user-id': user.id },
         cache: 'no-store',
       });
       const result = await response.json().catch(() => ({}));
-      const data = response.ok && Array.isArray(result.data) ? result.data : [];
+
+      if (!response.ok) {
+        setLoadError(result.error || `Erro ${response.status} ao carregar projetos.`);
+        setProjects([]);
+        return;
+      }
+
+      setLoadError('');
+      const data = Array.isArray(result.data) ? result.data : [];
 
       if (data.length > 0) {
         setProjects(data.map((d: any) => ({
@@ -51,10 +61,11 @@ export default function ProjetosPage() {
         })));
       } else {
         const saved = localStorage.getItem('vortice_projetos_data');
-        if (saved) setProjects(JSON.parse(saved));
+        setProjects(saved ? JSON.parse(saved) : []);
       }
     } catch (error) {
       console.error('Erro ao carregar projetos:', error);
+      setLoadError('Falha de conexão ao carregar projetos.');
       const saved = localStorage.getItem('vortice_projetos_data');
       if (saved) setProjects(JSON.parse(saved));
     } finally {
@@ -73,6 +84,15 @@ export default function ProjetosPage() {
       {loading ? (
         <div className={styles.emptyState}>
           <p>Carregando projetos...</p>
+        </div>
+      ) : loadError ? (
+        <div className={styles.emptyState} style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#ef4444' }}>
+          <AlertTriangle size={40} opacity={0.7} />
+          <h2>Não foi possível carregar os projetos</h2>
+          <p>{loadError}</p>
+          <button type="button" onClick={fetchProjects} style={{ marginTop: 8, padding: '8px 16px', borderRadius: 8, border: '1px solid currentColor', background: 'transparent', color: 'inherit', cursor: 'pointer' }}>
+            Tentar novamente
+          </button>
         </div>
       ) : projects.length === 0 ? (
         <div className={styles.emptyState}>
