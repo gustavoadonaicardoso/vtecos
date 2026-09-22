@@ -23,6 +23,7 @@
     width: 260px;
     transform: translateX(-100%);
     box-shadow: none;
+    background: var(--background);
   }
 
   .mobileOpen {
