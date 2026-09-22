@@ -9,7 +9,7 @@
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import type { ServiceResult } from '@/types';
 
-export async function fetchTenants(): Promise<ServiceResult> {
+export async function fetchTenants(): Promise<ServiceResult<any[]>> {
   const { data, error } = await supabase
     .from('tenants')
     .select('*')
@@ -19,7 +19,7 @@ export async function fetchTenants(): Promise<ServiceResult> {
   return { success: true, data };
 }
 
-export async function createTenant(name: string): Promise<ServiceResult> {
+export async function createTenant(name: string): Promise<ServiceResult<any>> {
   const { data, error } = await supabase
     .from('tenants')
     .insert({ name: name.trim(), status: 'ACTIVE' })

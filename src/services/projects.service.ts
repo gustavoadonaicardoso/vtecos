@@ -27,7 +27,7 @@ export async function fetchRequesterProfile(requesterId: string): Promise<Projec
   return data;
 }
 
-export async function fetchProjects(): Promise<ServiceResult> {
+export async function fetchProjects(): Promise<ServiceResult<any[]>> {
   const { data, error } = await supabase
     .from('action_plans')
     .select('*')

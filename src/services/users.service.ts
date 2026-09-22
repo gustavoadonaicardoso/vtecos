@@ -35,7 +35,7 @@ export async function fetchRequesterAccess(requesterId: string): Promise<Request
  * `scope=chat` retorna somente os campos necessários para o chat;
  * `scope=team` é reservado para administradores e gerentes.
  */
-export async function fetchProfiles(scope: 'chat' | 'team'): Promise<ServiceResult> {
+export async function fetchProfiles(scope: 'chat' | 'team'): Promise<ServiceResult<any[]>> {
   let query = supabaseAdmin
     .from('profiles')
     .select(
@@ -124,7 +124,7 @@ export async function createUserWithProfile(params: {
 export async function updateOwnProfile(
   userId: string,
   updates: { name: string; phone?: string | null; avatar_url?: string | null }
-): Promise<ServiceResult> {
+): Promise<ServiceResult<any>> {
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update({
