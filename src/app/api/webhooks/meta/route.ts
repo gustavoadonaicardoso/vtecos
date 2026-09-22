@@ -26,18 +26,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { WhatsAppService, getWhatsAppConfig } from '@/lib/whatsapp';
 import { logAudit } from '@/lib/audit';
 import type { WhatsAppWebhookPayload, WhatsAppInboundMessage, WhatsAppMessageStatus } from '@/types';
-
-// ─── Admin Supabase client (bypassa RLS) ──────────────────────
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // ─── Instância do serviço WhatsApp ───────────────────────────
 async function getService(supabaseClient?: any) {
@@ -67,7 +59,7 @@ export async function GET(request: NextRequest) {
   // Responde somente quando modo = subscribe e token correto
   if (mode === 'subscribe' && token) {
     try {
-      const supabase = getSupabase();
+      const supabase = supabaseAdmin;
       const service = await getService(supabase);
       if (service.verifyWebhookToken(token) && challenge) {
         console.log('[Webhook Meta] ✅ Verificação do webhook aprovada.');
@@ -94,7 +86,7 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get('x-hub-signature-256') ?? '';
 
-  const supabase = getSupabase();
+  const supabase = supabaseAdmin;
   let service: WhatsAppService | null = null;
 
   // 2. Valida assinatura HMAC-SHA256 (segurança)
@@ -149,7 +141,7 @@ export async function POST(request: NextRequest) {
 // Processamento de Entries
 // ─────────────────────────────────────────────────────────────
 async function processWebhookEntries(payload: WhatsAppWebhookPayload, service: WhatsAppService) {
-  const supabase = getSupabase();
+  const supabase = supabaseAdmin;
 
   for (const entry of payload.entry) {
     for (const change of entry.changes) {
@@ -181,7 +173,7 @@ async function processWebhookEntries(payload: WhatsAppWebhookPayload, service: W
 // Processamento de Mensagem Recebida
 // ─────────────────────────────────────────────────────────────
 async function handleInboundMessage(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: typeof supabaseAdmin,
   message: WhatsAppInboundMessage,
   senderName: string,
   phoneNumberId: string,
@@ -248,7 +240,8 @@ async function handleInboundMessage(
           'LEAD_CREATE',
           `Lead "${senderName}" criado via WhatsApp Business API (Meta). Phone: ${cleanPhone}`,
           'lead',
-          newLead.id
+          newLead.id,
+          supabaseAdmin
         );
       }
     }
@@ -306,7 +299,7 @@ async function handleInboundMessage(
 // Processamento de Status de Mensagem
 // ─────────────────────────────────────────────────────────────
 async function handleMessageStatus(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: typeof supabaseAdmin,
   status: WhatsAppMessageStatus
 ) {
   try {
@@ -343,7 +336,7 @@ async function handleMessageStatus(
 // Roteamento de Campanha Blast
 // ─────────────────────────────────────────────────────────────
 async function applyBlastRouting(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: typeof supabaseAdmin,
   cleanPhone: string,
   searchSuffix: string,
   leadId: string

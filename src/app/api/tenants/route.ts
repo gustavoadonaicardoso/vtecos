@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Usa a chave de serviço no servidor — bypassa o RLS completamente
-const adminSupabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin as adminSupabase } from '@/lib/supabase-admin';
 
 // GET: Lista todos os tenants
 export async function GET() {

@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import {
   normalizeBrazilPhone,
@@ -6,19 +5,7 @@ import {
   validateBrazilDocument,
   validateBrazilPhone,
 } from '@/lib/brazilian-fields';
-
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    throw new Error('Configuração do Supabase incompleta no servidor.');
-  }
-
-  return createClient(url, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(request: Request) {
   try {
@@ -43,7 +30,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    const supabaseAdmin = getAdminClient();
     const { data: ticket, error: insertError } = await supabaseAdmin
       .from('attendance_queue_tickets')
       .insert({ name, whatsapp, document, status: 'waiting' })

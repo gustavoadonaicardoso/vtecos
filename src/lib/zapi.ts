@@ -152,10 +152,16 @@ async function applyBlastRouting(
 }
 
 /**
- * Handle incoming Webhook from Z-API
+ * Handle incoming Webhook from Z-API.
+ *
+ * Este webhook é server-to-server (chamado pela Z-API, sem sessão de
+ * usuário), então precisa de um client com a service role para não ser
+ * bloqueado pelo RLS. A rota em src/app/api/webhooks/z-api/route.ts passa
+ * o client administrativo explicitamente; o default abaixo só existe para
+ * não quebrar chamadas antigas que não passem um client.
  */
-export async function handleZapiWebhook(payload: any) {
-    if (!supabase) return { success: false, error: 'Supabase não inicializado' };
+export async function handleZapiWebhook(payload: any, dbClient: any = supabase) {
+    if (!dbClient) return { success: false, error: 'Supabase não inicializado' };
 
     try {
         let rawPhone = payload.phone || '';
@@ -176,14 +182,14 @@ export async function handleZapiWebhook(payload: any) {
 
             // 1. Find existing lead by normalized phone
             // PostgreSQL trick to compare only digits
-            const { data: lead } = await supabase
+            const { data: lead } = await dbClient
                 .rpc('find_lead_by_phone', { search_phone: cleanPhone }) // Recommended SQL function approach
                 .maybeSingle();
-            
+
             // Fallback if RPC not defined
             let targetLead: any = lead;
             if (!targetLead) {
-                const { data: leads } = await supabase.from('leads').select('id, name, phone');
+                const { data: leads } = await dbClient.from('leads').select('id, name, phone');
                 targetLead = leads?.find((l: any) => l.phone.replace(/\D/g, '').endsWith(searchSuffix));
             }
 
@@ -193,10 +199,10 @@ export async function handleZapiWebhook(payload: any) {
             if (!leadId) {
                 // 2. Create new lead — check if phone belongs to an active blast campaign
                 // to determine the initial stage for routing
-                const { data: stages } = await supabase.from('pipeline_stages').select('id').order('position').limit(1);
+                const { data: stages } = await dbClient.from('pipeline_stages').select('id').order('position').limit(1);
                 const firstStageId = stages && stages.length > 0 ? stages[0].id : null;
 
-                const { data: newLead } = await supabase.from('leads').insert([{
+                const { data: newLead } = await dbClient.from('leads').insert([{
                     name: senderName,
                     phone: cleanPhone,
                     stage_id: firstStageId
@@ -205,13 +211,13 @@ export async function handleZapiWebhook(payload: any) {
                 if (newLead) {
                     leadId = newLead.id;
                     isNewLead = true;
-                    await logAudit(null, 'LEAD_CREATE', `Lead ${senderName} criado via Z-API.`, 'lead', newLead.id);
+                    await logAudit(null, 'LEAD_CREATE', `Lead ${senderName} criado via Z-API.`, 'lead', newLead.id, dbClient);
                 }
             }
 
             if (leadId) {
                 // 3. Save Message to Database
-                await supabase.from('chat_messages').insert([{
+                await dbClient.from('chat_messages').insert([{
                     lead_id: leadId.toString(),
                     text: messageText,
                     audio_url: audioUrl,
@@ -220,13 +226,13 @@ export async function handleZapiWebhook(payload: any) {
                 }]);
 
                 // 4. Update lead lastMsg
-                await supabase.from('leads').update({
+                await dbClient.from('leads').update({
                     last_msg: messageText || (audioUrl ? '🎵 Áudio' : 'Nova mensagem')
                 }).eq('id', leadId);
 
                 // 5. Apply blast routing: check if this phone was part of a blast campaign
                 //    with route_type configured. Only apply if lead wasn't already routed.
-                await applyBlastRouting(supabase, cleanPhone, searchSuffix, leadId);
+                await applyBlastRouting(dbClient, cleanPhone, searchSuffix, leadId);
             }
         }
         

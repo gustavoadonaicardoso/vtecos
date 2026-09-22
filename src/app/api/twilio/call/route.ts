@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { twilioService } from '@/services/twilio.service';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 export async function POST(request: Request) {
   try {

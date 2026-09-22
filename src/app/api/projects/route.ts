@@ -1,12 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Project data is read and written on the server so mobile clients do not
-// depend on localStorage or on public Supabase RLS policies.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 async function getRequester(request: Request) {
   const requesterId = request.headers.get('x-user-id');

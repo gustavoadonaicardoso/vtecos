@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key);
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function renderMessage(template: string, data: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] ?? '');
 }
 
 export async function GET() {
-  const supabase = getSupabase();
+  const supabase = supabaseAdmin;
   const { data, error } = await supabase
     .from('blast_campaigns')
     .select('*')
@@ -24,7 +18,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = supabaseAdmin;
     const body = await req.json();
     const { name, template, columnsConfig, delayMin, delayMax, contacts, routeType, routeToId, routeToLabel } = body;
 

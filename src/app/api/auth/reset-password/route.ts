@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { logAudit } from '@/lib/audit';
-
-// Admin client to query profiles and insert notifications bypassing RLS
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(request: Request) {
   try {
@@ -62,7 +56,8 @@ export async function POST(request: Request) {
       'SETTINGS_UPDATE',
       `Solicitou uma redefinição de senha para o Administrador.`,
       'profile',
-      userProfile.id
+      userProfile.id,
+      supabaseAdmin
     );
 
     return NextResponse.json({ success: true, message: 'Solicitação encaminhada com sucesso ao administrador.' }, { status: 200 });

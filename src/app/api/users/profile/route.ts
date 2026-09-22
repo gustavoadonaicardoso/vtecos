@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { logAudit } from '@/lib/audit';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function PATCH(request: Request) {
   try {
@@ -42,7 +37,8 @@ export async function PATCH(request: Request) {
       'SETTINGS_UPDATE',
       `Informações de perfil atualizadas (Nome/Telefone/Foto).`,
       'profile',
-      updatedProfile.id
+      updatedProfile.id,
+      supabaseAdmin
     );
 
     return NextResponse.json({ success: true, data: updatedProfile }, { status: 200 });

@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { sendWhatsAppWebMessage } from '@/lib/whatsapp-web';
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key);
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: campaignId } = await params;
-  const supabase = getSupabase();
+  const supabase = supabaseAdmin;
 
   try {
     const { contactId } = await req.json();

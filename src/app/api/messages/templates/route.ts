@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, key);
-}
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // GET — lista templates visíveis para o usuário (filtra por allowed_templates se configurado)
 export async function GET(req: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = supabaseAdmin;
   const userId = req.nextUrl.searchParams.get('userId');
 
   const { data: templates, error } = await supabase
@@ -42,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 // POST — criar template (admin)
 export async function POST(req: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = supabaseAdmin;
   const body = await req.json();
   const { name, content } = body;
 
