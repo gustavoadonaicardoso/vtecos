@@ -46,9 +46,9 @@ import {
   getGoalCurrentValue,
   getGoalProgress,
   getGoalProgressLabel,
-  readGoals,
   type GoalPlan,
 } from '@/lib/goals';
+import { fetchGoalsFromServer, migrateLocalGoalsIfAny } from '@/lib/goals-client';
 
 // ── Novos componentes modulares ──
 import {
@@ -318,15 +318,14 @@ function GoalsProgressSection({
   const [goals, setGoals] = React.useState<GoalPlan[]>([]);
 
   React.useEffect(() => {
-    const refreshGoals = () => setGoals(readGoals());
-    refreshGoals();
-    window.addEventListener('storage', refreshGoals);
-    window.addEventListener('vortice-goals-updated', refreshGoals);
-    return () => {
-      window.removeEventListener('storage', refreshGoals);
-      window.removeEventListener('vortice-goals-updated', refreshGoals);
-    };
-  }, []);
+    if (!user?.id) return;
+    let cancelled = false;
+    migrateLocalGoalsIfAny(user.id)
+      .then(() => fetchGoalsFromServer(user.id))
+      .then(serverGoals => { if (!cancelled) setGoals(serverGoals); })
+      .catch(() => { if (!cancelled) setGoals([]); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const visibleGoals = goals
     .filter(goal => canViewGoal(goal, user?.id, user?.role === 'ADMIN'))
