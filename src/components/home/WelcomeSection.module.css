@@ -28,6 +28,13 @@
   letter-spacing: 0.05em;
 }
 
+.avatarPhoto {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .onlineDot {
   position: absolute;
   bottom: 2px;
