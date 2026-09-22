@@ -44,14 +44,14 @@ A infraestrutura é **100% brasileira**: aplicação hospedada em VPS Locaweb e 
 |--------|-----------|
 | 🎯 **Pipeline** | Kanban visual com drag & drop, stages customizáveis e atualização em tempo real |
 | 👥 **Leads** | Cadastro completo, tags, filtros avançados, histórico e exportação |
-| 💬 **Chat** | Atendimento via WhatsApp (Z-API) com histórico persistido no banco |
+| 💬 **Chat** | Atendimento via WhatsApp (Meta / WhatsApp Web) com histórico persistido no banco |
 | 📣 **Disparos** | Campanhas em massa com upload de planilha XLSX, templates e roteamento automático |
 | 📨 **Messages** | Caixa unificada com templates de mensagem e variáveis dinâmicas |
 | 🧾 **Fiscal** | Geração e análise de documentos fiscais com IA (Google Gemini) |
 | ⚙️ **Automações** | Fluxos automáticos baseados em gatilhos do pipeline |
 | 📊 **Relatórios** | KPIs, funil de conversão e atividades da equipe |
 | 🏢 **Usuários** | Gestão de time com roles (Admin / Manager / Seller) e permissões granulares |
-| 🔌 **Integrações** | Z-API (WhatsApp), Meta (Instagram/Messenger), WhatsApp Business API |
+| 🔌 **Integrações** | WhatsApp Web (Baileys), Meta (Instagram/Messenger), WhatsApp Business API |
 | 🗓️ **Agendamentos** | Fila de atendimento e scheduling |
 | 🔐 **Admin** | Banners, logs de auditoria completos e configurações globais |
 | 👑 **Master** | Painel super admin para gestão multi-tenant |
@@ -118,7 +118,7 @@ Banco           Supabase (PostgreSQL 15) — região São Paulo
 Realtime        Supabase Realtime (WebSockets)
 Auth            JWT + localStorage session
 IA              Google Gemini 2.0 Flash
-WhatsApp        Z-API
+WhatsApp        Meta Cloud API + WhatsApp Web (Baileys)
 Planilhas       SheetJS (xlsx)
 Servidor        Nginx + PM2
 Hospedagem      VPS Locaweb — Brasil
@@ -138,7 +138,7 @@ vortice-crm/
 │   │   │   ├── disparos/           # campanhas · templates · upload
 │   │   │   ├── messages/           # templates de mensagem
 │   │   │   ├── fiscal/             # geração IA + exportação CSV
-│   │   │   ├── webhooks/z-api/     # recebimento de mensagens
+│   │   │   ├── webhooks/meta/      # recebimento de mensagens
 │   │   │   └── audit/              # log de auditoria
 │   │   ├── pipeline/               # Kanban visual
 │   │   ├── leads/                  # Listagem e gestão
@@ -156,7 +156,7 @@ vortice-crm/
 │   ├── components/                 # Sidebar · Navbar · Modais
 │   ├── context/                    # AuthContext · LeadContext
 │   ├── hooks/                      # usePermissions · useNotifications
-│   ├── lib/                        # supabase · gemini · zapi · audit
+│   ├── lib/                        # supabase · gemini · messaging · audit
 │   ├── services/                   # auth.service · leads.service
 │   └── types/                      # Interfaces TypeScript centralizadas
 ├── .env.local                      # ⚠️ Variáveis secretas (não commitado)
@@ -257,7 +257,7 @@ CREATE TABLE IF NOT EXISTS leads (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. Mensagens de Chat com Leads (Z-API / Meta)
+-- 4. Mensagens de Chat com Leads (Meta / WhatsApp Web)
 CREATE TABLE IF NOT EXISTS chat_messages (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
@@ -286,7 +286,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. Configurações de Integração (Z-API / Meta / Webhook)
+-- 6. Configurações de Integração (Meta / WhatsApp Web / Webhook)
 CREATE TABLE IF NOT EXISTS integrations_config (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   provider TEXT NOT NULL UNIQUE,

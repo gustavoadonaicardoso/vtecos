@@ -253,23 +253,15 @@
   margin-bottom: 2rem;
 }
 
-.metaIcon, .zapiIcon {
+.metaIcon {
   width: 56px;
   height: 56px;
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.metaIcon {
   background: rgba(24, 119, 242, 0.1);
   color: #1877f2;
-}
-
-.zapiIcon {
-  background: rgba(17, 193, 217, 0.1);
-  color: #11c1d9;
 }
 
 .tutorialHeader h4 {

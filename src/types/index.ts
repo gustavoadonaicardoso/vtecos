@@ -145,20 +145,6 @@ export interface AuditLog {
   entity_id?: string;
 }
 
-// ─── Integrações — Z-API (WhatsApp) ──────────────────────────
-
-export interface ZApiConfig {
-  instanceId: string;
-  token: string;
-  clientToken?: string;
-  receiveGroups?: boolean;
-}
-
-export interface ZApiSendOptions {
-  delayMessage?: number;
-  delayTyping?: number;
-}
-
 // ─── Integrações — WhatsApp Business Cloud API (Meta) ─────────
 
 /** Configuração completa da Meta Cloud API */

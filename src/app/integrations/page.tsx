@@ -119,10 +119,10 @@ export default function Integrations() {
 
   const [isTesting, setIsTesting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-  const [zapiQr, setZapiQr] = useState<string | null>(null);
+  const [whatsappWebQr, setWhatsAppWebQr] = useState<string | null>(null);
   const [isFetchingQr, setIsFetchingQr] = useState(false);
-  const [zapiConnection, setZapiConnection] = useState<'idle' | 'waiting' | 'connected' | 'error'>('idle');
-  const [zapiConnectionMessage, setZapiConnectionMessage] = useState('');
+  const [whatsappWebConnection, setWhatsAppWebConnection] = useState<'idle' | 'waiting' | 'connected' | 'error'>('idle');
+  const [whatsappWebConnectionMessage, setWhatsAppWebConnectionMessage] = useState('');
   const qrRefreshCount = React.useRef(0);
 
   const requestWhatsAppWeb = React.useCallback(async () => {
@@ -132,68 +132,68 @@ export default function Integrations() {
     return data;
   }, []);
 
-  const fetchZapiQrCode = React.useCallback(async (isRefresh = false) => {
+  const fetchWhatsAppWebQrCode = React.useCallback(async (isRefresh = false) => {
     setIsFetchingQr(true);
     if (!isRefresh) {
-      setZapiQr(null);
+      setWhatsAppWebQr(null);
       qrRefreshCount.current = 0;
     }
-    setZapiConnection('waiting');
-    setZapiConnectionMessage('Aguardando leitura do QR Code...');
+    setWhatsAppWebConnection('waiting');
+    setWhatsAppWebConnectionMessage('Aguardando leitura do QR Code...');
     
     try {
       const status = await requestWhatsAppWeb();
       if (status.connected) {
-        setZapiQr(null);
-        setZapiConnection('connected');
-        setZapiConnectionMessage('WhatsApp conectado com sucesso.');
+        setWhatsAppWebQr(null);
+        setWhatsAppWebConnection('connected');
+        setWhatsAppWebConnectionMessage('WhatsApp conectado com sucesso.');
         return;
       }
 
-      setZapiQr(status.qrCode || null);
+      setWhatsAppWebQr(status.qrCode || null);
     } catch (err) {
       console.error(err);
-      setZapiConnection('error');
-      setZapiConnectionMessage(err instanceof Error ? err.message : 'Erro ao conectar com WhatsApp Web.');
+      setWhatsAppWebConnection('error');
+      setWhatsAppWebConnectionMessage(err instanceof Error ? err.message : 'Erro ao conectar com WhatsApp Web.');
     } finally {
       setIsFetchingQr(false);
     }
   }, [requestWhatsAppWeb]);
 
   React.useEffect(() => {
-    if (activeModal !== 'whatsapp-web' || zapiConnection !== 'waiting') return;
+    if (activeModal !== 'whatsapp-web' || whatsappWebConnection !== 'waiting') return;
 
     const timer = window.setInterval(async () => {
       try {
         const status = await requestWhatsAppWeb();
         if (status.connected) {
-          setZapiQr(null);
-          setZapiConnection('connected');
-          setZapiConnectionMessage('WhatsApp conectado com sucesso. Salve a integração para ativá-la no CRM.');
+          setWhatsAppWebQr(null);
+          setWhatsAppWebConnection('connected');
+          setWhatsAppWebConnectionMessage('WhatsApp conectado com sucesso. Salve a integração para ativá-la no CRM.');
           window.clearInterval(timer);
           return;
         }
 
-        if (status.qrCode) setZapiQr(status.qrCode);
+        if (status.qrCode) setWhatsAppWebQr(status.qrCode);
 
         if (qrRefreshCount.current >= 30) {
-          setZapiQr(null);
-          setZapiConnection('idle');
-          setZapiConnectionMessage('QR Code expirado. Gere um novo código para tentar novamente.');
+          setWhatsAppWebQr(null);
+          setWhatsAppWebConnection('idle');
+          setWhatsAppWebConnectionMessage('QR Code expirado. Gere um novo código para tentar novamente.');
           window.clearInterval(timer);
           return;
         }
 
         qrRefreshCount.current += 1;
       } catch (error) {
-        setZapiConnection('error');
-        setZapiConnectionMessage(error instanceof Error ? error.message : 'Falha ao verificar a conexão.');
+        setWhatsAppWebConnection('error');
+        setWhatsAppWebConnectionMessage(error instanceof Error ? error.message : 'Falha ao verificar a conexão.');
         window.clearInterval(timer);
       }
     }, 2_000);
 
     return () => window.clearInterval(timer);
-  }, [activeModal, requestWhatsAppWeb, zapiConnection]);
+  }, [activeModal, requestWhatsAppWeb, whatsappWebConnection]);
 
   const handleTestConnection = async () => {
     if (!waConfig.token || !waConfig.phoneId) {
@@ -313,9 +313,9 @@ export default function Integrations() {
 
       if (provider === 'whatsapp_web') {
         setWebConfig({ name: 'WhatsApp principal' });
-        setZapiQr(null);
-        setZapiConnection('idle');
-        setZapiConnectionMessage('');
+        setWhatsAppWebQr(null);
+        setWhatsAppWebConnection('idle');
+        setWhatsAppWebConnectionMessage('');
       }
 
       setActiveModal(null);
@@ -591,24 +591,24 @@ export default function Integrations() {
             </div>
 
             <div className={styles.qrContainer} style={{ marginTop: '0.5rem', textAlign: 'center', padding: '1.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px solid var(--border)' }}>
-               {zapiConnectionMessage && (
-                 <p style={{ marginBottom: '1rem', fontSize: '0.85rem', color: zapiConnection === 'connected' ? '#25D366' : zapiConnection === 'error' ? '#ef4444' : 'var(--foreground)', opacity: zapiConnection === 'waiting' ? 0.7 : 1 }}>
-                   {zapiConnectionMessage}
+               {whatsappWebConnectionMessage && (
+                 <p style={{ marginBottom: '1rem', fontSize: '0.85rem', color: whatsappWebConnection === 'connected' ? '#25D366' : whatsappWebConnection === 'error' ? '#ef4444' : 'var(--foreground)', opacity: whatsappWebConnection === 'waiting' ? 0.7 : 1 }}>
+                   {whatsappWebConnectionMessage}
                  </p>
                )}
-               {zapiQr ? (
+               {whatsappWebQr ? (
                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ background: 'white', padding: '12px', borderRadius: '12px', lineHeight: 0 }}>
-                      <Image src={zapiQr} alt="QR Code do WhatsApp Web" width={220} height={220} unoptimized />
+                      <Image src={whatsappWebQr} alt="QR Code do WhatsApp Web" width={220} height={220} unoptimized />
                     </div>
-                    <button onClick={() => fetchZapiQrCode()} style={{ background: 'none', border: 'none', color: '#11c1d9', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}>
+                    <button onClick={() => fetchWhatsAppWebQrCode()} style={{ background: 'none', border: 'none', color: '#11c1d9', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}>
                       Atualizar QR Code
                     </button>
                  </div>
                ) : (
                  <button 
                    className={styles.btnTest} 
-                   onClick={() => fetchZapiQrCode()}
+                   onClick={() => fetchWhatsAppWebQrCode()}
                    disabled={isFetchingQr}
                    style={{ margin: '0 auto', background: 'rgba(17, 193, 217, 0.1)', color: '#11c1d9', border: '1px solid #11c1d944' }}
                  >

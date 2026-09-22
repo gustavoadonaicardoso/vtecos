@@ -44,7 +44,7 @@ import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/lib/permissions';
 import styles from './messages.module.css';
 import { motion, AnimatePresence } from 'framer-motion';
-import { sendWhatsApp, saveChatMessage } from '@/lib/zapi';
+import { sendWhatsApp, saveChatMessage } from '@/lib/messaging';
 import { supabase } from '@/lib/supabase';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationDropdown from '@/components/NotificationDropdown';
