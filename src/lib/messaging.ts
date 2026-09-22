@@ -98,7 +98,7 @@ export async function sendWhatsApp(
  * Only the most recent active/completed campaign for this phone is used.
  * Routing is idempotent — re-applying to an already-routed lead is harmless.
  */
-async function applyBlastRouting(
+export async function applyBlastRouting(
     supabase: any,
     cleanPhone: string,
     searchSuffix: string,
