@@ -5,7 +5,7 @@ import {
   validateBrazilDocument,
   validateBrazilPhone,
 } from '@/lib/brazilian-fields';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createQueueTicket } from '@/services/queue.service';
 
 export async function POST(request: Request) {
   try {
@@ -30,13 +30,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    const { data: ticket, error: insertError } = await supabaseAdmin
-      .from('attendance_queue_tickets')
-      .insert({ name, whatsapp, document, status: 'waiting' })
-      .select('number')
-      .single();
-
-    if (insertError) throw insertError;
+    const ticket = await createQueueTicket({ name, whatsapp, document });
 
     return NextResponse.json({ number: ticket.number }, { status: 201 });
   } catch (error: unknown) {

@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin as adminSupabase } from '@/lib/supabase-admin';
+import { fetchTenants, createTenant } from '@/services/tenants.service';
 
 // GET: Lista todos os tenants
 export async function GET() {
-  const { data, error } = await adminSupabase
-    .from('tenants')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  const result = await fetchTenants();
+  if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
+  return NextResponse.json({ data: result.data });
 }
 
 // POST: Cria um novo tenant
@@ -20,14 +16,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 });
     }
 
-    const { data, error } = await adminSupabase
-      .from('tenants')
-      .insert({ name: name.trim(), status: 'ACTIVE' })
-      .select()
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ data }, { status: 201 });
+    const result = await createTenant(name);
+    if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
+    return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

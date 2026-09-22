@@ -1,18 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { fetchRequesterProfile, fetchProjects, replaceProjects } from '@/services/projects.service';
 
 async function getRequester(request: Request) {
   const requesterId = request.headers.get('x-user-id');
   if (!requesterId) return null;
-
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('role, status, permissions')
-    .eq('id', requesterId)
-    .maybeSingle();
-
-  if (error || !data || data.status !== 'ACTIVE') return null;
-  return data;
+  return fetchRequesterProfile(requesterId);
 }
 
 export async function GET(request: Request) {
@@ -29,17 +21,13 @@ export async function GET(request: Request) {
     );
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('action_plans')
-    .select('*')
-    .order('created_at');
-
-  if (error) {
-    console.error('List projects error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const result = await fetchProjects();
+  if (!result.success) {
+    console.error('List projects error:', result.error);
+    return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
-  return NextResponse.json({ data: data || [] }, { status: 200 });
+  return NextResponse.json({ data: result.data }, { status: 200 });
 }
 
 export async function PUT(request: Request) {
@@ -58,35 +46,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Lista de projetos inválida.' }, { status: 400 });
     }
 
-    const rows = body.projects.map((project: any) => ({
-      client_name: String(project.clientName || ''),
-      project_name: String(project.projectName || ''),
-      status: String(project.status || 'Planejamento'),
-      strategies: String(project.strategies || ''),
-      weekly_goals: String(project.weeklyGoals || ''),
-      commercial_points: String(project.commercialPoints || ''),
-      color_gradient: String(project.color || ''),
-    }));
-
-    const { error: deleteError } = await supabaseAdmin
-      .from('action_plans')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000');
-
-    if (deleteError) {
-      console.error('Clear projects error:', deleteError);
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
-    }
-
-    if (rows.length > 0) {
-      const { error: insertError } = await supabaseAdmin
-        .from('action_plans')
-        .insert(rows);
-
-      if (insertError) {
-        console.error('Save projects error:', insertError);
-        return NextResponse.json({ error: insertError.message }, { status: 500 });
-      }
+    const result = await replaceProjects(body.projects);
+    if (!result.success) {
+      console.error('Save projects error:', result.error);
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
