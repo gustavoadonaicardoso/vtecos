@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { findProfileByEmail, notifyAdminsOfPasswordResetRequest } from '@/services/users.service';
 
 export async function POST(request: Request) {
   try {
@@ -10,47 +11,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'E-mail é obrigatório.' }, { status: 400 });
     }
 
-    // 1. Find user profile matching the email
-    const { data: userProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, name, email')
-      .eq('email', email)
-      .single();
+    const userProfile = await findProfileByEmail(email);
 
-    if (profileError || !userProfile) {
+    if (!userProfile) {
       return NextResponse.json({ error: 'Nenhum usuário encontrado com este e-mail.' }, { status: 404 });
     }
 
-    // 2. Find all Admin users
-    const { data: admins, error: adminsError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('role', 'ADMIN')
-      .eq('status', 'ACTIVE');
+    await notifyAdminsOfPasswordResetRequest(userProfile);
 
-    if (adminsError || !admins || admins.length === 0) {
-      console.warn('Nenhum administrador ativo encontrado no sistema para receber a demanda.');
-    } else {
-      // 3. Insert notification for each admin
-      const notifications = admins.map(admin => ({
-        user_id: admin.id,
-        type: 'task',
-        title: 'Solicitação de Senha',
-        content: `O usuário ${userProfile.name} (${userProfile.email}) solicitou a redefinição de sua senha.`,
-        is_read: false,
-        link: '/users'
-      }));
-
-      const { error: notifError } = await supabaseAdmin
-        .from('system_notifications')
-        .insert(notifications);
-
-      if (notifError) {
-        console.error('Erro ao criar notificações para os admins:', notifError.message);
-      }
-    }
-
-    // 4. Log audit log
     await logAudit(
       { id: userProfile.id, name: userProfile.name },
       'SETTINGS_UPDATE',

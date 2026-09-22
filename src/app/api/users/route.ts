@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { fetchRequesterAccess, fetchProfiles, createUserWithProfile } from '@/services/users.service';
 
 const ALLOWED_ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
 
@@ -24,14 +24,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Escopo inválido.' }, { status: 400 });
     }
 
-    const { data: requester, error: requesterError } = await supabaseAdmin
-      .from('profiles')
-      .select('role, status')
-      .eq('id', requesterId)
-      .maybeSingle();
+    const requester = await fetchRequesterAccess(requesterId);
 
     if (
-      requesterError ||
       !requester ||
       requester.status !== 'ACTIVE' ||
       (scope === 'team' && !['ADMIN', 'MANAGER'].includes(requester.role))
@@ -42,27 +37,13 @@ export async function GET(request: Request) {
       );
     }
 
-    let query = supabaseAdmin
-      .from('profiles')
-      .select(
-        scope === 'chat'
-          ? 'id, name, email, role, status, avatar_url'
-          : 'id, name, email, role, status, permissions, allowed_templates, phone, avatar_url, created_at'
-      )
-      .order('name');
-
-    if (scope === 'chat') {
-      query = query.eq('status', 'ACTIVE');
+    const result = await fetchProfiles(scope);
+    if (!result.success) {
+      console.error('List profiles error:', result.error);
+      return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('List profiles error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ data: data || [] }, { status: 200 });
+    return NextResponse.json({ data: result.data }, { status: 200 });
   } catch (error: unknown) {
     console.error('List profiles error:', error);
     return NextResponse.json(
@@ -77,8 +58,6 @@ export async function GET(request: Request) {
  * A chave de serviço fica exclusivamente no servidor.
  */
 export async function POST(request: Request) {
-  let createdAuthUserId: string | null = null;
-
   try {
     const requesterId = request.headers.get('x-user-id');
 
@@ -89,18 +68,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: requester, error: requesterError } = await supabaseAdmin
-      .from('profiles')
-      .select('role, status')
-      .eq('id', requesterId)
-      .maybeSingle();
+    const requester = await fetchRequesterAccess(requesterId);
 
-    if (
-      requesterError ||
-      !requester ||
-      requester.status !== 'ACTIVE' ||
-      requester.role !== 'ADMIN'
-    ) {
+    if (!requester || requester.status !== 'ACTIVE' || requester.role !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Apenas administradores ativos podem criar usuários.' },
         { status: 403 }
@@ -131,65 +101,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cargo inválido.' }, { status: 400 });
     }
 
-    const { data: authData, error: authError } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { name },
-      });
-
-    if (authError || !authData.user) {
-      const isDuplicate =
-        authError?.message.toLowerCase().includes('already') ||
-        authError?.message.toLowerCase().includes('exist');
-
-      return NextResponse.json(
-        {
-          error: isDuplicate
-            ? 'Este e-mail já está cadastrado.'
-            : authError?.message || 'Não foi possível criar a credencial de acesso.',
-        },
-        { status: isDuplicate ? 409 : 400 }
-      );
-    }
-
-    createdAuthUserId = authData.user.id;
-
     const permissions = body.permissions && typeof body.permissions === 'object'
       ? body.permissions
       : {};
 
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .upsert({
-        id: authData.user.id,
-        name,
-        email,
-        role,
-        status: 'ACTIVE',
-        permissions,
-      }, { onConflict: 'id' })
-      .select()
-      .single();
+    const result = await createUserWithProfile({ name, email, password, role, permissions });
 
-    if (profileError || !profile) {
-      // Evita deixar uma credencial sem perfil se a gravação do perfil falhar.
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      createdAuthUserId = null;
-
-      return NextResponse.json(
-        { error: profileError?.message || 'Não foi possível criar o perfil do usuário.' },
-        { status: 400 }
-      );
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    return NextResponse.json({ data: profile }, { status: 201 });
+    return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (error: unknown) {
-    if (createdAuthUserId) {
-      await supabaseAdmin.auth.admin.deleteUser(createdAuthUserId);
-    }
-
     console.error('Create user error:', error);
 
     return NextResponse.json(

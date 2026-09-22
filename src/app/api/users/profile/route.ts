@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { updateOwnProfile } from '@/services/users.service';
 
 export async function PATCH(request: Request) {
   try {
@@ -15,23 +16,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Nome completo é obrigatório.' }, { status: 400 });
     }
 
-    // Update profiles table
-    const { data: updatedProfile, error } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        name,
-        phone: phone || null,
-        avatar_url: avatar_url || null
-      })
-      .eq('id', userId)
-      .select()
-      .single();
+    const result = await updateOwnProfile(userId, { name, phone, avatar_url });
 
-    if (error || !updatedProfile) {
-      return NextResponse.json({ error: error?.message || 'Falha ao atualizar perfil.' }, { status: 400 });
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    // Log audit log
+    const updatedProfile = result.data!;
+
     await logAudit(
       { id: updatedProfile.id, name: updatedProfile.name },
       'SETTINGS_UPDATE',
