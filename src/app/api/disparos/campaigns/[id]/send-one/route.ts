@@ -1,91 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sendWhatsAppWebMessage } from '@/lib/whatsapp-web';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { sendCampaignContact } from '@/services/disparos.service';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: campaignId } = await params;
-  const supabase = supabaseAdmin;
 
   try {
     const { contactId } = await req.json();
+    const result = await sendCampaignContact(campaignId, contactId);
 
-    const { data: contact, error: contactError } = await supabase
-      .from('blast_contacts')
-      .select('*')
-      .eq('id', contactId)
-      .eq('campaign_id', campaignId)
-      .single();
-
-    if (contactError || !contact) {
-      return NextResponse.json({ error: 'Contato não encontrado' }, { status: 404 });
-    }
-
-    await supabase
-      .from('blast_contacts')
-      .update({ status: 'sending' })
-      .eq('id', contactId);
-
-    let cleanPhone = (contact.phone ?? '').replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      await supabase
-        .from('blast_contacts')
-        .update({ status: 'failed', error_msg: 'Telefone inválido' })
-        .eq('id', contactId);
-      await incrementFailed(supabase, campaignId);
-      return NextResponse.json({ success: false, error: 'Telefone inválido' });
-    }
-    if (!cleanPhone.startsWith('55')) cleanPhone = '55' + cleanPhone;
-
-    const message = contact.rendered_message ?? '';
-
-    try {
-      await sendWhatsAppWebMessage(cleanPhone, message);
-      await supabase
-        .from('blast_contacts')
-        .update({ status: 'sent', sent_at: new Date().toISOString(), error_msg: null })
-        .eq('id', contactId);
-      await incrementSent(supabase, campaignId);
-      return NextResponse.json({ success: true });
-    } catch (sendError) {
-      const errorMessage = sendError instanceof Error ? sendError.message : 'Falha no envio pelo WhatsApp Web';
-      await supabase
-        .from('blast_contacts')
-        .update({ status: 'failed', error_msg: errorMessage.slice(0, 200) })
-        .eq('id', contactId);
-      await incrementFailed(supabase, campaignId);
-      return NextResponse.json({ success: false, error: errorMessage });
-    }
+    if (!result.success) return NextResponse.json({ success: false, error: result.error });
+    return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
-}
-
-async function incrementSent(supabase: any, campaignId: string) {
-  const { data } = await supabase
-    .from('blast_campaigns')
-    .select('sent_count, total_contacts, failed_count')
-    .eq('id', campaignId)
-    .single();
-  if (!data) return;
-  const newSent = (data.sent_count ?? 0) + 1;
-  const done = newSent + (data.failed_count ?? 0) >= (data.total_contacts ?? 0);
-  await supabase
-    .from('blast_campaigns')
-    .update({ sent_count: newSent, status: done ? 'completed' : 'running', updated_at: new Date().toISOString() })
-    .eq('id', campaignId);
-}
-
-async function incrementFailed(supabase: any, campaignId: string) {
-  const { data } = await supabase
-    .from('blast_campaigns')
-    .select('sent_count, total_contacts, failed_count')
-    .eq('id', campaignId)
-    .single();
-  if (!data) return;
-  const newFailed = (data.failed_count ?? 0) + 1;
-  const done = (data.sent_count ?? 0) + newFailed >= (data.total_contacts ?? 0);
-  await supabase
-    .from('blast_campaigns')
-    .update({ failed_count: newFailed, status: done ? 'completed' : 'running', updated_at: new Date().toISOString() })
-    .eq('id', campaignId);
 }

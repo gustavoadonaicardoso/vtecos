@@ -1,46 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { fetchCampaignWithContacts, updateCampaign, deleteCampaign } from '@/services/disparos.service';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = supabaseAdmin;
+  const result = await fetchCampaignWithContacts(id);
 
-  const { data: campaign, error } = await supabase
-    .from('blast_campaigns')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-
-  const { data: contacts } = await supabase
-    .from('blast_contacts')
-    .select('*')
-    .eq('campaign_id', id)
-    .order('created_at', { ascending: true });
-
-  return NextResponse.json({ campaign, contacts: contacts ?? [] });
+  if (!result.success) return NextResponse.json({ error: result.error }, { status: 404 });
+  return NextResponse.json(result.data);
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = supabaseAdmin;
   const body = await req.json();
+  const result = await updateCampaign(id, body);
 
-  const { error } = await supabase
-    .from('blast_campaigns')
-    .update({ ...body, updated_at: new Date().toISOString() })
-    .eq('id', id);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
   return NextResponse.json({ success: true });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = supabaseAdmin;
+  const result = await deleteCampaign(id);
 
-  const { error } = await supabase.from('blast_campaigns').delete().eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
   return NextResponse.json({ success: true });
 }
