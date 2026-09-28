@@ -1,19 +1,22 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { verifyTwilioRequest, twilioRejectResponse } from '@/lib/twilio-webhook';
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const callSid = formData.get('CallSid') as string;
-    const recordingUrl = formData.get('RecordingUrl') as string;
-    const status = formData.get('CallStatus') as string;
-    const duration = formData.get('RecordingDuration') as string;
+    const { valid, params } = await verifyTwilioRequest(request);
+    if (!valid) return twilioRejectResponse();
+
+    const callSid = params.CallSid;
+    const recordingUrl = params.RecordingUrl;
+    const status = params.CallStatus;
+    const duration = params.RecordingDuration;
 
     if (callSid && recordingUrl) {
       // Update the call log with the recording URL
       await supabase
         .from('call_logs')
-        .update({ 
+        .update({
           recording_url: recordingUrl,
           duration: duration ? parseInt(duration) : 0,
           status: status || 'completed'

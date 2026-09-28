@@ -10,13 +10,18 @@
 import { supabase } from '@/lib/supabase';
 import type { UserProfile, ServiceResult } from '@/types';
 
+export interface SignInResult {
+  profile: UserProfile;
+  session: { access_token: string; refresh_token: string; expires_in: number };
+}
+
 /**
  * Realiza login via Supabase Auth.
  */
 export async function signIn(
   email: string,
   password: string
-): Promise<ServiceResult<UserProfile>> {
+): Promise<ServiceResult<SignInResult>> {
   try {
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -39,7 +44,7 @@ export async function signIn(
       };
     }
 
-    if (!authData.user) {
+    if (!authData.user || !authData.session) {
       return {
         success: false,
         error: 'Não foi possível identificar o usuário autenticado.',
@@ -76,7 +81,14 @@ export async function signIn(
 
     return {
       success: true,
-      data: profile,
+      data: {
+        profile,
+        session: {
+          access_token: authData.session.access_token,
+          refresh_token: authData.session.refresh_token,
+          expires_in: authData.session.expires_in,
+        },
+      },
     };
   } catch (err: unknown) {
     console.error('[AuthService] signIn:', err);

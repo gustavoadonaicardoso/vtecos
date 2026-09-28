@@ -69,7 +69,7 @@ export const CATEGORIES = ['Todos', 'Marketing', 'Comunicação', 'Produtividade
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 export type WhatsAppWebConnectionState = 'idle' | 'waiting' | 'connected' | 'error';
 
-export interface WaConfig { token: string; phoneId: string; wabaId: string }
+export interface WaConfig { token: string; phoneId: string; wabaId: string; appSecret?: string }
 export interface MetaConfig { pageToken: string; pageId: string; instagramId: string }
 export interface WebConfig { name: string }
 export interface WebhookConfig { url: string; secret: string }

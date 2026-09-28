@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { twilioService } from '@/services/twilio.service';
+import { verifyTwilioRequest, twilioRejectResponse } from '@/lib/twilio-webhook';
 
 export async function POST(request: Request) {
+  const { valid } = await verifyTwilioRequest(request);
+  if (!valid) return twilioRejectResponse();
+
   const { searchParams } = new URL(request.url);
   const to = searchParams.get('to');
 
@@ -18,7 +22,8 @@ export async function POST(request: Request) {
   });
 }
 
-// Support GET for easier debugging/Twilio setup if needed
+// Suporte a GET (a Twilio pode ser configurada pra chamar via GET); a
+// assinatura ainda é validada dentro de verifyTwilioRequest.
 export async function GET(request: Request) {
   return POST(request);
 }

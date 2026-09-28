@@ -10,7 +10,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 import {
   fetchUserNotifications,
   markNotificationAsRead,
@@ -18,6 +17,8 @@ import {
 } from '@/services/notifications.service';
 import { SystemNotification } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+
+const POLL_INTERVAL_MS = 15_000;
 
 export function useNotifications(isOpen: boolean) {
   const { user } = useAuth();
@@ -38,24 +39,12 @@ export function useNotifications(isOpen: boolean) {
 
     refresh();
 
-    // Realtime com nome único para evitar conflitos
-    const channel = supabase
-      .channel(`notifications_dropdown_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'system_notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => refresh()
-      )
-      .subscribe();
+    // Antes usava Realtime direto na tabela; a leitura agora passa por
+    // uma API autenticada (não dá pra assinar Realtime nela), então o
+    // dropdown atualiza por polling enquanto está aberto.
+    const interval = setInterval(refresh, POLL_INTERVAL_MS);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [isOpen, user, refresh]);
 
   const markAsRead = async (id: string) => {

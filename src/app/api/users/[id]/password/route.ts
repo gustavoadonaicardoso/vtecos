@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { fetchRequesterAccess, adminResetPassword } from '@/services/users.service';
+import { adminResetPassword } from '@/services/users.service';
+import { requireAdminProfile } from '@/lib/session';
 
 /**
  * Define uma nova senha para um membro da equipe SEM exigir a senha
@@ -11,14 +12,9 @@ import { fetchRequesterAccess, adminResetPassword } from '@/services/users.servi
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const requesterId = request.headers.get('x-user-id');
-    if (!requesterId) {
-      return NextResponse.json({ error: 'Identificação do administrador necessária.' }, { status: 401 });
-    }
-
-    const requester = await fetchRequesterAccess(requesterId);
-    if (!requester || requester.status !== 'ACTIVE' || requester.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Apenas administradores ativos podem redefinir senhas.' }, { status: 403 });
+    const auth = await requireAdminProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
     const { id } = await params;
@@ -35,7 +31,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     await logAudit(
-      { id: requesterId, name: 'Administrador' },
+      { id: auth.profile.id, name: auth.profile.name },
       'SETTINGS_UPDATE',
       `Redefiniu a senha do membro ${id} sem exigir a senha atual.`,
       'profile',

@@ -1,30 +1,44 @@
 import { NextResponse } from 'next/server';
 import { fetchLeadsAndStages, createLead } from '@/services/leads.service';
+import { requireActiveProfile } from '@/lib/session';
 
-export async function GET(request: Request) {
+/**
+ * Antes: userId/role vinham direto de headers enviados pelo próprio
+ * navegador (x-user-id/x-user-role) -- qualquer um podia se declarar
+ * ADMIN e ver/editar leads de qualquer colega. Agora vem da sessão
+ * verificada contra o Supabase Auth.
+ */
+export async function GET() {
   try {
-    const userId = request.headers.get('x-user-id') || undefined;
-    const role = request.headers.get('x-user-role') || undefined;
+    const auth = await requireActiveProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+    }
 
-    const data = await fetchLeadsAndStages({ userId, role });
+    const data = await fetchLeadsAndStages({ userId: auth.profile.id, role: auth.profile.role });
     if (!data) return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
     return NextResponse.json({ data }, { status: 200 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro interno.' }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireActiveProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+    }
+
     const leadData = await request.json();
     const result = await createLead(leadData);
-    
+
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
-    
+
     return NextResponse.json({ data: result.data }, { status: 201 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro interno.' }, { status: 500 });
   }
 }

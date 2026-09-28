@@ -17,9 +17,10 @@ import Link from 'next/link';
 import NotificationDropdown from './NotificationDropdown';
 import { useLeads } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
 import { useTwilio } from '@/context/TwilioContext';
+
+const NOTIFICATIONS_POLL_MS = 20_000;
 
 const Navbar = () => {
   const { isMobileOpen, toggleMobileMenu } = useSidebar();
@@ -35,23 +36,14 @@ const Navbar = () => {
   React.useEffect(() => {
     if (!user) return;
 
-    // Busca inicial via service
-    fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
+    const refreshCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
 
-    // Realtime para atualizar badge em tempo real
-    const channel = supabase
-      .channel(`navbar_notifications_${user.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'system_notifications',
-        filter: `user_id=eq.${user.id}`,
-      }, () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0)))
-      .subscribe();
+    refreshCount();
+    // A leitura passa por uma API autenticada (não dá pra assinar
+    // Realtime nela), então o badge atualiza por polling.
+    const interval = setInterval(refreshCount, NOTIFICATIONS_POLL_MS);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [user]);
 
   return (

@@ -9,6 +9,7 @@ import styles from './messages.module.css';
 import { AnimatePresence } from 'framer-motion';
 import { sendWhatsApp, saveChatMessage } from '@/lib/messaging';
 import { supabase } from '@/lib/supabase';
+import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
 import type { ChatMessage, LeadEditForm, MetaTemplate, NewContactForm, QuickTemplate } from './types';
 import ChatSidebar from './components/ChatSidebar';
 import ChatHeaderMain from './components/ChatHeaderMain';
@@ -238,35 +239,17 @@ function MessagesContent() {
     };
   }, [selectedChatId]);
 
-  // Realtime System Notifications
+  // Notificações não lidas -- a leitura passa pela API autenticada
+  // (/api/notifications), então atualiza por polling.
   useEffect(() => {
-    if (!user || !supabase) return;
+    if (!user) return;
 
-    const fetchCount = async () => {
-      const { count, error } = await supabase
-        .from('system_notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
-
-      if (!error) setUnreadCount(count || 0);
-    };
+    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
 
     fetchCount();
+    const interval = setInterval(fetchCount, 20_000);
 
-    const channel = supabase
-      .channel('messages_system_notifications')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'system_notifications',
-        filter: `user_id=eq.${user.id}`
-      }, () => fetchCount())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [user]);
 
   const [sendError, setSendError] = useState<string | null>(null);

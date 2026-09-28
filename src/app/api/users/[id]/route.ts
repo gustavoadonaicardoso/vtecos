@@ -1,24 +1,11 @@
 import { NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { fetchRequesterAccess, updateTeamMember, deleteTeamMember } from '@/services/users.service';
+import { updateTeamMember, deleteTeamMember } from '@/services/users.service';
+import { requireAdminProfile } from '@/lib/session';
 
 const ALLOWED_ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
 const ALLOWED_STATUSES = new Set(['ACTIVE', 'INACTIVE']);
-
-async function requireAdmin(request: Request) {
-  const requesterId = request.headers.get('x-user-id');
-  if (!requesterId) {
-    return { error: NextResponse.json({ error: 'Identificação do administrador necessária.' }, { status: 401 }) };
-  }
-
-  const requester = await fetchRequesterAccess(requesterId);
-  if (!requester || requester.status !== 'ACTIVE' || requester.role !== 'ADMIN') {
-    return { error: NextResponse.json({ error: 'Apenas administradores ativos podem gerenciar a equipe.' }, { status: 403 }) };
-  }
-
-  return { requesterId };
-}
 
 /**
  * Atualiza um membro da equipe (nome, e-mail, cargo, status, permissões,
@@ -28,8 +15,10 @@ async function requireAdmin(request: Request) {
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const auth = await requireAdmin(request);
-    if ('error' in auth) return auth.error;
+    const auth = await requireAdminProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+    }
 
     const { id } = await params;
     const body = await request.json();
@@ -48,6 +37,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!ALLOWED_STATUSES.has(status)) {
       return NextResponse.json({ error: 'Status inválido.' }, { status: 400 });
     }
+    // Ninguém pode alterar o próprio cargo -- evita auto-promoção e evita
+    // que um admin se rebaixe por engano e perca acesso ao próprio painel.
+    if (id === auth.profile.id && role !== auth.profile.role) {
+      return NextResponse.json({ error: 'Você não pode alterar seu próprio cargo.' }, { status: 400 });
+    }
 
     const permissions = body.permissions && typeof body.permissions === 'object' ? body.permissions : {};
     const allowed_templates = Array.isArray(body.allowed_templates) ? body.allowed_templates : [];
@@ -58,7 +52,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     await logAudit(
-      { id: auth.requesterId, name: 'Administrador' },
+      { id: auth.profile.id, name: auth.profile.name },
       'SETTINGS_UPDATE',
       `Atualizou os dados do membro ${name} (${email}).`,
       'profile',
@@ -81,12 +75,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
  */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const auth = await requireAdmin(request);
-    if ('error' in auth) return auth.error;
+    const auth = await requireAdminProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+    }
 
     const { id } = await params;
 
-    if (id === auth.requesterId) {
+    if (id === auth.profile.id) {
       return NextResponse.json({ error: 'Você não pode remover sua própria conta.' }, { status: 400 });
     }
 
@@ -96,7 +92,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
 
     await logAudit(
-      { id: auth.requesterId, name: 'Administrador' },
+      { id: auth.profile.id, name: auth.profile.name },
       'SETTINGS_UPDATE',
       `Removeu o membro ${id} da equipe.`,
       'profile',

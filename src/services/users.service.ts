@@ -13,23 +13,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { ServiceResult } from '@/types';
 
-export interface RequesterAccess {
-  role: string;
-  status: string;
-}
-
-/** Busca role/status de quem fez a requisição, para checagem de permissão na rota. */
-export async function fetchRequesterAccess(requesterId: string): Promise<RequesterAccess | null> {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('role, status')
-    .eq('id', requesterId)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return data;
-}
-
 /**
  * Lista perfis pelo servidor para não depender do RLS do cliente anon.
  * `scope=chat` retorna somente os campos necessários para o chat;
@@ -121,6 +104,25 @@ export async function createUserWithProfile(params: {
   }
 }
 
+/** Verifica se `userId` é o único admin ATIVO restante no sistema. */
+async function isLastActiveAdmin(userId: string): Promise<boolean> {
+  const { data: target } = await supabaseAdmin
+    .from('profiles')
+    .select('role, status')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!target || target.role !== 'ADMIN' || target.status !== 'ACTIVE') return false;
+
+  const { count } = await supabaseAdmin
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'ADMIN')
+    .eq('status', 'ACTIVE');
+
+  return (count ?? 0) <= 1;
+}
+
 /**
  * Atualiza os campos administráveis de um membro da equipe (nome, e-mail,
  * cargo, status, permissões e templates liberados). Não mexe em senha —
@@ -137,6 +139,14 @@ export async function updateTeamMember(
     allowed_templates: string[];
   }
 ): Promise<ServiceResult<any>> {
+  // Se a mudança tira o cargo ADMIN ou desativa o usuário, garante que
+  // não é o último admin ativo -- senão ninguém mais consegue entrar em
+  // Usuários/Admin/Master pra desfazer.
+  const losingAdminAccess = updates.role !== 'ADMIN' || updates.status !== 'ACTIVE';
+  if (losingAdminAccess && (await isLastActiveAdmin(userId))) {
+    return { success: false, error: 'Não é possível remover o acesso do último administrador ativo do sistema.' };
+  }
+
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update({
@@ -162,6 +172,10 @@ export async function updateTeamMember(
  * objetivo principal (tirar o acesso ao CRM) já foi cumprido.
  */
 export async function deleteTeamMember(userId: string): Promise<ServiceResult> {
+  if (await isLastActiveAdmin(userId)) {
+    return { success: false, error: 'Não é possível remover o último administrador ativo do sistema.' };
+  }
+
   const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
   if (profileError) return { success: false, error: profileError.message };
 

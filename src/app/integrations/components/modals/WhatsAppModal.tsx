@@ -88,6 +88,25 @@ export default function WhatsAppModal({
           </div>
 
           <div className={styles.formGroup}>
+            <label>App Secret (obrigatório para validar o webhook)</label>
+            <div className={styles.inputWrapper}>
+              <input
+                type="password"
+                name="wa-app-secret"
+                autoComplete="new-password"
+                placeholder="Encontrado em Configurações básicas do App Meta"
+                className={styles.premiumInput}
+                value={waConfig.appSecret || ''}
+                onChange={(e) => onWaConfigChange({ ...waConfig, appSecret: e.target.value })}
+              />
+              <Lock size={14} className={styles.inputIcon} />
+            </div>
+            <small style={{ opacity: 0.5, marginTop: '4px', display: 'block' }}>
+              Sem isso, o servidor recusa qualquer mensagem recebida (a Meta assina o webhook com esse segredo).
+            </small>
+          </div>
+
+          <div className={styles.formGroup}>
             <label>Webhook Verify Token (Opcional)</label>
             <div className={styles.inputWrapper}>
               <input type="text" defaultValue="vortice_verify_token_2024" readOnly className={styles.premiumInput} style={{ background: 'rgba(255,255,255,0.03)', cursor: 'not-allowed' }} />

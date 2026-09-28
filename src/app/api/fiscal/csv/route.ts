@@ -13,11 +13,17 @@ import { callGemini, parseGeminiJsonArray } from '@/lib/gemini';
 import { sanitizarNota } from '@/lib/fiscal';
 import type { GerarNotasViaCsvPayload } from '@/types/fiscal';
 import { buildNfeFromCsvPrompt } from '../gerar/prompt';
+import { requireActiveProfile } from '@/lib/session';
 
 const MAX_CSV_ROWS = 200;
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireActiveProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+    }
+
     const body = (await request.json()) as GerarNotasViaCsvPayload;
     const { emitente, csvContent, contexto } = body;
 
