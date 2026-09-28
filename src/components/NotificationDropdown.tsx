@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, MessageSquare, Zap, UserPlus, CheckCircle2, Trash2 } from 'lucide-react';
+import { Bell, MessageSquare, Zap, UserPlus, CheckCircle2, Trash2, Check } from 'lucide-react';
 import styles from './NotificationDropdown.module.css';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
@@ -60,6 +60,16 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
       router.push(notif.link);
       onClose();
     }
+  };
+
+  const handleMarkAsReadClick = (e: React.MouseEvent, notif: SystemNotification) => {
+    e.stopPropagation();
+    markAsRead(notif.id);
+  };
+
+  const handleSeeAll = () => {
+    onClose();
+    router.push('/notificacoes');
   };
 
   return (
@@ -115,7 +125,15 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
                         </div>
                         <p className={styles.text}>{notif.content}</p>
                       </div>
-                      {!notif.is_read && <div className={styles.unreadDot} />}
+                      {!notif.is_read && (
+                        <button
+                          className={styles.markReadBtn}
+                          onClick={(e) => handleMarkAsReadClick(e, notif)}
+                          title="Marcar como lida"
+                        >
+                          <Check size={14} />
+                        </button>
+                      )}
                     </div>
                   );
                 })
@@ -140,7 +158,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
                   Ativar notificações do sistema
                 </button>
               )}
-              <button className={styles.seeAll}>Ver todas as notificações</button>
+              <button className={styles.seeAll} onClick={handleSeeAll}>Ver todas as notificações</button>
             </div>
           </motion.div>
         </>
