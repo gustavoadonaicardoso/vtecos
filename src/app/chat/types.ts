@@ -26,3 +26,8 @@ export interface GroupMember {
   name: string;
   isAdmin: boolean;
 }
+
+export interface ConversationMeta {
+  lastMessageAt: string | null;
+  unreadCount: number;
+}

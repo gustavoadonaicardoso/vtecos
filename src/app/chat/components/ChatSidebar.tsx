@@ -2,7 +2,7 @@ import { LogOut, Pin, PinOff, Search, Trash2, Users as UsersIcon } from 'lucide-
 import { motion } from 'framer-motion';
 import styles from '../chat.module.css';
 import { getInitials } from '../utils';
-import type { Profile } from '../types';
+import type { ConversationMeta, Profile } from '../types';
 
 interface ChatSidebarProps {
   filteredProfiles: Profile[];
@@ -16,9 +16,10 @@ interface ChatSidebarProps {
   onTogglePin: (profileId: string) => void;
   onRequestDelete: (profileId: string) => void;
   hiddenOnMobile: boolean;
+  conversationMeta: Record<string, ConversationMeta>;
 }
 
-export default function ChatSidebar({ filteredProfiles, selectedProfileId, currentUserId, searchQuery, onSearchQueryChange, onSelectProfile, onNewGroup, pinnedChats, onTogglePin, onRequestDelete, hiddenOnMobile }: ChatSidebarProps) {
+export default function ChatSidebar({ filteredProfiles, selectedProfileId, currentUserId, searchQuery, onSearchQueryChange, onSelectProfile, onNewGroup, pinnedChats, onTogglePin, onRequestDelete, hiddenOnMobile, conversationMeta }: ChatSidebarProps) {
   return (
     <aside className={`${styles.sidebar} ${hiddenOnMobile ? styles.hiddenOnMobile : ''}`}>
       <div className={styles.sidebarHeader}>
@@ -45,7 +46,9 @@ export default function ChatSidebar({ filteredProfiles, selectedProfileId, curre
 
       <div className={styles.userList}>
         {filteredProfiles.length > 0 ? (
-          filteredProfiles.map(profile => (
+          filteredProfiles.map(profile => {
+            const unreadCount = conversationMeta[profile.id]?.unreadCount || 0;
+            return (
             <motion.div
               key={profile.id}
               initial={{ opacity: 0, x: -10 }}
@@ -60,7 +63,7 @@ export default function ChatSidebar({ filteredProfiles, selectedProfileId, curre
                 {!profile.isGroup && <div className={styles.statusIndicator} />}
               </div>
               <div className={styles.userInfo}>
-                <span className={styles.userName} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span className={`${styles.userName} ${unreadCount > 0 ? styles.userNameUnread : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {profile.name}
                   {profile.id === currentUserId && <span style={{ opacity: 0.55, fontSize: '0.7rem' }}>(Você)</span>}
                   {pinnedChats.has(profile.id) && <Pin size={12} style={{ opacity: 0.6, transform: 'rotate(45deg)' }} />}
@@ -68,6 +71,9 @@ export default function ChatSidebar({ filteredProfiles, selectedProfileId, curre
                 <span className={styles.userRole}>{profile.role}</span>
               </div>
               <div className={styles.userActions}>
+                {unreadCount > 0 && (
+                  <span className={styles.unreadBadge}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+                )}
                 <button
                   className={styles.deleteBtn}
                   onClick={(e) => { e.stopPropagation(); onTogglePin(profile.id); }}
@@ -86,7 +92,8 @@ export default function ChatSidebar({ filteredProfiles, selectedProfileId, curre
                 )}
               </div>
             </motion.div>
-          ))
+            );
+          })
         ) : (
           <div className={styles.emptyState} style={{ opacity: 0.3, fontSize: '0.8rem' }}>
             Nenhum colega encontrado.
