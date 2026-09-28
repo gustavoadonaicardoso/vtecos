@@ -273,7 +273,6 @@
 }
 
 .message {
-  max-width: min(70%, 720px);
   min-width: 0;
   padding: 12px 16px;
   border-radius: 16px;
@@ -456,6 +455,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  max-width: min(70%, 720px);
+  min-width: 0;
 }
 
 .msgWrapperSent {
@@ -639,8 +640,11 @@
     gap: 12px;
   }
 
-  .message {
+  .msgWrapper {
     max-width: 86%;
+  }
+
+  .message {
     padding: 10px 12px;
     font-size: 0.9rem;
   }
@@ -759,7 +763,7 @@
     flex-basis: clamp(260px, 30vw, 300px);
   }
 
-  .message {
+  .msgWrapper {
     max-width: 78%;
   }
 }
