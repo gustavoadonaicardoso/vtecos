@@ -36,7 +36,7 @@ const Navbar = () => {
     if (!user) return;
 
     // Busca inicial via service
-    fetchUnreadNotificationsCount(user.id).then(setUnreadCount);
+    fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
 
     // Realtime para atualizar badge em tempo real
     const channel = supabase
@@ -46,7 +46,7 @@ const Navbar = () => {
         schema: 'public',
         table: 'system_notifications',
         filter: `user_id=eq.${user.id}`,
-      }, () => fetchUnreadNotificationsCount(user.id).then(setUnreadCount))
+      }, () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0)))
       .subscribe();
 
     return () => {

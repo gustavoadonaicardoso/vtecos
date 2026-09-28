@@ -23,11 +23,13 @@ export function useNotifications(isOpen: boolean) {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<SystemNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!user) return;
     const data = await fetchUserNotifications(user.id, 10);
-    setNotifications(data);
+    setLoadError(data === null);
+    setNotifications(data || []);
     setLoading(false);
   }, [user]);
 
@@ -71,5 +73,5 @@ export function useNotifications(isOpen: boolean) {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  return { notifications, loading, unreadCount, markAsRead, clearAll, refresh };
+  return { notifications, loading, loadError, unreadCount, markAsRead, clearAll, refresh };
 }

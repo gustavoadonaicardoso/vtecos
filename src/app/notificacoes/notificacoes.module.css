@@ -80,6 +80,18 @@
   text-align: center;
 }
 
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 1rem 1.25rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--glass-radius);
+  color: #ef4444;
+  font-size: 0.85rem;
+}
+
 .table {
   display: flex;
   flex-direction: column;

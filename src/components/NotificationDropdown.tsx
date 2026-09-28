@@ -38,7 +38,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
   const { format: formatTime } = useRelativeTime();
   const { permission, requestPermission, refreshPermission } = useBrowserNotifications();
   // Toda a lógica de dados vem do hook — componente fica "burro"
-  const { notifications, loading, unreadCount, markAsRead, clearAll } = useNotifications(isOpen);
+  const { notifications, loading, loadError, unreadCount, markAsRead, clearAll } = useNotifications(isOpen);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -102,6 +102,10 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
               {loading ? (
                 <div className={styles.emptyState}>
                   <p>Carregando...</p>
+                </div>
+              ) : loadError ? (
+                <div className={styles.emptyState}>
+                  <p>Não foi possível carregar as notificações. Veja o console do navegador (F12) para detalhes do erro.</p>
                 </div>
               ) : notifications.length > 0 ? (
                 notifications.map((notif) => {
