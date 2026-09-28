@@ -121,6 +121,68 @@ export async function createUserWithProfile(params: {
   }
 }
 
+/**
+ * Atualiza os campos administráveis de um membro da equipe (nome, e-mail,
+ * cargo, status, permissões e templates liberados). Não mexe em senha —
+ * isso é responsabilidade de adminResetPassword, abaixo.
+ */
+export async function updateTeamMember(
+  userId: string,
+  updates: {
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    permissions: Record<string, unknown>;
+    allowed_templates: string[];
+  }
+): Promise<ServiceResult<any>> {
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .update({
+      name: updates.name,
+      email: updates.email,
+      role: updates.role,
+      status: updates.status,
+      permissions: updates.permissions,
+      allowed_templates: updates.allowed_templates,
+    })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error || !data) return { success: false, error: error?.message || 'Falha ao atualizar o membro.' };
+  return { success: true, data };
+}
+
+/**
+ * Remove um membro da equipe por completo: perfil e credencial de Auth.
+ * Se a remoção da credencial falhar, o perfil já removido não é
+ * restaurado -- registra o erro mas não bloqueia a operação, já que o
+ * objetivo principal (tirar o acesso ao CRM) já foi cumprido.
+ */
+export async function deleteTeamMember(userId: string): Promise<ServiceResult> {
+  const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
+  if (profileError) return { success: false, error: profileError.message };
+
+  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (authError) {
+    console.error('Erro ao remover credencial de Auth do membro removido:', authError.message);
+  }
+
+  return { success: true };
+}
+
+/**
+ * Define uma nova senha para um usuário sem exigir a senha atual --
+ * uso exclusivo de administradores, para casos de esquecimento.
+ */
+export async function adminResetPassword(userId: string, newPassword: string): Promise<ServiceResult> {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
 export async function updateOwnProfile(
   userId: string,
   updates: { name: string; phone?: string | null; avatar_url?: string | null }

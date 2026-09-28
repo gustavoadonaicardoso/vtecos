@@ -174,23 +174,65 @@ export default function UsersPage() {
   };
 
   const saveChanges = async () => {
-    if (!name || !email || !selectedUserId || !supabase) return;
+    if (!name || !email || !selectedUserId || !user?.id) return;
 
     setLoading(true);
-    const { error } = await supabase.from('profiles').update({
-      name,
-      email,
-      role,
-      status,
-      permissions: userPermissions,
-      allowed_templates: allowedTemplates
-    }).eq('id', selectedUserId);
+    try {
+      const response = await fetch(`/api/users/${selectedUserId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          role,
+          status,
+          permissions: userPermissions,
+          allowed_templates: allowedTemplates,
+        }),
+      });
 
-    if (!error) {
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Não foi possível salvar as alterações.');
+      }
+
       await fetchUsers();
       setIsEditing(false);
+    } catch (error: unknown) {
+      alert(`Erro ao salvar alterações: ${error instanceof Error ? error.message : 'Tente novamente.'}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const handleResetPassword = async (newPassword: string) => {
+    if (!selectedUserId || !user?.id) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/users/${selectedUserId}/password`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Não foi possível redefinir a senha.');
+      }
+
+      alert('Senha redefinida com sucesso.');
+    } catch (error: unknown) {
+      alert(`Erro ao redefinir senha: ${error instanceof Error ? error.message : 'Tente novamente.'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCreateMember = async (e: React.FormEvent) => {
@@ -236,19 +278,26 @@ export default function UsersPage() {
   };
 
   const handleDeleteMember = async () => {
-    if (!selectedUserId || !supabase) return;
+    if (!selectedUserId || !user?.id) return;
 
     if (window.confirm(`Tem certeza que deseja remover o membro ${selectedUser?.name}? Esta ação não pode ser desfeita.`)) {
       setLoading(true);
-      const { error } = await supabase.from('profiles').delete().eq('id', selectedUserId);
-
-      if (!error) {
+      try {
+        const response = await fetch(`/api/users/${selectedUserId}`, {
+          method: 'DELETE',
+          headers: { 'x-user-id': user.id },
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Não foi possível remover o membro.');
+        }
         setSelectedUserId(null);
         await fetchUsers();
-      } else {
-        alert("Erro ao remover membro: " + error.message);
+      } catch (error: unknown) {
+        alert(`Erro ao remover membro: ${error instanceof Error ? error.message : 'Tente novamente.'}`);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
   };
 
@@ -378,6 +427,7 @@ export default function UsersPage() {
                     onRoleChange={handleRoleChange}
                     onStatusChange={handleStatusChange}
                     onDeleteMember={handleDeleteMember}
+                    onResetPassword={handleResetPassword}
                   />
                 ) : activeTab === 'permissions' ? (
                   <UserPermissionsTab
