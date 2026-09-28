@@ -29,7 +29,76 @@ export async function sendInternalMessage(
     .single();
 
   if (error) return { success: false, error: error.message };
+
+  await notifyMessageRecipients(type, payload);
+
   return { success: true, data };
+}
+
+/**
+ * Cria as notificações (system_notifications) para quem deve saber
+ * de uma nova mensagem interna. Roda com supabaseAdmin (service_role)
+ * porque o navegador nunca tem sessão real do Supabase Auth (login
+ * é próprio/localStorage) -- inserir isso direto do cliente com a
+ * anon key ficaria refém de RLS/grants exatamente certos, então
+ * fazemos aqui, no mesmo lugar que já envia a mensagem com
+ * privilégio total. Falhas aqui nunca devem derrubar o envio da
+ * mensagem em si, por isso não propagam erro.
+ */
+async function notifyMessageRecipients(
+  type: MessageType,
+  payload: Record<string, unknown>
+): Promise<void> {
+  try {
+    const senderId = payload.sender_id as string;
+
+    const { data: senderProfile } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', senderId)
+      .single();
+    const senderName = senderProfile?.name || 'Alguém';
+
+    if (type === 'direct') {
+      const receiverId = payload.receiver_id as string;
+      if (!receiverId) return;
+
+      const { error } = await supabase.from('system_notifications').insert([{
+        user_id: receiverId,
+        type: 'chat',
+        title: 'Nova mensagem interna',
+        content: `${senderName} enviou uma mensagem no chat interno.`,
+        is_read: false,
+        link: `/chat?userId=${senderId}`,
+      }]);
+      if (error) console.error('[chat.service] Erro ao notificar mensagem direta:', error.message);
+      return;
+    }
+
+    const groupId = payload.group_id as string;
+    if (!groupId) return;
+
+    const [{ data: group }, { data: members }] = await Promise.all([
+      supabase.from('chat_groups').select('name').eq('id', groupId).single(),
+      supabase.from('chat_group_members').select('user_id').eq('group_id', groupId).neq('user_id', senderId),
+    ]);
+
+    if (!members || members.length === 0) return;
+
+    const { error } = await supabase.from('system_notifications').insert(
+      members.map((m) => ({
+        user_id: m.user_id,
+        type: 'chat',
+        title: `Nova mensagem em ${group?.name || 'grupo'}`,
+        content: `${senderName} enviou uma mensagem no grupo.`,
+        is_read: false,
+        link: `/chat?userId=${groupId}`,
+      }))
+    );
+    if (error) console.error('[chat.service] Erro ao notificar mensagem de grupo:', error.message);
+  } catch (err) {
+    console.error('[chat.service] Erro inesperado ao criar notificações:', err);
+  }
 }
 
 export async function editInternalMessage(type: MessageType, id: string, text: string): Promise<ServiceResult> {

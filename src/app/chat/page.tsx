@@ -313,35 +313,11 @@ function ChatContent() {
       const r = await res.json();
       console.error('Error sending message:', r.error);
       alert('Erro ao enviar mensagem.');
-    } else if (!isGroup && supabase) {
-      // Notificação para mensagens diretas
-      await supabase.from('system_notifications').insert([{
-        user_id: selectedProfileId,
-        type: 'chat',
-        title: 'Nova mensagem interna',
-        content: `${user.name} enviou uma mensagem no chat interno.`,
-        link: `/chat?userId=${user.id}`
-      }]);
-    } else if (isGroup && supabase) {
-      // Notificação para todos os outros membros do grupo
-      const { data: members } = await supabase
-        .from('chat_group_members')
-        .select('user_id')
-        .eq('group_id', selectedProfileId)
-        .neq('user_id', user.id);
-
-      if (members && members.length > 0) {
-        await supabase.from('system_notifications').insert(
-          members.map((m) => ({
-            user_id: m.user_id,
-            type: 'chat',
-            title: `Nova mensagem em ${selectedProfile?.name || 'grupo'}`,
-            content: `${user.name} enviou uma mensagem no grupo.`,
-            link: `/chat?userId=${selectedProfileId}`,
-          }))
-        );
-      }
     }
+    // Notificação de nova mensagem (system_notifications) é criada no
+    // servidor, dentro de sendInternalMessage (src/services/chat.service.ts),
+    // com supabaseAdmin -- o navegador nunca tem sessão real do Supabase
+    // Auth, então inserir isso direto daqui ficaria refém de RLS/grants.
   };
 
   const handleDeleteMessage = async () => {
