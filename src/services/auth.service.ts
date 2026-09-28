@@ -8,6 +8,8 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { supabaseAuth } from '@/lib/supabase-auth';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { UserProfile, ServiceResult } from '@/types';
 
 export interface SignInResult {
@@ -26,7 +28,7 @@ export async function signIn(
     const normalizedEmail = email.trim().toLowerCase();
 
     const { data: authData, error: authError } =
-      await supabase.auth.signInWithPassword({
+      await supabaseAuth.auth.signInWithPassword({
         email: normalizedEmail,
         password,
       });
@@ -61,7 +63,7 @@ export async function signIn(
       (authData.user.email ? await fetchProfileByEmail(authData.user.email) : null);
 
     if (!profile) {
-      await supabase.auth.signOut();
+      await supabaseAdmin.auth.admin.signOut(authData.session.access_token, 'global');
 
       return {
         success: false,
@@ -71,7 +73,7 @@ export async function signIn(
     }
 
     if (profile.status === 'INACTIVE') {
-      await supabase.auth.signOut();
+      await supabaseAdmin.auth.admin.signOut(authData.session.access_token, 'global');
 
       return {
         success: false,
@@ -104,11 +106,16 @@ export async function signIn(
 }
 
 /**
- * Encerra a sessão no Supabase Auth.
+ * Revoga a sessão no Supabase Auth. Recebe o access_token explicitamente
+ * (em vez de usar "a sessão atual" de algum client) porque o servidor
+ * atende muitos usuários ao mesmo tempo -- não existe "sessão atual"
+ * única no processo.
  */
-export async function signOut(): Promise<void> {
+export async function signOut(accessToken?: string): Promise<void> {
+  if (!accessToken) return;
+
   try {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabaseAdmin.auth.admin.signOut(accessToken, 'global');
 
     if (error) {
       console.error('[AuthService] signOut:', error);
@@ -184,7 +191,7 @@ export async function sendPasswordResetEmail(
   try {
     const normalizedEmail = email.trim().toLowerCase();
 
-    const { error } = await supabase.auth.resetPasswordForEmail(
+    const { error } = await supabaseAuth.auth.resetPasswordForEmail(
       normalizedEmail,
       {
         redirectTo,

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { signOut } from '@/services/auth.service';
 import { clearSessionCookies } from '@/lib/session';
 
 export async function POST() {
   try {
-    await signOut();
+    const store = await cookies();
+    const accessToken = store.get('vortice_at')?.value;
+
+    await signOut(accessToken);
     await clearSessionCookies();
     return NextResponse.json({ success: true }, { status: 200 });
   } catch {
