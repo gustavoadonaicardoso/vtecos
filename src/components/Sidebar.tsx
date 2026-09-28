@@ -24,7 +24,8 @@ import {
   MessageCircle,
   FileText,
   Megaphone,
-  Phone
+  Phone,
+  Bell
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import { useSidebar } from '@/components/SidebarProvider';
@@ -67,6 +68,7 @@ const Sidebar = () => {
     { name: 'Equipe', icon: UserCog, path: '/users', permission: 'team.view' },
     { name: 'Automações', icon: Zap, path: '/automations', permission: 'automations.view' },
     { name: 'Integrações', icon: Blocks, path: '/integrations', permission: 'integrations.view' },
+    { name: 'Notificações', icon: Bell, path: '/notificacoes' }, // Sempre visível — histórico é por usuário
     { name: 'Central de Ajuda', icon: LifeBuoy, path: '/help' }, // Public or always visible
     { name: 'Configurações', icon: Settings, path: '/settings', permission: 'admin.settings' },
   ], []);
