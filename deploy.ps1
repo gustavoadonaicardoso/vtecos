@@ -1,9 +1,9 @@
 # =============================================================
-#  VTEC OS - Deploy Script para VPS 191.252.192.29
+#  VTEC OS - Deploy Script para VPS 179.199.143.217 (Hostinger)
 #  Uso: .\deploy.ps1
 # =============================================================
 
-$VPS_HOST = "root@191.252.192.29"
+$VPS_HOST = "root@179.199.143.217"
 $VPS_DIR  = "/root/vtec-os"
 $APP_NAME = "vtec-os"
 $ErrorActionPreference = "Stop"
@@ -80,4 +80,4 @@ Log "[5/5] Verificando status na VPS..."
 ssh $VPS_HOST "pm2 list"
 
 Write-Host ""
-Write-Host "Deploy concluido! App rodando em http://191.252.192.29:3000" -ForegroundColor Green
+Write-Host "Deploy concluido! App rodando em http://179.199.143.217:3000" -ForegroundColor Green
