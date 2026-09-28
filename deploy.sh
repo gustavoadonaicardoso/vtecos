@@ -1,13 +1,13 @@
 #!/bin/bash
 # =============================================================
-#  VTEC OS - Deploy Script para VPS 191.252.192.29
+#  VTEC OS - Deploy Script para VPS 179.199.143.217 (Hostinger)
 #  Versão macOS/Linux (bash) do deploy.ps1
 #  Uso: ./deploy.sh
 # =============================================================
 
 set -e
 
-VPS_HOST="root@191.252.192.29"
+VPS_HOST="root@179.199.143.217"
 VPS_DIR="/root/vtec-os"
 APP_NAME="vtec-os"
 
@@ -71,4 +71,4 @@ log "[5/5] Verificando status na VPS..."
 ssh "$VPS_HOST" "pm2 list"
 
 echo ""
-echo -e "${GREEN}Deploy concluido! App rodando em http://191.252.192.29:3000${NC}"
+echo -e "${GREEN}Deploy concluido! App rodando em http://179.199.143.217:3000${NC}"
