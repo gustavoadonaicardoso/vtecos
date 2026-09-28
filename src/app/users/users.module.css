@@ -554,6 +554,68 @@ input:checked + .cyberSlider:before {
   box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
 }
 
+.passwordResetZone {
+  grid-column: 1 / -1;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--glass-border);
+}
+
+.passwordResetZone h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #3b82f6;
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05rem;
+}
+
+.passwordResetZone p {
+  font-size: 0.85rem;
+  opacity: 0.5;
+  margin-bottom: 1.5rem;
+  max-width: 480px;
+}
+
+.passwordResetFields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.passwordResetFields .input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.resetPasswordBtn {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.resetPasswordBtn:hover:not(:disabled) {
+  background: #3b82f6;
+  color: white;
+}
+
+.resetPasswordBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .dangerZone {
   grid-column: 1 / -1;
   margin-top: 3rem;

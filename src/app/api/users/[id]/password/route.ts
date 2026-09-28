@@ -1,0 +1,54 @@
+import { NextResponse } from 'next/server';
+import { logAudit } from '@/lib/audit';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { fetchRequesterAccess, adminResetPassword } from '@/services/users.service';
+
+/**
+ * Define uma nova senha para um membro da equipe SEM exigir a senha
+ * atual -- para casos de esquecimento. Só administradores ativos podem
+ * chamar essa rota, e ela roda inteiramente no servidor com
+ * supabaseAdmin.auth.admin.updateUserById (nunca exposto ao navegador).
+ */
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const requesterId = request.headers.get('x-user-id');
+    if (!requesterId) {
+      return NextResponse.json({ error: 'Identificação do administrador necessária.' }, { status: 401 });
+    }
+
+    const requester = await fetchRequesterAccess(requesterId);
+    if (!requester || requester.status !== 'ACTIVE' || requester.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Apenas administradores ativos podem redefinir senhas.' }, { status: 403 });
+    }
+
+    const { id } = await params;
+    const body = await request.json();
+    const newPassword = typeof body.newPassword === 'string' ? body.newPassword : '';
+
+    if (newPassword.length < 8) {
+      return NextResponse.json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' }, { status: 400 });
+    }
+
+    const result = await adminResetPassword(id, newPassword);
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
+
+    await logAudit(
+      { id: requesterId, name: 'Administrador' },
+      'SETTINGS_UPDATE',
+      `Redefiniu a senha do membro ${id} sem exigir a senha atual.`,
+      'profile',
+      id,
+      supabaseAdmin
+    );
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error: unknown) {
+    console.error('Admin reset password error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Erro interno ao redefinir a senha.' },
+      { status: 500 }
+    );
+  }
+}
