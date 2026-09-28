@@ -145,9 +145,8 @@
 }
 
 .markReadBtn {
-  position: absolute;
-  top: 1rem;
-  right: 0.75rem;
+  align-self: flex-start;
+  margin-top: 2px;
   width: 24px;
   height: 24px;
   flex-shrink: 0;
@@ -214,6 +213,12 @@
 }
 
 @media (max-width: 480px) {
+  .overlay {
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
   .dropdown {
     position: fixed;
     top: auto;
@@ -221,8 +226,38 @@
     left: 0;
     right: 0;
     width: 100%;
-    max-height: min(80dvh, 680px);
-    border-radius: var(--glass-radius) var(--glass-radius) 0 0;
+    max-height: min(85dvh, 680px);
+    border-radius: 20px 20px 0 0;
     border-bottom: none;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
+    padding-top: 14px;
+  }
+
+  .dropdown::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    border-radius: 100px;
+    background: var(--glass-border);
+  }
+
+  .header {
+    padding: 0.75rem 1.25rem 1rem;
+  }
+
+  .header h3 {
+    font-size: 1.1rem;
+  }
+
+  .item {
+    padding: 1rem 1.25rem;
+  }
+
+  .footer {
+    padding: 1rem 1.25rem calc(1rem + env(safe-area-inset-bottom));
   }
 }
