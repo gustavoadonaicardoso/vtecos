@@ -17,7 +17,7 @@ import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
 
 function AppGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const { isModalOpen } = useLeads();
   const { isDialerOpen, closeDialer } = useTwilio();
@@ -47,6 +47,17 @@ function AppGuard({ children }: { children: React.ReactNode }) {
   };
 
   const canAccess = checkRouteAccess();
+
+  // Sem isso, uma página protegida renderizava o conteúdo (com dados de
+  // ninguém, já que não há usuário) antes do efeito de redirecionamento
+  // rodar -- dava pra ver um "flash" do layout/dashboard por trás da
+  // tela de login. Enquanto carrega a sessão ou ela não existe, não
+  // renderiza nada do conteúdo protegido; o redirect cuida do resto.
+  if (!isPublicPage && (isLoading || !isAuthenticated)) {
+    return (
+      <div style={{ height: '100vh', background: '#0a0a0f' }} />
+    );
+  }
 
   if (!isLoading && !isPublicPage && user && !canAccess) {
     return (

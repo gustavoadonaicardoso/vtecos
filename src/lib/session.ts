@@ -16,7 +16,7 @@
  */
 
 import { cookies } from 'next/headers';
-import { supabase } from '@/lib/supabase';
+import { supabaseAuth } from '@/lib/supabase-auth';
 import { fetchProfileById, fetchProfileByEmail } from '@/services/auth.service';
 import type { UserProfile } from '@/types';
 
@@ -62,7 +62,7 @@ export async function getAuthenticatedProfile(): Promise<UserProfile | null> {
   const refreshToken = store.get(REFRESH_COOKIE)?.value;
 
   if (accessToken) {
-    const { data, error } = await supabase.auth.getUser(accessToken);
+    const { data, error } = await supabaseAuth.auth.getUser(accessToken);
     if (!error && data.user) {
       return resolveProfileFromAuthUser(data.user);
     }
@@ -70,7 +70,7 @@ export async function getAuthenticatedProfile(): Promise<UserProfile | null> {
 
   if (!refreshToken) return null;
 
-  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession({
+  const { data: refreshed, error: refreshError } = await supabaseAuth.auth.refreshSession({
     refresh_token: refreshToken,
   });
 
