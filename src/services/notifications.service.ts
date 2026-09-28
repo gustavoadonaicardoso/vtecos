@@ -1,36 +1,31 @@
 /**
  * ============================================================
- * VÓRTICE CRM — Notifications Service
+ * VÓRTICE CRM — Notifications Service (client-side)
  * ============================================================
- * Responsável por TODAS as operações de banco relacionadas
- * a notificações do sistema (system_notifications).
+ * Antes lia/escrevia direto na tabela system_notifications com a
+ * anon key -- como RLS não conseguia isolar por usuário sem uma
+ * sessão real do Supabase Auth no navegador, qualquer um podia ler
+ * a notificação de outro usuário. Agora tudo passa pela API
+ * /api/notifications, que resolve a identidade pela sessão (cookie),
+ * nunca pelo userId que o próprio chamador informa.
  * ============================================================
  */
 
-import { supabase } from '@/lib/supabase';
 import { SystemNotification, ServiceResult } from '@/types';
 
 /**
- * Busca as últimas notificações de um usuário.
+ * Busca as últimas notificações do usuário autenticado.
  * Retorna `null` (em vez de []) quando a busca falha, para o chamador
  * conseguir distinguir "erro" de "realmente não tem notificação".
  */
 export async function fetchUserNotifications(
-  userId: string,
+  _userId: string,
   limit = 10
 ): Promise<SystemNotification[] | null> {
   try {
-    const { data, error } = await supabase
-      .from('system_notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      console.error('[NotificationsService] fetchUserNotifications:', error.message, error);
-      return null;
-    }
+    const resp = await fetch(`/api/notifications?limit=${limit}`);
+    if (!resp.ok) return null;
+    const { data } = await resp.json();
     return (data || []) as SystemNotification[];
   } catch (err) {
     console.error('[NotificationsService] fetchUserNotifications:', err);
@@ -39,22 +34,15 @@ export async function fetchUserNotifications(
 }
 
 /**
- * Busca a contagem de notificações não lidas de um usuário.
+ * Busca a contagem de notificações não lidas do usuário autenticado.
  * Retorna `null` quando a busca falha (ver fetchUserNotifications).
  */
-export async function fetchUnreadNotificationsCount(userId: string): Promise<number | null> {
+export async function fetchUnreadNotificationsCount(_userId: string): Promise<number | null> {
   try {
-    const { count, error } = await supabase
-      .from('system_notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
-
-    if (error) {
-      console.error('[NotificationsService] fetchUnreadNotificationsCount:', error.message, error);
-      return null;
-    }
-    return count || 0;
+    const resp = await fetch('/api/notifications?countOnly=1');
+    if (!resp.ok) return null;
+    const { count } = await resp.json();
+    return count ?? 0;
   } catch (err) {
     console.error('[NotificationsService] fetchUnreadNotificationsCount:', err);
     return null;
@@ -66,52 +54,50 @@ export async function fetchUnreadNotificationsCount(userId: string): Promise<num
  */
 export async function markNotificationAsRead(notificationId: string): Promise<ServiceResult> {
   try {
-    const { error } = await supabase
-      .from('system_notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
-
-    if (error) return { success: false, error: error.message };
+    const resp = await fetch('/api/notifications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: notificationId }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) return { success: false, error: result.error };
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[NotificationsService] markNotificationAsRead:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : 'Erro desconhecido.' };
   }
 }
 
 /**
- * Marca todas as notificações de um usuário como lidas.
+ * Marca todas as notificações do usuário autenticado como lidas.
  */
-export async function markAllNotificationsAsRead(userId: string): Promise<ServiceResult> {
+export async function markAllNotificationsAsRead(_userId: string): Promise<ServiceResult> {
   try {
-    const { error } = await supabase
-      .from('system_notifications')
-      .update({ is_read: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
-
-    if (error) return { success: false, error: error.message };
+    const resp = await fetch('/api/notifications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    });
+    const result = await resp.json();
+    if (!resp.ok) return { success: false, error: result.error };
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[NotificationsService] markAllNotificationsAsRead:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : 'Erro desconhecido.' };
   }
 }
 
 /**
- * Remove todas as notificações de um usuário.
+ * Remove todas as notificações do usuário autenticado.
  */
-export async function clearUserNotifications(userId: string): Promise<ServiceResult> {
+export async function clearUserNotifications(_userId: string): Promise<ServiceResult> {
   try {
-    const { error } = await supabase
-      .from('system_notifications')
-      .delete()
-      .eq('user_id', userId);
-
-    if (error) return { success: false, error: error.message };
+    const resp = await fetch('/api/notifications', { method: 'DELETE' });
+    const result = await resp.json();
+    if (!resp.ok) return { success: false, error: result.error };
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[NotificationsService] clearUserNotifications:', err);
-    return { success: false, error: err.message };
+    return { success: false, error: err instanceof Error ? err.message : 'Erro desconhecido.' };
   }
 }

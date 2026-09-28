@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { fetchRequesterAccess, fetchProfiles, createUserWithProfile } from '@/services/users.service';
+import { fetchProfiles, createUserWithProfile } from '@/services/users.service';
+import { requireActiveProfile, requireAdminProfile, requireAdminOrManagerProfile } from '@/lib/session';
 
 const ALLOWED_ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
 
@@ -10,31 +11,15 @@ const ALLOWED_ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
  */
 export async function GET(request: Request) {
   try {
-    const requesterId = request.headers.get('x-user-id');
     const scope = new URL(request.url).searchParams.get('scope') || 'team';
-
-    if (!requesterId) {
-      return NextResponse.json(
-        { error: 'Identificação do usuário necessária.' },
-        { status: 401 }
-      );
-    }
 
     if (scope !== 'chat' && scope !== 'team') {
       return NextResponse.json({ error: 'Escopo inválido.' }, { status: 400 });
     }
 
-    const requester = await fetchRequesterAccess(requesterId);
-
-    if (
-      !requester ||
-      requester.status !== 'ACTIVE' ||
-      (scope === 'team' && !['ADMIN', 'MANAGER'].includes(requester.role))
-    ) {
-      return NextResponse.json(
-        { error: 'Usuário sem permissão para listar estes perfis.' },
-        { status: 403 }
-      );
+    const auth = scope === 'team' ? await requireAdminOrManagerProfile() : await requireActiveProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
     const result = await fetchProfiles(scope);
@@ -59,22 +44,9 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   try {
-    const requesterId = request.headers.get('x-user-id');
-
-    if (!requesterId) {
-      return NextResponse.json(
-        { error: 'Identificação do administrador necessária.' },
-        { status: 401 }
-      );
-    }
-
-    const requester = await fetchRequesterAccess(requesterId);
-
-    if (!requester || requester.status !== 'ACTIVE' || requester.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Apenas administradores ativos podem criar usuários.' },
-        { status: 403 }
-      );
+    const auth = await requireAdminProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
     const body = await request.json();

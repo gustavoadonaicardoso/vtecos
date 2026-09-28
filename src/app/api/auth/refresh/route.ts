@@ -1,21 +1,21 @@
 import { NextResponse } from 'next/server';
-import { fetchProfileById } from '@/services/auth.service';
+import { getAuthenticatedProfile } from '@/lib/session';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ error: 'User ID missing' }, { status: 400 });
-  }
-
+/**
+ * Antes: aceitava ?id=<qualquer-uuid> e devolvia o perfil completo sem
+ * checar nada -- qualquer pessoa podia ler cargo/e-mail/telefone/
+ * permissões de qualquer usuário. Agora a identidade vem só da sessão
+ * (cookie httpOnly verificado contra o Supabase Auth); nunca do que o
+ * cliente pede.
+ */
+export async function GET() {
   try {
-    const profile = await fetchProfileById(id);
+    const profile = await getAuthenticatedProfile();
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Sessão inválida ou expirada.' }, { status: 401 });
     }
     return NextResponse.json({ data: profile }, { status: 200 });
-  } catch (error: any) {
+  } catch {
     return NextResponse.json({ error: 'Failed to refresh user' }, { status: 500 });
   }
 }

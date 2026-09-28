@@ -1,19 +1,21 @@
 import { NextResponse } from 'next/server';
 import { twilioService } from '@/services/twilio.service';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { verifyTwilioRequest, twilioRejectResponse } from '@/lib/twilio-webhook';
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const to = formData.get('To') as string;
-    const identity = formData.get('ApplicationSid') ? formData.get('From') : null; // Usually identity is in From for client calls
-    const callSid = formData.get('CallSid') as string;
-    const identityStr = identity as string | null;
+    const { valid, params } = await verifyTwilioRequest(request);
+    if (!valid) return twilioRejectResponse();
+
+    const to = params.To;
+    const identity = params.ApplicationSid ? params.From : null;
+    const callSid = params.CallSid;
 
     // Log the call
     if (to && callSid) {
       await supabase.from('call_logs').insert([{
-        user_id: identityStr?.startsWith('user_') ? null : identityStr, // This needs proper mapping
+        user_id: identity?.startsWith('user_') ? null : identity, // This needs proper mapping
         contact_number: to,
         direction: 'outbound',
         status: 'in-progress',

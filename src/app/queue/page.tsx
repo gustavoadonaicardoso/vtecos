@@ -6,6 +6,7 @@ import styles from './queue.module.css';
 import { logAudit } from '@/lib/audit';
 import { useAuth } from '@/context/AuthContext';
 import { sendWhatsApp } from '@/lib/messaging';
+import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
 import { 
   Monitor, 
   UserPlus, 
@@ -28,8 +29,6 @@ interface Ticket {
   id: string;
   number: number;
   name?: string;
-  whatsapp?: string;
-  document?: string;
   desk: string;
   status: 'waiting' | 'calling' | 'completed';
   created_at: string;
@@ -75,34 +74,17 @@ export default function QueuePage() {
   }, []);
 
   // Realtime System Notifications
+  // Notificações não lidas -- a leitura passa pela API autenticada
+  // (/api/notifications), então atualiza por polling.
   useEffect(() => {
-    if (!user || !supabase) return;
+    if (!user) return;
 
-    const fetchCount = async () => {
-      const { count, error } = await supabase
-        .from('system_notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('is_read', false);
-      
-      if (!error) setUnreadCount(count || 0);
-    };
+    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
 
     fetchCount();
+    const interval = setInterval(fetchCount, 20_000);
 
-    const channel = supabase
-      .channel('queue_system_notifications')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'system_notifications',
-        filter: `user_id=eq.${user.id}`
-      }, () => fetchCount())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [user]);
 
   const fetchQueue = async () => {

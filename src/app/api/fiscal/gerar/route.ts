@@ -10,9 +10,15 @@ import { callGemini, parseGeminiJsonArray } from '@/lib/gemini';
 import { sanitizarNota } from '@/lib/fiscal';
 import type { GerarNotasPayload } from '@/types/fiscal';
 import { buildNfePrompt } from './prompt';
+import { requireActiveProfile } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireActiveProfile();
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+    }
+
     const body = (await request.json()) as GerarNotasPayload;
     const { emitente, quantidade, contexto } = body;
 

@@ -407,8 +407,12 @@ export class WhatsAppService {
   validateWebhookSignature(rawBody: string | Buffer, signature: string): boolean {
     if (!signature?.startsWith('sha256=')) return false;
     if (!this.config.appSecret) {
-      console.warn('[WhatsAppService] ⚠️ appSecret não configurado. Ignorando validação de assinatura HMAC.');
-      return true;
+      // Sem segredo configurado não dá pra confirmar que o payload veio
+      // da Meta de verdade -- recusar é a opção segura. Configure o App
+      // Secret em Integrações > WhatsApp Oficial ou na env
+      // WHATSAPP_APP_SECRET.
+      console.error('[WhatsAppService] ❌ appSecret não configurado. Recusando webhook (não é possível validar a origem).');
+      return false;
     }
     const receivedHash = signature.slice(7); // Remove "sha256="
     const expectedHash = createHmac('sha256', this.config.appSecret)

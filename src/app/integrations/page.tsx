@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import styles from './integrations.module.css';
-import { supabase } from '@/lib/supabase';
 import { WhatsAppService } from '@/lib/whatsapp';
 
 import {
@@ -158,13 +157,14 @@ export default function Integrations() {
   const [connectedProviders, setConnectedProviders] = useState<string[]>([]);
 
   const fetchConfigs = async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from('integrations_config').select('*');
+    const response = await fetch('/api/integrations');
+    if (!response.ok) return;
+    const { data } = await response.json() as { data?: Array<{ provider: string; config: Record<string, string> }> };
     if (data) {
-      const providers = data.map(item => item.provider);
+      const providers = data.map((item) => item.provider);
       setConnectedProviders(providers);
 
-      data.forEach(item => {
+      data.forEach((item) => {
         if (item.provider === 'whatsapp_web') {
           setWebConfig({ name: item.config.name || 'WhatsApp principal' });
         } else if (item.provider === 'whatsapp_meta') {
@@ -183,7 +183,6 @@ export default function Integrations() {
   }, []);
 
   const handleSaveConfig = async (type: 'whatsapp' | 'meta' | 'whatsapp-web' | 'webhook' = 'whatsapp') => {
-     if (!supabase) return;
      setSaveStatus('saving');
 
      try {
@@ -204,13 +203,13 @@ export default function Integrations() {
          provider = 'meta_ads';
        }
 
-       const { error } = await supabase.from('integrations_config').upsert({
-         provider,
-         config: configToSave,
-         updated_at: new Date().toISOString()
-       }, { onConflict: 'provider' });
-
-       if (error) throw error;
+       const response = await fetch('/api/integrations', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ provider, config: configToSave }),
+       });
+       const result = await response.json();
+       if (!response.ok) throw new Error(result.error || 'Erro ao salvar configuração.');
 
        setConnectedProviders(prev => prev.includes(provider) ? prev : [...prev, provider]);
        setSaveStatus('success');
@@ -231,7 +230,7 @@ export default function Integrations() {
     const confirmed = confirm(
       `Tem certeza que deseja remover a integração com ${provider === 'whatsapp_web' ? 'WhatsApp Web' : provider}?`
     );
-    if (!confirmed || !supabase) return;
+    if (!confirmed) return;
 
     try {
       if (provider === 'whatsapp_web') {
@@ -242,12 +241,11 @@ export default function Integrations() {
         if (!response.ok) throw new Error(data.error || 'Não foi possível desconectar o WhatsApp.');
       }
 
-      const { error } = await supabase
-        .from('integrations_config')
-        .delete()
-        .eq('provider', provider);
-
-      if (error) throw error;
+      const response = await fetch(`/api/integrations?provider=${encodeURIComponent(provider)}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao remover integração.');
 
       setConnectedProviders(prev => prev.filter(p => p !== provider));
 

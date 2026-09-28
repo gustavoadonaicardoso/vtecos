@@ -202,6 +202,15 @@ export async function deleteLeadFromDb(leadId: string): Promise<ServiceResult> {
 }
 
 /**
+ * Busca só o dono (assigned_to) de um lead -- usado pra checar
+ * propriedade antes de deixar um SELLER editar/apagar.
+ */
+export async function fetchLeadOwner(leadId: string): Promise<string | null> {
+  const { data } = await supabase.from('leads').select('assigned_to').eq('id', leadId).maybeSingle();
+  return data?.assigned_to ?? null;
+}
+
+/**
  * Verifica se um ID é local (mock/dev) ou real (banco UUID).
  * IDs mock seguem o padrão 'lead-<número>'.
  */
