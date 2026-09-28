@@ -116,7 +116,7 @@ pm2 save
 
 echo "--- Health check ---"
 for i in $(seq 1 20); do
-    if curl -fsS -o /dev/null "http://127.0.0.1:$PORT"; then
+    if curl -fsS -o /dev/null "http://127.0.0.1:$PORT" 2>/dev/null; then
         echo "App respondendo na porta $PORT."
         exit 0
     fi
