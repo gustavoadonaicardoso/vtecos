@@ -152,6 +152,26 @@
   text-overflow: ellipsis;
 }
 
+.userNameUnread {
+  font-weight: 800;
+  color: var(--foreground);
+}
+
+.unreadBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 .userRole {
   font-size: 0.8rem;
   opacity: 0.6;

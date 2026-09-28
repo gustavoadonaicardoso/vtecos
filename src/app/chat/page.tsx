@@ -7,7 +7,7 @@ import { Users as UsersIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import styles from './chat.module.css';
-import type { Profile, InternalMessage, GroupMember } from './types';
+import type { Profile, InternalMessage, GroupMember, ConversationMeta } from './types';
 import ChatHeader from './components/ChatHeader';
 import ChatSidebar from './components/ChatSidebar';
 import MessageList from './components/MessageList';
@@ -39,6 +39,7 @@ function ChatContent() {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
   const [pinnedChats, setPinnedChats] = useState<Set<string>>(new Set());
+  const [conversationMeta, setConversationMeta] = useState<Record<string, ConversationMeta>>({});
   const groupAvatarInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -126,6 +127,61 @@ function ChatContent() {
     fetchProfiles();
   }, [user]);
 
+  // Última mensagem + contagem de não lidas por conversa (ordenação da
+  // lista e indicador de "mensagem nova" no estilo WhatsApp).
+  useEffect(() => {
+    if (!user || !supabase || profiles.length === 0) return;
+    const groupIds = profiles.filter(p => p.isGroup).map(p => p.id);
+
+    const refreshConversationMeta = async () => {
+      if (!supabase) return;
+      const meta: Record<string, ConversationMeta> = {};
+
+      const { data: directMsgs } = await supabase
+        .from('internal_chat')
+        .select('sender_id, receiver_id, created_at, is_read')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      for (const msg of directMsgs || []) {
+        const counterpartId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+        if (!meta[counterpartId]) meta[counterpartId] = { lastMessageAt: msg.created_at, unreadCount: 0 };
+        if (msg.receiver_id === user.id && !msg.is_read) meta[counterpartId].unreadCount += 1;
+      }
+
+      if (groupIds.length > 0) {
+        const { data: groupMsgs } = await supabase
+          .from('chat_group_messages')
+          .select('group_id, sender_id, created_at, is_read')
+          .in('group_id', groupIds)
+          .order('created_at', { ascending: false });
+
+        for (const msg of groupMsgs || []) {
+          if (!meta[msg.group_id]) meta[msg.group_id] = { lastMessageAt: msg.created_at, unreadCount: 0 };
+          if (msg.sender_id !== user.id && !msg.is_read) meta[msg.group_id].unreadCount += 1;
+        }
+      }
+
+      setConversationMeta(meta);
+    };
+
+    refreshConversationMeta();
+
+    const channel = supabase
+      .channel(`chat_conversation_meta_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'internal_chat', filter: `sender_id=eq.${user.id}` }, refreshConversationMeta)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'internal_chat', filter: `receiver_id=eq.${user.id}` }, refreshConversationMeta)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_group_messages' }, (payload) => {
+        const row = (payload.new || payload.old) as { group_id?: string };
+        if (row?.group_id && groupIds.includes(row.group_id)) refreshConversationMeta();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, profiles]);
+
   // Fetch messages and subscribe to real-time
   useEffect(() => {
     if (!selectedProfileId || !user || !supabase) {
@@ -147,6 +203,12 @@ function ChatContent() {
 
         if (!error && data) {
           setMessages(data as any[]);
+          await supabase
+            .from('chat_group_messages')
+            .update({ is_read: true })
+            .eq('group_id', selectedProfileId)
+            .neq('sender_id', user.id)
+            .eq('is_read', false);
         }
       } else {
         const { data, error } = await supabase
@@ -198,6 +260,11 @@ function ChatContent() {
               if (pData) newMessage.profiles = { name: pData.name };
             }
             setMessages(prev => [...prev, newMessage]);
+            // Conversa já está aberta: marca como lida na hora, sem
+            // esperar o usuário trocar de conversa e voltar.
+            if (newMessage.sender_id !== user.id && !newMessage.is_read) {
+              await supabase.from('chat_group_messages').update({ is_read: true }).eq('id', newMessage.id);
+            }
           }
         } else {
           const isBelonging =
@@ -206,6 +273,9 @@ function ChatContent() {
 
           if (isBelonging) {
             setMessages(prev => [...prev, newMessage]);
+            if (newMessage.receiver_id === user.id && !newMessage.is_read) {
+              await supabase.from('internal_chat').update({ is_read: true }).eq('id', newMessage.id);
+            }
           }
         }
       })
@@ -253,7 +323,7 @@ function ChatContent() {
   }, [messages]);
 
   const filteredProfiles = useMemo(() => {
-    let filtered = profiles.filter(p =>
+    const filtered = profiles.filter(p =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -262,10 +332,16 @@ function ChatContent() {
       const bPinned = pinnedChats.has(b.id);
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
+
+      const aTime = conversationMeta[a.id]?.lastMessageAt;
+      const bTime = conversationMeta[b.id]?.lastMessageAt;
+      if (aTime && bTime) return new Date(bTime).getTime() - new Date(aTime).getTime();
+      if (aTime && !bTime) return -1;
+      if (!aTime && bTime) return 1;
       return 0;
     });
     return filtered;
-  }, [profiles, searchQuery, pinnedChats]);
+  }, [profiles, searchQuery, pinnedChats, conversationMeta]);
 
   const selectedProfile = useMemo(() => {
     return profiles.find(p => p.id === selectedProfileId);
@@ -574,6 +650,7 @@ function ChatContent() {
           onTogglePin={togglePinChat}
           onRequestDelete={setDeletingProfileId}
           hiddenOnMobile={!!selectedProfileId}
+          conversationMeta={conversationMeta}
         />
 
         {/* MAIN CHAT AREA */}
