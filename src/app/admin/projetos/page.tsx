@@ -37,6 +37,7 @@ export default function AdminProjetos() {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -79,27 +80,32 @@ export default function AdminProjetos() {
 
   const saveToDisk = async (newProjects: ProjectData[]) => {
     setProjects(newProjects);
-    
-    if (user) {
-      const response = await fetch('/api/projects', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user.id,
-        },
-        body: JSON.stringify({ projects: newProjects }),
-      });
-      const result = await response.json().catch(() => ({}));
+    setSaving(true);
 
-      if (!response.ok) {
-        alert(`Erro ao salvar projetos: ${result.error || 'Tente novamente.'}`);
-        return;
+    try {
+      if (user) {
+        const response = await fetch('/api/projects', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': user.id,
+          },
+          body: JSON.stringify({ projects: newProjects }),
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          alert(`Erro ao salvar projetos: ${result.error || 'Tente novamente.'}`);
+          return;
+        }
       }
-    }
 
-    localStorage.setItem('vortice_projetos_data', JSON.stringify(newProjects));
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 2000);
+      localStorage.setItem('vortice_projetos_data', JSON.stringify(newProjects));
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+    } finally {
+      setSaving(false);
+    }
   };
 
 
@@ -110,6 +116,7 @@ export default function AdminProjetos() {
   };
 
   const addProject = () => {
+    if (saving) return;
     const next = [...projects, {
       id: Date.now().toString(),
       clientName: "Novo Cliente",
@@ -125,6 +132,7 @@ export default function AdminProjetos() {
   };
 
   const removeProject = (idx: number) => {
+    if (saving) return;
     if (confirm('Deseja deletar este Plano de Ação permanentemente?')) {
       const next = projects.filter((_, i) => i !== idx);
       saveToDisk(next);
@@ -140,7 +148,7 @@ export default function AdminProjetos() {
           <p>Gerencie estratégias, abordagens e metas semanais de cada cliente/projeto.</p>
         </div>
         
-        <button className={styles.addBtn} onClick={addProject}>
+        <button className={styles.addBtn} onClick={addProject} disabled={saving}>
           <Plus size={18} /> Criar Plano
         </button>
       </header>
@@ -260,10 +268,11 @@ export default function AdminProjetos() {
               </div>
 
               <div className={styles.modalFooter}>
-                <button className={styles.deleteBtn} onClick={() => removeProject(editingIdx)}>
+                <button className={styles.deleteBtn} onClick={() => removeProject(editingIdx)} disabled={saving}>
                   <Trash2 size={18} /> Deletar Plano
                 </button>
-                <button className={styles.finalSaveBtn} onClick={() => {
+                <button className={styles.finalSaveBtn} disabled={saving} onClick={() => {
+                  if (saving) return;
                   saveToDisk(projects);
                   setEditingIdx(null);
                 }}>
