@@ -322,6 +322,25 @@ function ChatContent() {
         content: `${user.name} enviou uma mensagem no chat interno.`,
         link: `/chat?userId=${user.id}`
       }]);
+    } else if (isGroup && supabase) {
+      // Notificação para todos os outros membros do grupo
+      const { data: members } = await supabase
+        .from('chat_group_members')
+        .select('user_id')
+        .eq('group_id', selectedProfileId)
+        .neq('user_id', user.id);
+
+      if (members && members.length > 0) {
+        await supabase.from('system_notifications').insert(
+          members.map((m) => ({
+            user_id: m.user_id,
+            type: 'chat',
+            title: `Nova mensagem em ${selectedProfile?.name || 'grupo'}`,
+            content: `${user.name} enviou uma mensagem no grupo.`,
+            link: `/chat?userId=${selectedProfileId}`,
+          }))
+        );
+      }
     }
   };
 
