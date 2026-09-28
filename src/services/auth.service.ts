@@ -46,7 +46,14 @@ export async function signIn(
       };
     }
 
-    const profile = await fetchProfileById(authData.user.id);
+    // O caminho normal é profiles.id === auth.users.id, mas alguns
+    // perfis mais antigos (criados fora do fluxo padrão de criação de
+    // usuário) podem ter um id de profile diferente do auth.users
+    // correspondente. Sem esse fallback por e-mail, esses usuários
+    // simplesmente nunca conseguiriam logar.
+    const profile =
+      (await fetchProfileById(authData.user.id)) ||
+      (authData.user.email ? await fetchProfileByEmail(authData.user.email) : null);
 
     if (!profile) {
       await supabase.auth.signOut();
@@ -124,6 +131,33 @@ export async function fetchProfileById(
     return data as UserProfile;
   } catch (err: unknown) {
     console.error('[AuthService] fetchProfileById:', err);
+    return null;
+  }
+}
+
+/**
+ * Busca o perfil completo de um usuário pelo e-mail -- fallback usado
+ * no login quando profiles.id não bate com o auth.users.id (ver
+ * comentário em signIn).
+ */
+export async function fetchProfileByEmail(
+  email: string
+): Promise<UserProfile | null> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[AuthService] fetchProfileByEmail:', error);
+      return null;
+    }
+
+    return (data as UserProfile) ?? null;
+  } catch (err: unknown) {
+    console.error('[AuthService] fetchProfileByEmail:', err);
     return null;
   }
 }

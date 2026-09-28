@@ -175,15 +175,21 @@ export async function deleteTeamMember(userId: string): Promise<ServiceResult> {
 
 /**
  * Define uma nova senha para um usuário sem exigir a senha atual --
- * uso exclusivo de administradores, para casos de esquecimento.
+ * uso exclusivo de administradores, para casos de esquecimento (ou de
+ * um perfil que nunca teve credencial de acesso de verdade).
  *
  * O caminho normal é profiles.id === auth.users.id (é assim que
  * createUserWithProfile cria contas novas, e é o que o login usa pra
- * achar o perfil depois de autenticar). Mas alguns perfis mais antigos
- * -- criados fora desse fluxo, direto no banco -- podem ter um id
- * diferente do auth.users correspondente. Se a atualização direta por
- * id falhar com "não encontrado", busca a credencial pelo e-mail do
- * perfil como fallback antes de desistir.
+ * achar o perfil depois de autenticar). Três casos, nessa ordem:
+ *  1. A atualização direta por id funciona -- caso normal.
+ *  2. Existe uma credencial de Auth com o mesmo e-mail do perfil, mas
+ *     com um id diferente (perfil criado fora do fluxo padrão do app,
+ *     direto no banco) -- atualiza a senha dessa credencial.
+ *  3. Não existe credencial nenhuma pra esse e-mail -- o perfil nunca
+ *     teve login de verdade. Cria uma nova credencial já com a senha
+ *     definida, usando o MESMO id do perfil (a Admin API aceita `id`
+ *     no corpo do createUser mesmo sem estar no tipo do SDK) pra não
+ *     quebrar o login, que depende de profiles.id === auth.users.id.
  */
 export async function adminResetPassword(userId: string, newPassword: string): Promise<ServiceResult> {
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
@@ -196,12 +202,20 @@ export async function adminResetPassword(userId: string, newPassword: string): P
   if (listError) return { success: false, error: error.message };
 
   const match = listData.users.find((u) => u.email?.toLowerCase() === profile.email.toLowerCase());
-  if (!match) {
-    return { success: false, error: `Nenhuma credencial de acesso encontrada para ${profile.email}.` };
+  if (match) {
+    const { error: retryError } = await supabaseAdmin.auth.admin.updateUserById(match.id, { password: newPassword });
+    if (retryError) return { success: false, error: retryError.message };
+    return { success: true };
   }
 
-  const { error: retryError } = await supabaseAdmin.auth.admin.updateUserById(match.id, { password: newPassword });
-  if (retryError) return { success: false, error: retryError.message };
+  const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+    id: userId,
+    email: profile.email,
+    password: newPassword,
+    email_confirm: true,
+  } as Parameters<typeof supabaseAdmin.auth.admin.createUser>[0] & { id: string });
+
+  if (createError) return { success: false, error: createError.message };
   return { success: true };
 }
 
