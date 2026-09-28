@@ -27,12 +27,14 @@ export default function NotificacoesPage() {
   const { format: formatRelative } = useRelativeTime();
   const [notifications, setNotifications] = useState<SystemNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const data = await fetchUserNotifications(user.id, 200);
-    setNotifications(data);
+    setLoadError(data === null);
+    setNotifications(data || []);
     setLoading(false);
   }, [user]);
 
@@ -83,6 +85,10 @@ export default function NotificacoesPage() {
       {loading ? (
         <div className={styles.emptyState}>
           <p>Carregando...</p>
+        </div>
+      ) : loadError ? (
+        <div className={styles.errorBanner}>
+          <p>Não foi possível carregar o histórico de notificações. Veja o console do navegador (F12) para detalhes do erro.</p>
         </div>
       ) : notifications.length === 0 ? (
         <div className={styles.emptyState}>

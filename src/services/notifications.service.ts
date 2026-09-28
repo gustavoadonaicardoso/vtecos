@@ -12,11 +12,13 @@ import { SystemNotification, ServiceResult } from '@/types';
 
 /**
  * Busca as últimas notificações de um usuário.
+ * Retorna `null` (em vez de []) quando a busca falha, para o chamador
+ * conseguir distinguir "erro" de "realmente não tem notificação".
  */
 export async function fetchUserNotifications(
   userId: string,
   limit = 10
-): Promise<SystemNotification[]> {
+): Promise<SystemNotification[] | null> {
   try {
     const { data, error } = await supabase
       .from('system_notifications')
@@ -25,18 +27,22 @@ export async function fetchUserNotifications(
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (error || !data) return [];
-    return data as SystemNotification[];
+    if (error) {
+      console.error('[NotificationsService] fetchUserNotifications:', error.message, error);
+      return null;
+    }
+    return (data || []) as SystemNotification[];
   } catch (err) {
     console.error('[NotificationsService] fetchUserNotifications:', err);
-    return [];
+    return null;
   }
 }
 
 /**
  * Busca a contagem de notificações não lidas de um usuário.
+ * Retorna `null` quando a busca falha (ver fetchUserNotifications).
  */
-export async function fetchUnreadNotificationsCount(userId: string): Promise<number> {
+export async function fetchUnreadNotificationsCount(userId: string): Promise<number | null> {
   try {
     const { count, error } = await supabase
       .from('system_notifications')
@@ -44,11 +50,14 @@ export async function fetchUnreadNotificationsCount(userId: string): Promise<num
       .eq('user_id', userId)
       .eq('is_read', false);
 
-    if (error) return 0;
+    if (error) {
+      console.error('[NotificationsService] fetchUnreadNotificationsCount:', error.message, error);
+      return null;
+    }
     return count || 0;
   } catch (err) {
     console.error('[NotificationsService] fetchUnreadNotificationsCount:', err);
-    return 0;
+    return null;
   }
 }
 
