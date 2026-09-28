@@ -166,6 +166,10 @@
   background: linear-gradient(to bottom, rgba(255, 255, 255, 0.02), transparent);
 }
 
+.mobileBackBtn {
+  display: none;
+}
+
 .profileMain {
   display: flex;
   align-items: center;
@@ -414,11 +418,59 @@ input:checked + .cyberSlider:before {
     padding: 0;
   }
 
+  /* No mobile, a lista e o editor não dividem mais o mesmo espaço
+     limitado (era isso que espremia o editor a quase zero de
+     altura). O editor vira uma tela cheia própria, só visível
+     depois que um membro é selecionado. */
+  .splitLayout {
+    display: block;
+  }
+
+  .sidebarSection {
+    height: auto;
+    max-height: calc(100dvh - 260px);
+  }
+
+  .mainEditorSection {
+    display: none;
+  }
+
+  .mainEditorSection.mobileEditorOpen {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+    background: var(--background);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .mobileBackBtn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: #3b82f6;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 4px 0;
+    cursor: pointer;
+  }
+
+  .editorContainer {
+    height: 100dvh;
+  }
+
   .editorProfileHeader {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
     padding: 1.25rem;
+    padding-top: calc(1.25rem + env(safe-area-inset-top));
   }
 
   .tabSwitcher {

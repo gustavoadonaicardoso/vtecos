@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ChevronLeft, Plus } from 'lucide-react';
 import styles from './users.module.css';
 
 import { supabase } from '@/lib/supabase';
@@ -29,6 +29,7 @@ export default function UsersPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'permissions' | 'updates' | 'personalization'>('info');
   const [isEditing, setIsEditing] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
   const [systemUpdates, setSystemUpdates] = useState<any[]>([]);
 
   const { config, refreshConfig } = useTheme();
@@ -364,12 +365,19 @@ export default function UsersPage() {
       </header>
 
       <div className={styles.splitLayout}>
-        <UserListSidebar users={users} selectedUserId={selectedUserId} onSelectUser={setSelectedUserId} />
+        <UserListSidebar
+          users={users}
+          selectedUserId={selectedUserId}
+          onSelectUser={(id) => { setSelectedUserId(id); setMobileEditorOpen(true); }}
+        />
 
-        <main className={styles.mainEditorSection}>
+        <main className={`${styles.mainEditorSection} ${mobileEditorOpen ? styles.mobileEditorOpen : ''}`}>
           {selectedUser && (
             <div className={styles.editorContainer}>
               <div className={styles.editorProfileHeader}>
+                <button className={styles.mobileBackBtn} onClick={() => setMobileEditorOpen(false)}>
+                  <ChevronLeft size={20} /> Voltar
+                </button>
                 <div className={styles.profileMain}>
                   <div className={styles.profileAvatarLarge}>
                     {selectedUser.name.charAt(0)}{selectedUser.name.split(' ')[1]?.charAt(0) || ''}
