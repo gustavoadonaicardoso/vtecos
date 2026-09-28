@@ -406,6 +406,43 @@ input:checked + .cyberSlider:before {
   .sidebarSection { height: 300px; }
 }
 
+@media (max-width: 768px) {
+  .headerRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0;
+  }
+
+  .editorProfileHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .tabSwitcher {
+    padding: 0 1.25rem;
+    gap: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tabBtn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .editorScroller {
+    padding: 1.25rem;
+  }
+
+  .infoFormGrid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}
+
 /* Modal Novo Membro */
 .modalOverlay {
   position: fixed;
