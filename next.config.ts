@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
     "@supabase/storage-js",
     "@supabase/auth-js",
     "@supabase/functions-js",
+    "@whiskeysockets/baileys",
   ],
 
   // FIX #15: Headers de segurança (CSP, X-Frame-Options, etc.)
