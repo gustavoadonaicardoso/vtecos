@@ -167,6 +167,12 @@ export async function processInboundWhatsAppMessage(payload: any, dbClient: any 
         // pelos últimos dígitos para não depender do formato exato salvo no lead.
         const searchSuffix = cleanPhone.slice(-8); // Get last 8 digits
 
+        // LOG TEMPORÁRIO -- ajuda a diagnosticar por que uma conversa nova
+        // está sendo criada em vez de casar com o lead existente (o
+        // WhatsApp pode estar mandando um identificador LID em vez do
+        // número de telefone de verdade). Remover depois de confirmar.
+        console.log('[processInboundWhatsAppMessage] payload.phone=', JSON.stringify(rawPhone), 'cleanPhone=', cleanPhone, 'searchSuffix=', searchSuffix);
+
         const isReceivedMessage = payload.isGroup === false;
 
         if (isReceivedMessage && (payload.text?.message || payload.audio?.audioUrl)) {

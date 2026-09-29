@@ -65,6 +65,12 @@ export async function startWhatsAppWeb() {
         const text = item.message?.conversation || item.message?.extendedTextMessage?.text;
         if (!text) continue;
 
+        // LOG TEMPORÁRIO -- ver o JID cru que o WhatsApp está mandando
+        // (pode vir como @lid em vez de @s.whatsapp.net dependendo da
+        // configuração de privacidade de número do contato). Remover
+        // depois de confirmar a causa de "criou uma nova conversa".
+        console.log('[whatsapp-web] remoteJid=', item.key.remoteJid, 'participant=', item.key.participant);
+
         // Sem passar supabaseAdmin aqui, a função usava o client anon por
         // padrão -- como leads/chat_messages sempre exigiram um papel
         // autenticado, a busca/criação do lead falhava silenciosamente
