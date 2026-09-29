@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Clock, Mail, MessageCircle, MessageSquare } from 'lucide-react';
+import { AlertCircle, Clock, FileDown, Mail, MessageCircle, MessageSquare } from 'lucide-react';
 import styles from '../messages.module.css';
 import type { ChatMessage } from '../types';
 import AudioPlayer from './AudioPlayer';
@@ -44,6 +44,23 @@ export default function MessageBubbleList({ activeMessages, selectedChatName, se
           <div key={msg.id} className={`${styles.message} ${msg.sent ? styles.sent : styles.received} ${msg.status === 'failed' ? styles.failedMsg : ''}`}>
             {msg.type === 'text' && <span>{msg.text}</span>}
             {msg.type === 'audio' && <AudioPlayer url={msg.audioUrl || ''} duration={5} />}
+            {msg.type === 'image' && msg.audioUrl && (
+              <a href={msg.audioUrl} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
+                <img src={msg.audioUrl} alt="Imagem enviada" style={{ maxWidth: '240px', borderRadius: '10px', display: 'block' }} />
+              </a>
+            )}
+            {msg.type === 'image' && msg.text && <span style={{ display: 'block', marginTop: '6px' }}>{msg.text}</span>}
+            {msg.type === 'document' && msg.audioUrl && (
+              <a
+                href={msg.audioUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: 'inherit', background: 'rgba(255,255,255,0.06)', padding: '10px 14px', borderRadius: '10px' }}
+              >
+                <FileDown size={20} />
+                <span>{msg.text || 'Arquivo enviado'}</span>
+              </a>
+            )}
             <div className={styles.msgFooter}>
               <span className={styles.msgTime}>{msg.time}</span>
               {msg.sent && (

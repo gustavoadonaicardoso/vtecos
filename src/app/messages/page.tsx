@@ -61,6 +61,7 @@ function MessagesContent() {
 
   // Audio States
   const [isRecording, setIsRecording] = useState(false);
+  const [isSendingAttachment, setIsSendingAttachment] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -295,6 +296,39 @@ function MessagesContent() {
     }
   };
 
+  const sendAttachment = async (file: File, caption = '') => {
+    if (!selectedChatId) return;
+    const targetLead = leads.find(l => l.id === selectedChatId);
+    if (!targetLead?.phone) {
+      setSendError('Este contato não tem telefone cadastrado para enviar anexos.');
+      return;
+    }
+
+    setSendError(null);
+    setIsSendingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('phone', targetLead.phone);
+      formData.append('leadId', selectedChatId);
+      formData.append('caption', caption);
+
+      const response = await fetch('/api/whatsapp/web/send-media', { method: 'POST', body: formData });
+      const result = await response.json();
+      if (!response.ok) {
+        setSendError(result.error || 'Falha ao enviar anexo.');
+      }
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Falha ao enviar anexo.');
+    } finally {
+      setIsSendingAttachment(false);
+    }
+  };
+
+  const handleFileSelected = (file: File) => {
+    void sendAttachment(file);
+  };
+
   const toggleSignature = () => {
     setUseSignature(!useSignature);
   };
@@ -336,11 +370,10 @@ function MessagesContent() {
       };
 
       mediaRecorder.onstop = () => {
-        if (!(mediaRecorderRef.current as any)?.hasCanceled) {
+        if (!(mediaRecorderRef.current as any)?.hasCanceled && audioChunksRef.current.length > 0) {
           const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const audioUrl = URL.createObjectURL(audioBlob);
-          // TODO: Implement Z-API audio sending for DB persistence
-          // For now, these are not saved to chat_messages table
+          const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
+          void sendAttachment(audioFile);
         }
         stream.getTracks().forEach(track => track.stop());
       };
@@ -471,6 +504,8 @@ function MessagesContent() {
               onUseTemplate={useTemplate}
               onSendMessage={() => handleSendMessage()}
               onStartRecording={startRecording}
+              onSelectFile={handleFileSelected}
+              isSendingAttachment={isSendingAttachment}
             />
 
             {/* INFO DRAWER */}

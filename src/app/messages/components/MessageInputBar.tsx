@@ -29,6 +29,8 @@ interface MessageInputBarProps {
   onUseTemplate: (tpl: MetaTemplate) => void;
   onSendMessage: () => void;
   onStartRecording: () => void;
+  onSelectFile: (file: File) => void;
+  isSendingAttachment: boolean;
 }
 
 export default function MessageInputBar({
@@ -38,8 +40,10 @@ export default function MessageInputBar({
   useSignature, onToggleSignature,
   canUseQuickMessages, showQuickMsgs, onToggleQuickMsgs, quickTemplates, onUseQuickMsg,
   showTemplates, onToggleTemplates, onUseTemplate,
-  onSendMessage, onStartRecording,
+  onSendMessage, onStartRecording, onSelectFile, isSendingAttachment,
 }: MessageInputBarProps) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   return (
     <div className={styles.premiumInputArea}>
       <div className={styles.inputContainer}>
@@ -53,7 +57,24 @@ export default function MessageInputBar({
           </div>
         ) : (
           <>
-            <button className={styles.actionBtn} title="Anexar Arquivo"><Paperclip size={22} /></button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onSelectFile(file);
+                e.target.value = '';
+              }}
+            />
+            <button
+              className={styles.actionBtn}
+              title="Anexar Arquivo"
+              disabled={isSendingAttachment}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip size={22} />
+            </button>
 
             <div className={styles.textareaWrapper}>
               <textarea

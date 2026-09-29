@@ -129,7 +129,7 @@ export function getWhatsAppWebStatus() {
   };
 }
 
-export async function sendWhatsAppWebMessage(phone: string, message: string) {
+async function ensureConnectedSocket(): Promise<WASocket> {
   if (!runtime.socket || runtime.status !== 'connected') {
     await startWhatsAppWeb();
   }
@@ -142,9 +142,49 @@ export async function sendWhatsAppWebMessage(phone: string, message: string) {
     throw new Error('WhatsApp Web não está conectado. Escaneie o QR Code em Integrações.');
   }
 
+  return runtime.socket;
+}
+
+function toWhatsAppJid(phone: string) {
   const digits = phone.replace(/\D/g, '');
   const normalized = digits.startsWith('55') ? digits : `55${digits}`;
-  return runtime.socket.sendMessage(`${normalized}@s.whatsapp.net`, { text: message });
+  return `${normalized}@s.whatsapp.net`;
+}
+
+export async function sendWhatsAppWebMessage(phone: string, message: string) {
+  const socket = await ensureConnectedSocket();
+  return socket.sendMessage(toWhatsAppJid(phone), { text: message });
+}
+
+/**
+ * Envia um arquivo/imagem/áudio pelo WhatsApp Web. `buffer` já deve estar
+ * no bucket de mídia (chat-media) e ser o mesmo conteúdo -- passamos o
+ * buffer direto pro Baileys (em vez da URL pública) pra não depender de
+ * o arquivo já estar propagado/acessível no CDN no exato instante do envio.
+ */
+export async function sendWhatsAppWebMedia(
+  phone: string,
+  buffer: Buffer,
+  kind: 'image' | 'document' | 'audio',
+  options: { caption?: string; fileName?: string; mimetype: string }
+) {
+  const socket = await ensureConnectedSocket();
+  const jid = toWhatsAppJid(phone);
+
+  if (kind === 'image') {
+    return socket.sendMessage(jid, { image: buffer, caption: options.caption });
+  }
+
+  if (kind === 'audio') {
+    return socket.sendMessage(jid, { audio: buffer, mimetype: options.mimetype, ptt: false });
+  }
+
+  return socket.sendMessage(jid, {
+    document: buffer,
+    mimetype: options.mimetype,
+    fileName: options.fileName || 'arquivo',
+    caption: options.caption,
+  });
 }
 
 export async function disconnectWhatsAppWeb() {
