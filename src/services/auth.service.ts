@@ -9,8 +9,13 @@
 
 import { supabase } from '@/lib/supabase';
 import { supabaseAuth } from '@/lib/supabase-auth';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { UserProfile, ServiceResult } from '@/types';
+
+// NUNCA importe @/lib/supabase-admin aqui -- este arquivo é importado
+// também por código client-side (ex: src/hooks/useUnreadCount.ts). Um
+// import de supabaseAdmin aqui quebra a build do navegador inteira: o
+// módulo lança um erro assim que é avaliado, no cliente, porque a
+// service role key não existe (nem deveria existir) no navegador.
 
 export interface SignInResult {
   profile: UserProfile;
@@ -63,8 +68,6 @@ export async function signIn(
       (authData.user.email ? await fetchProfileByEmail(authData.user.email) : null);
 
     if (!profile) {
-      await supabaseAdmin.auth.admin.signOut(authData.session.access_token, 'global');
-
       return {
         success: false,
         error:
@@ -73,8 +76,6 @@ export async function signIn(
     }
 
     if (profile.status === 'INACTIVE') {
-      await supabaseAdmin.auth.admin.signOut(authData.session.access_token, 'global');
-
       return {
         success: false,
         error: 'Conta desativada. Contate o administrador.',
@@ -102,26 +103,6 @@ export async function signIn(
           ? err.message
           : 'Falha na autenticação. Tente novamente.',
     };
-  }
-}
-
-/**
- * Revoga a sessão no Supabase Auth. Recebe o access_token explicitamente
- * (em vez de usar "a sessão atual" de algum client) porque o servidor
- * atende muitos usuários ao mesmo tempo -- não existe "sessão atual"
- * única no processo.
- */
-export async function signOut(accessToken?: string): Promise<void> {
-  if (!accessToken) return;
-
-  try {
-    const { error } = await supabaseAdmin.auth.admin.signOut(accessToken, 'global');
-
-    if (error) {
-      console.error('[AuthService] signOut:', error);
-    }
-  } catch (err: unknown) {
-    console.error('[AuthService] signOut:', err);
   }
 }
 
