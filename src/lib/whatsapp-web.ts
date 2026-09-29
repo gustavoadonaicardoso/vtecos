@@ -2,10 +2,24 @@ import path from 'node:path';
 import makeWASocket, {
   Browsers,
   DisconnectReason,
+  downloadMediaMessage,
   useMultiFileAuthState,
+  type WAMessage,
   type WASocket,
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
+
+// downloadMediaMessage exige um logger no formato do pino -- não
+// precisamos de log de verdade aqui, só satisfazer o formato esperado.
+const silentLogger = {
+  level: 'silent',
+  child: () => silentLogger,
+  trace: () => {},
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: (obj: unknown) => console.error('[whatsapp-web:media]', obj),
+};
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'qr' | 'connected';
 
@@ -62,8 +76,62 @@ export async function startWhatsAppWeb() {
 
       for (const item of messages) {
         if (item.key.fromMe || !item.key.remoteJid || item.key.remoteJid.endsWith('@g.us')) continue;
-        const text = item.message?.conversation || item.message?.extendedTextMessage?.text;
-        if (!text) continue;
+
+        const content = item.message;
+        if (!content) continue;
+
+        const text = content.conversation || content.extendedTextMessage?.text;
+        // Figurinha, imagem, áudio e documento recebidos não têm texto
+        // nenhum (conversation/extendedTextMessage) -- antes disso, essas
+        // mensagens eram descartadas em silêncio (o "if (!text) continue"
+        // pulava tudo que não fosse texto puro).
+        const mediaContent =
+          content.imageMessage || content.stickerMessage || content.audioMessage || content.documentMessage;
+        if (!text && !mediaContent) continue;
+
+        let media: { url: string; kind: 'image' | 'audio' | 'document' } | undefined;
+        let mediaCaption: string | undefined;
+
+        if (mediaContent) {
+          try {
+            const buffer = await downloadMediaMessage(
+              item as WAMessage,
+              'buffer',
+              {},
+              { logger: silentLogger, reuploadRequest: socket.updateMediaMessage }
+            );
+
+            // Figurinha é sempre webp -- tratamos como imagem pra
+            // reaproveitar a mesma renderização (a tela já sabe mostrar
+            // imagem com preview).
+            const kind: 'image' | 'audio' | 'document' = content.imageMessage
+              ? 'image'
+              : content.stickerMessage
+              ? 'image'
+              : content.audioMessage
+              ? 'audio'
+              : 'document';
+
+            const mimetype = mediaContent.mimetype || 'application/octet-stream';
+            const ext = content.stickerMessage ? 'webp' : (mimetype.split('/')[1]?.split(';')[0] || 'bin');
+            const storagePath = `inbound/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+            const { supabaseAdmin: admin } = await import('@/lib/supabase-admin');
+            const { error: uploadError } = await admin.storage
+              .from('chat-media')
+              .upload(storagePath, buffer, { contentType: mimetype });
+
+            if (!uploadError) {
+              const { data } = admin.storage.from('chat-media').getPublicUrl(storagePath);
+              media = { url: data.publicUrl, kind };
+              mediaCaption = content.imageMessage?.caption || content.documentMessage?.caption || undefined;
+            } else {
+              console.error('[whatsapp-web] Falha ao salvar mídia recebida:', uploadError.message);
+            }
+          } catch (err) {
+            console.error('[whatsapp-web] Falha ao baixar mídia recebida:', err);
+          }
+        }
 
         // O WhatsApp pode identificar o contato por um LID (@lid, sistema
         // de privacidade de número) em vez do telefone de verdade
@@ -86,7 +154,8 @@ export async function startWhatsAppWeb() {
           phone: phoneJid.replace(/@.*$/, ''),
           isGroup: false,
           senderName: item.pushName || 'Cliente WhatsApp',
-          text: { message: text },
+          text: { message: text || mediaCaption || '' },
+          media,
         }, supabaseAdmin);
       }
     });
