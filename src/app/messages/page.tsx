@@ -85,28 +85,28 @@ function MessagesContent() {
       setContactError('Nome e telefone são obrigatórios.');
       return;
     }
-    if (!supabase) return;
     setSavingContact(true);
     setContactError('');
 
     const stageId = newContact.stage || pipelineStages[0]?.id || null;
-    const { data, error } = await supabase
-      .from('leads')
-      .insert([{
+    const response = await fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: newContact.name.trim(),
         phone: newContact.phone.trim(),
         email: newContact.email.trim() || null,
-        stage_id: stageId,
-      }])
-      .select()
-      .single();
+        pipelineStage: stageId,
+      }),
+    });
+    const result = await response.json();
 
     setSavingContact(false);
-    if (error) { setContactError(error.message); return; }
+    if (!response.ok) { setContactError(result.error || 'Erro ao criar contato.'); return; }
     setShowNewContact(false);
     setNewContact({ name: '', phone: '', email: '', stage: '' });
     await refreshDatabase();
-    if (data) setSelectedChatId(data.id);
+    if (result.data) setSelectedChatId(result.data.id);
   };
 
   const MOCK_CHATS = useMemo(() => {
