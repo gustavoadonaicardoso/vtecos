@@ -65,18 +65,25 @@ export async function startWhatsAppWeb() {
         const text = item.message?.conversation || item.message?.extendedTextMessage?.text;
         if (!text) continue;
 
-        // LOG TEMPORÁRIO -- ver o JID cru que o WhatsApp está mandando
-        // (pode vir como @lid em vez de @s.whatsapp.net dependendo da
-        // configuração de privacidade de número do contato). Remover
-        // depois de confirmar a causa de "criou uma nova conversa".
-        console.log('[whatsapp-web] remoteJid=', item.key.remoteJid, 'participant=', item.key.participant);
+        // O WhatsApp pode identificar o contato por um LID (@lid, sistema
+        // de privacidade de número) em vez do telefone de verdade
+        // (@s.whatsapp.net) -- nesse caso remoteJid não é um telefone e
+        // nunca bate com o lead existente, criando um contato duplicado a
+        // cada mensagem. remoteJidAlt já vem preenchido com o JID de
+        // telefone quando o Baileys conhece o par; se não vier, resolve
+        // pelo mapeamento LID->PN da própria lib.
+        let phoneJid = item.key.remoteJidAlt || item.key.remoteJid;
+        if (phoneJid.endsWith('@lid')) {
+          const resolved = await socket.signalRepository.lidMapping.getPNForLID(phoneJid).catch(() => null);
+          if (resolved) phoneJid = resolved;
+        }
 
         // Sem passar supabaseAdmin aqui, a função usava o client anon por
         // padrão -- como leads/chat_messages sempre exigiram um papel
         // autenticado, a busca/criação do lead falhava silenciosamente
         // (erros descartados) e a mensagem recebida nunca era salva.
         await processInboundWhatsAppMessage({
-          phone: item.key.remoteJid.replace('@s.whatsapp.net', ''),
+          phone: phoneJid.replace(/@.*$/, ''),
           isGroup: false,
           senderName: item.pushName || 'Cliente WhatsApp',
           text: { message: text },
