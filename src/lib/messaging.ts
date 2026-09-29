@@ -168,12 +168,15 @@ export async function processInboundWhatsAppMessage(payload: any, dbClient: any 
         const searchSuffix = cleanPhone.slice(-8); // Get last 8 digits
 
         const isReceivedMessage = payload.isGroup === false;
+        const media = payload.media as { url: string; kind: 'image' | 'audio' | 'document' } | undefined;
 
-        if (isReceivedMessage && (payload.text?.message || payload.audio?.audioUrl)) {
+        if (isReceivedMessage && (payload.text?.message || payload.audio?.audioUrl || media)) {
             const senderName = payload.senderName || 'Cliente WhatsApp';
             const messageText = payload.text?.message || '';
-            const audioUrl = payload.audio?.audioUrl || null;
-            const messageType = audioUrl ? 'audio' : 'text';
+            // audio.audioUrl mantido por compatibilidade; media é o formato
+            // novo, usado pra imagem/áudio/documento/figurinha recebidos.
+            const mediaUrl = media?.url || payload.audio?.audioUrl || null;
+            const messageType = media?.kind || (mediaUrl ? 'audio' : 'text');
 
             // 1. Find existing lead by normalized phone
             // PostgreSQL trick to compare only digits
@@ -215,14 +218,19 @@ export async function processInboundWhatsAppMessage(payload: any, dbClient: any 
                 await dbClient.from('chat_messages').insert([{
                     lead_id: leadId.toString(),
                     text: messageText,
-                    audio_url: audioUrl,
+                    audio_url: mediaUrl,
                     sent_by_me: false,
                     type: messageType
                 }]);
 
                 // 4. Update lead lastMsg
+                const lastMsgPreview = messageText
+                    || (messageType === 'audio' ? '🎵 Áudio'
+                        : messageType === 'image' ? '📷 Imagem'
+                        : messageType === 'document' ? '📎 Arquivo'
+                        : 'Nova mensagem');
                 await dbClient.from('leads').update({
-                    last_msg: messageText || (audioUrl ? '🎵 Áudio' : 'Nova mensagem')
+                    last_msg: lastMsgPreview
                 }).eq('id', leadId);
 
                 // 5. Apply blast routing: check if this phone was part of a blast campaign
