@@ -58,18 +58,23 @@ export async function startWhatsAppWeb() {
     socket.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type !== 'notify') return;
       const { processInboundWhatsAppMessage } = await import('@/lib/messaging');
+      const { supabaseAdmin } = await import('@/lib/supabase-admin');
 
       for (const item of messages) {
         if (item.key.fromMe || !item.key.remoteJid || item.key.remoteJid.endsWith('@g.us')) continue;
         const text = item.message?.conversation || item.message?.extendedTextMessage?.text;
         if (!text) continue;
 
+        // Sem passar supabaseAdmin aqui, a função usava o client anon por
+        // padrão -- como leads/chat_messages sempre exigiram um papel
+        // autenticado, a busca/criação do lead falhava silenciosamente
+        // (erros descartados) e a mensagem recebida nunca era salva.
         await processInboundWhatsAppMessage({
           phone: item.key.remoteJid.replace('@s.whatsapp.net', ''),
           isGroup: false,
           senderName: item.pushName || 'Cliente WhatsApp',
           text: { message: text },
-        });
+        }, supabaseAdmin);
       }
     });
     socket.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
