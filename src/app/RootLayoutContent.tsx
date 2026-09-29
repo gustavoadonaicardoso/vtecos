@@ -12,6 +12,7 @@ import { SidebarProvider } from "@/components/SidebarProvider";
 import { TwilioProvider, useTwilio } from "@/context/TwilioContext";
 import Dialer from "@/components/Dialer";
 import BrowserNotificationListener from "@/components/BrowserNotificationListener";
+import WhatsAppNotificationListener from "@/components/WhatsAppNotificationListener";
 // FIX #7: hook centralizado de permissões — sem duplicação
 import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
 
@@ -123,6 +124,7 @@ export default function RootLayoutContent({ children }: { children: React.ReactN
           <TwilioProvider>
             <LeadProvider>
               <BrowserNotificationListener />
+              <WhatsAppNotificationListener />
               <AppGuard>
                 {children}
               </AppGuard>

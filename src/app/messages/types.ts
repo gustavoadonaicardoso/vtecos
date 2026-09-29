@@ -1,7 +1,9 @@
 export interface ChatMessage {
   id: string | number;
-  type: 'text' | 'audio';
+  type: 'text' | 'audio' | 'image' | 'document';
   text?: string;
+  // Reaproveitado como URL genérica de mídia (imagem/documento/áudio) --
+  // é o mesmo campo audio_url que já existia no banco.
   audioUrl?: string;
   sent: boolean;
   status?: 'sending' | 'sent' | 'received' | 'failed';
