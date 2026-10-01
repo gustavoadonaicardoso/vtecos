@@ -31,7 +31,9 @@ function AppGuard({ children }: { children: React.ReactNode }) {
   const isPublicPage = isLoginPage || isDisplayPage || isTotemPage;
 
   const fullPageRoutes = ['/chat', '/messages'];
-  const isFullPage = fullPageRoutes.includes(pathname);
+  // O editor de planejamentos é uma rota dinâmica (/planejamentos/[id]) --
+  // precisa de prefixo em vez de igualdade exata como as demais.
+  const isFullPage = fullPageRoutes.includes(pathname) || pathname.startsWith('/planejamentos/');
 
   // Verifica acesso à rota atual
   const checkRouteAccess = () => {
