@@ -44,8 +44,13 @@
 }
 
 .handle {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   background: var(--accent, #3b82f6);
   border: 2px solid var(--background);
+  z-index: 10;
+}
+
+.handle:hover {
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.35);
 }
