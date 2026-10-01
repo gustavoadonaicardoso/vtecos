@@ -8,6 +8,8 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  MarkerType,
+  ConnectionLineType,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -85,7 +87,18 @@ function PlanningCanvasInner({
   }, [nodes, edges, viewport]);
 
   const onConnect = useCallback(
-    (connection: Connection) => setEdges((eds) => addEdge({ ...connection, animated: false }, eds)),
+    (connection: Connection) =>
+      setEdges((eds) =>
+        addEdge(
+          {
+            ...connection,
+            type: 'smoothstep',
+            style: { stroke: '#3b82f6', strokeWidth: 2.5 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6', width: 18, height: 18 },
+          },
+          eds
+        )
+      ),
     [setEdges]
   );
 
@@ -198,6 +211,14 @@ function PlanningCanvasInner({
         minZoom={0.2}
         maxZoom={2}
         fitViewOptions={{ padding: 0.2 }}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          style: { stroke: '#3b82f6', strokeWidth: 2.5 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6', width: 18, height: 18 },
+        }}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2.5 }}
+        connectionRadius={32}
       >
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
         <Controls showInteractive={false} />

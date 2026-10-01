@@ -18,8 +18,13 @@
 }
 
 .handle {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   background: #f5c842;
   border: 2px solid #fde68a;
+  z-index: 10;
+}
+
+.handle:hover {
+  box-shadow: 0 0 0 4px rgba(245, 200, 66, 0.4);
 }
