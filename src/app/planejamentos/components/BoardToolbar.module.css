@@ -1,0 +1,83 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--background);
+  flex: none;
+}
+
+.backButton {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: none;
+}
+
+.paletteToggle {
+  display: none;
+}
+
+.nameInput {
+  background: transparent;
+  border: none;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--foreground);
+  min-width: 0;
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.nameInput:hover,
+.nameInput:focus {
+  background: var(--glass-bg);
+  outline: none;
+}
+
+.saveStatus {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #64748b);
+  white-space: nowrap;
+  flex: none;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+@media (max-width: 768px) {
+  .paletteToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--foreground);
+    cursor: pointer;
+    flex: none;
+  }
+
+  .nameInput {
+    font-size: 0.92rem;
+  }
+
+  .saveStatus {
+    display: none;
+  }
+}
