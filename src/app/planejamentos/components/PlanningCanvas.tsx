@@ -77,9 +77,37 @@ function PlanningCanvasInner({
   forwardedRef,
 }: PlanningCanvasProps & { forwardedRef: React.ForwardedRef<PlanningCanvasHandle> }) {
   const { screenToFlowPosition } = useReactFlow();
-  const [nodes, setNodes, onNodesChange] = useNodesState<PlanningNode>(initialData.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialData.edges);
+  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<PlanningNode>(initialData.nodes);
+  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>(initialData.edges);
   const [viewport, setViewport] = React.useState<Viewport>(initialData.viewport);
+
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[planejamentos:diag] PlanningCanvas MONTOU', { nodes: initialData.nodes.length, edges: initialData.edges.length, ts: Date.now() });
+    return () => {
+      // eslint-disable-next-line no-console
+      console.log('[planejamentos:diag] PlanningCanvas DESMONTOU', { ts: Date.now() });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onNodesChange = useCallback(
+    (changes: any[]) => {
+      // eslint-disable-next-line no-console
+      console.log('[planejamentos:diag] onNodesChange', changes.map((c) => c.type), { ts: Date.now() });
+      onNodesChangeRaw(changes);
+    },
+    [onNodesChangeRaw]
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: any[]) => {
+      // eslint-disable-next-line no-console
+      console.log('[planejamentos:diag] onEdgesChange', changes.map((c) => c.type), { ts: Date.now() });
+      onEdgesChangeRaw(changes);
+    },
+    [onEdgesChangeRaw]
+  );
 
   useEffect(() => {
     onChange({ nodes, edges, viewport });
@@ -87,7 +115,9 @@ function PlanningCanvasInner({
   }, [nodes, edges, viewport]);
 
   const onConnect = useCallback(
-    (connection: Connection) =>
+    (connection: Connection) => {
+      // eslint-disable-next-line no-console
+      console.log('[planejamentos:diag] onConnect disparou', connection, { ts: Date.now() });
       setEdges((eds) =>
         addEdge(
           {
@@ -97,7 +127,8 @@ function PlanningCanvasInner({
           },
           eds
         )
-      ),
+      );
+    },
     [setEdges]
   );
 
