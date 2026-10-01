@@ -9,7 +9,7 @@ import {
   Controls,
   MiniMap,
   MarkerType,
-  ConnectionLineType,
+  ConnectionMode,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -92,7 +92,6 @@ function PlanningCanvasInner({
         addEdge(
           {
             ...connection,
-            type: 'smoothstep',
             style: { stroke: '#3b82f6', strokeWidth: 2.5 },
             markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6', width: 18, height: 18 },
           },
@@ -212,13 +211,12 @@ function PlanningCanvasInner({
         maxZoom={2}
         fitViewOptions={{ padding: 0.2 }}
         defaultEdgeOptions={{
-          type: 'smoothstep',
           style: { stroke: '#3b82f6', strokeWidth: 2.5 },
           markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6', width: 18, height: 18 },
         }}
-        connectionLineType={ConnectionLineType.SmoothStep}
         connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2.5 }}
         connectionRadius={32}
+        connectionMode={ConnectionMode.Loose}
       >
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
         <Controls showInteractive={false} />
