@@ -544,14 +544,19 @@ function ChatContent() {
     if (!selectedProfileId || !supabase) return;
     const { data } = await supabase
       .from('chat_group_members')
-      .select('user_id, is_admin, profiles(name)')
+      .select('user_id, is_admin, profiles(name, avatar_url)')
       .eq('group_id', selectedProfileId);
     if (data) {
-      setGroupMembers(data.map(d => ({
-        id: d.user_id,
-        name: (d.profiles as any)?.[0]?.name || 'Desconhecido',
-        isAdmin: d.is_admin || d.user_id === selectedProfile?.createdBy
-      })));
+      setGroupMembers(data.map(d => {
+        // O join pode vir como objeto ou como lista, dependendo do schema.
+        const profile = (Array.isArray(d.profiles) ? d.profiles[0] : d.profiles) as { name?: string; avatar_url?: string | null } | null;
+        return {
+          id: d.user_id,
+          name: profile?.name || 'Desconhecido',
+          avatar_url: profile?.avatar_url ?? null,
+          isAdmin: d.is_admin || d.user_id === selectedProfile?.createdBy
+        };
+      }));
     }
   };
 

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import styles from '../chat.module.css';
-import { getInitials } from '../utils';
+import UserAvatar from './UserAvatar';
 import type { Profile } from '../types';
 import { usePresence } from '@/context/PresenceContext';
 
@@ -41,7 +41,7 @@ export default function ChatHeader({ selectedProfileId, selectedProfile, onBack,
             <div className={styles.userAvatar} style={{ width: 40, height: 40 }}>
               {selectedProfile.isGroup ? (
                 selectedProfile.avatar_url ? <img src={selectedProfile.avatar_url} alt="Group" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <UsersIcon size={20} />
-              ) : getInitials(selectedProfile.name)}
+              ) : <UserAvatar name={selectedProfile.name} avatarUrl={selectedProfile.avatar_url} />}
               {!selectedProfile.isGroup && <div className={`${styles.statusIndicator} ${online ? '' : styles.statusOffline}`} />}
             </div>
             <div>
