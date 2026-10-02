@@ -35,7 +35,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationDropdown from '@/components/NotificationDropdown';
-import { Bell, HelpCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bell, ChevronDown, ChevronUp, GripVertical, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 
 const PRESET_COLORS = [
@@ -116,7 +116,7 @@ const CustomColorPicker = ({ color, onChange }: { color: string, onChange: (c: s
 
 export default function Pipeline() {
   const router = useRouter();
-  const { pipelineStages, updatePipelineStages, leads, openModal, updateLead, deleteLead } = useLeads();
+  const { pipelineStages, updatePipelineStages, savePipelineStructure, leads, openModal, updateLead, deleteLead } = useLeads();
   const [isReady, setIsReady] = useState(false);
   const [viewMode, setViewMode] = useState<'kanban' | 'funnel'>('kanban');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -128,6 +128,8 @@ export default function Pipeline() {
   const [filterMine, setFilterMine] = useState(false);
   const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
   const { user } = useAuth();
+  // Etapas são compartilhadas pela equipe: só admin e gerente mudam a estrutura.
+  const canEditStages = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const toggleMenu = (stageId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -172,6 +174,15 @@ export default function Pipeline() {
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
+    // Arrastou uma coluna inteira: muda a ordem das etapas.
+    if (result.type === 'COLUMN') {
+      const reordered = [...pipelineStages];
+      const [moved] = reordered.splice(source.index, 1);
+      reordered.splice(destination.index, 0, moved);
+      savePipelineStructure(reordered);
+      return;
+    }
+
     const sourceStageIdx = pipelineStages.findIndex(s => s.id === source.droppableId);
     const destStageIdx = pipelineStages.findIndex(s => s.id === destination.droppableId);
     
@@ -194,25 +205,48 @@ export default function Pipeline() {
     updatePipelineStages(newStages);
   };
 
-  const updateStageConfig = (stageId: string, updates: any) => {
+  const updateStageConfig = (stageId: string, updates: { name?: string; color?: string }) => {
     const newStages = pipelineStages.map(s => s.id === stageId ? { ...s, ...updates } : s);
-    updatePipelineStages(newStages);
+    // Digitando o nome: espera uma pausa antes de salvar.
+    savePipelineStructure(newStages, { debounce: updates.name !== undefined });
+  };
+
+  const moveStage = (stageId: string, direction: -1 | 1) => {
+    const index = pipelineStages.findIndex(s => s.id === stageId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= pipelineStages.length) return;
+    const reordered = [...pipelineStages];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    savePipelineStructure(reordered);
   };
 
   const deleteStage = (stageId: string) => {
-    if(confirm('Tem certeza que deseja excluir esta etapa? Os leads nela não serão perdidos na base geral.')) {
-      updatePipelineStages(pipelineStages.filter(s => s.id !== stageId));
+    if (stageId === 'ganho') {
+      alert('A etapa de ganhos não pode ser excluída: metas, relatórios e o dashboard dependem dela. Você pode renomear ou mudar a cor.');
+      return;
     }
+    if (pipelineStages.length <= 1) return;
+    const stage = pipelineStages.find(s => s.id === stageId);
+    const remaining = pipelineStages.filter(s => s.id !== stageId);
+    const leadCount = stage?.leads.length ?? 0;
+    const message = leadCount > 0
+      ? `Excluir a etapa "${stage?.name}"? Os ${leadCount} lead(s) dela vão para "${remaining[0].name}".`
+      : `Excluir a etapa "${stage?.name}"?`;
+    if (confirm(message)) savePipelineStructure(remaining);
   };
 
   const addStage = () => {
     const newStage = {
-      id: `stage-${Date.now()}`,
+      id: `etapa-${Date.now()}`,
       name: 'Nova Etapa',
       color: '#06b6d4',
       leads: []
     };
-    updatePipelineStages([...pipelineStages, newStage]);
+    // Entra antes de "Ganhos", que costuma ser a última etapa do funil.
+    const wonIndex = pipelineStages.findIndex(s => s.id === 'ganho');
+    const next = [...pipelineStages];
+    next.splice(wonIndex >= 0 ? wonIndex : next.length, 0, newStage);
+    savePipelineStructure(next);
   };
 
   if (!isReady) return null;
@@ -276,7 +310,7 @@ export default function Pipeline() {
             {viewMode === 'kanban' ? 'Visual de Funil' : 'Visual Kanban'}
           </button>
           
-          {viewMode === 'kanban' && (
+          {viewMode === 'kanban' && canEditStages && (
             <button 
               style={{ background: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer' }}
               onClick={addStage}
@@ -296,6 +330,16 @@ export default function Pipeline() {
               {pipelineStages.map((stage, i) => (
                 <div key={stage.id} className={styles.stageConfigRow}>
                   <div style={{ fontWeight: 'bold', color: 'var(--foreground)', opacity: 0.5, width: 24, textAlign: 'center' }}>{i + 1}</div>
+                  {canEditStages && (
+                    <div className={styles.reorderButtons}>
+                      <button type="button" onClick={() => moveStage(stage.id, -1)} disabled={i === 0} title="Subir etapa" aria-label="Subir etapa">
+                        <ChevronUp size={14} />
+                      </button>
+                      <button type="button" onClick={() => moveStage(stage.id, 1)} disabled={i === pipelineStages.length - 1} title="Descer etapa" aria-label="Descer etapa">
+                        <ChevronDown size={14} />
+                      </button>
+                    </div>
+                  )}
                   <CustomColorPicker 
                     color={stage.color} 
                     onChange={(color) => updateStageConfig(stage.id, { color })} 
@@ -304,18 +348,23 @@ export default function Pipeline() {
                     type="text" 
                     value={stage.name || ''} 
                     onChange={(e) => updateStageConfig(stage.id, { name: e.target.value })}
+                    disabled={!canEditStages}
                     className={styles.stageInput}
                     placeholder="Nome da Etapa"
                   />
-                  <button className={styles.deleteStageBtn} onClick={() => deleteStage(stage.id)} title="Excluir Etapa">
-                    <Trash2 size={18} />
-                  </button>
+                  {canEditStages && stage.id !== 'ganho' && (
+                    <button className={styles.deleteStageBtn} onClick={() => deleteStage(stage.id)} title="Excluir Etapa">
+                      <Trash2 size={18} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
-            <button className={styles.addStageBtn} onClick={addStage}>
-              <Plus size={18} /> Adicionar Nova Etapa
-            </button>
+            {canEditStages && (
+              <button className={styles.addStageBtn} onClick={addStage}>
+                <Plus size={18} /> Adicionar Nova Etapa
+              </button>
+            )}
           </div>
 
           {/* Relatório Visual do Funil */}
@@ -384,11 +433,20 @@ export default function Pipeline() {
       ) : (
         <div className={styles.scrollOuter}>
           <DragDropContext onDragEnd={onDragEnd}>
-            <div className={styles.pipelineWrapper}>
-              {pipelineStages.map((stage) => (
-                <div key={stage.id} className={styles.stage}>
-                  <div className={styles.stageHeader}>
+            <Droppable droppableId="pipeline-board" type="COLUMN" direction="horizontal">
+            {(boardProvided) => (
+            <div className={styles.pipelineWrapper} ref={boardProvided.innerRef} {...boardProvided.droppableProps}>
+              {pipelineStages.map((stage, stageIndex) => (
+                <Draggable key={stage.id} draggableId={`column-${stage.id}`} index={stageIndex} isDragDisabled={!canEditStages}>
+                {(columnProvided, columnSnapshot) => (
+                <div
+                  ref={columnProvided.innerRef}
+                  {...columnProvided.draggableProps}
+                  className={`${styles.stage} ${columnSnapshot.isDragging ? styles.stageDragging : ''}`}
+                >
+                  <div className={styles.stageHeader} {...columnProvided.dragHandleProps} title={canEditStages ? 'Arraste para mudar a ordem da etapa' : undefined}>
                     <div className={styles.stageTitle}>
+                      {canEditStages && <GripVertical size={14} className={styles.columnGrip} />}
                       <CircleDot size={16} style={{ color: stage.color }} />
                       <span>{stage.name}</span>
                       <span className={styles.leadCount}>
@@ -396,6 +454,7 @@ export default function Pipeline() {
                       </span>
                     </div>
                     
+                    {canEditStages && (
                     <div style={{ position: 'relative' }}>
                       <MoreVertical 
                         size={16} 
@@ -434,22 +493,43 @@ export default function Pipeline() {
                               </div>
                             </div>
 
-                            <div className={styles.menuDivider} />
-                            
-                            <button className={`${styles.menuItem} ${styles.deleteItem}`} onClick={() => {
-                              deleteStage(stage.id);
-                              setActiveMenu(null);
-                            }}>
-                              <Trash2 size={14} />
-                              <span>Excluir Etapa</span>
+                            <button
+                              className={styles.menuItem}
+                              disabled={stageIndex === 0}
+                              onClick={() => { moveStage(stage.id, -1); setActiveMenu(null); }}
+                            >
+                              <ArrowLeft size={14} />
+                              <span>Mover para a esquerda</span>
                             </button>
+                            <button
+                              className={styles.menuItem}
+                              disabled={stageIndex === pipelineStages.length - 1}
+                              onClick={() => { moveStage(stage.id, 1); setActiveMenu(null); }}
+                            >
+                              <ArrowRight size={14} />
+                              <span>Mover para a direita</span>
+                            </button>
+
+                            {stage.id !== 'ganho' && (
+                              <>
+                                <div className={styles.menuDivider} />
+                                <button className={`${styles.menuItem} ${styles.deleteItem}`} onClick={() => {
+                                  deleteStage(stage.id);
+                                  setActiveMenu(null);
+                                }}>
+                                  <Trash2 size={14} />
+                                  <span>Excluir Etapa</span>
+                                </button>
+                              </>
+                            )}
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
+                    )}
                   </div>
 
-                  <Droppable droppableId={stage.id}>
+                  <Droppable droppableId={stage.id} type="LEAD">
                     {(provided, snapshot) => (
                       <div 
                         className={`${styles.leadList} ${snapshot.isDraggingOver ? styles.draggingOver : ''}`}
@@ -519,8 +599,13 @@ export default function Pipeline() {
                     )}
                   </Droppable>
                 </div>
+                )}
+                </Draggable>
               ))}
+              {boardProvided.placeholder}
             </div>
+            )}
+            </Droppable>
           </DragDropContext>
         </div>
       )}
