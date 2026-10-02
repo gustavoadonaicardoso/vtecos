@@ -19,11 +19,13 @@ import {
   ExternalLink,
   Trash2,
   Bell,
-  HelpCircle
+  HelpCircle,
+  Clapperboard
 } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import Link from 'next/link';
+import DisplayMediaSettings from './DisplayMediaSettings';
 
 interface Ticket {
   id: string;
@@ -49,6 +51,8 @@ export default function QueuePage() {
   const [manualDocument, setManualDocument] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showMediaSettings, setShowMediaSettings] = useState(false);
+  const canManageDisplay = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const fetchSettings = async () => {
     if (!supabase) return;
@@ -262,6 +266,11 @@ export default function QueuePage() {
            <button onClick={() => window.open('/totem', '_blank')} className={styles.linkBtn}>
             <ExternalLink size={18} /> Ver Totem
            </button>
+           {canManageDisplay && (
+             <button onClick={() => setShowMediaSettings(true)} className={styles.linkBtn}>
+              <Clapperboard size={18} /> Mídia do Painel
+             </button>
+           )}
            <button onClick={resetQueue} className={styles.resetBtn}>
             <Trash2 size={18} /> Reiniciar Fila
            </button>
@@ -350,6 +359,8 @@ export default function QueuePage() {
           </div>
         </section>
       </div>
+
+      {showMediaSettings && <DisplayMediaSettings onClose={() => setShowMediaSettings(false)} />}
     </div>
   );
 }

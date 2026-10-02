@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import styles from './display.module.css';
+import { DisplayMediaLayer, useDisplayMedia } from './DisplayMedia';
 
 interface Ticket {
   id: string;
@@ -31,6 +32,12 @@ export default function DisplayPage() {
   // time is populated after hydration, when the browser has mounted the page.
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { mode: mediaMode, media, active: mediaActive, notifyCall } = useDisplayMedia();
+  const [mediaSlot, setMediaSlot] = useState<HTMLDivElement | null>(null);
+  // fetchTickets roda dentro do efeito de montagem; o ref sempre aponta pra versão atual.
+  const notifyCallRef = useRef(notifyCall);
+  notifyCallRef.current = notifyCall;
+  const lastCallKey = useRef<string | null>(null);
 
   const fetchTickets = async () => {
     if (!supabase) return;
@@ -45,6 +52,11 @@ export default function DisplayPage() {
       // Find the most recent 'calling' ticket for the main display
       const calling = data.find(t => t.status === 'calling') || data[0];
       setCurrentTicket(calling);
+
+      // Senha nova chamada (ou rechamada): tira a mídia da frente por alguns segundos.
+      const callKey = calling.status === 'calling' ? `${calling.id}-${calling.updated_at}` : null;
+      if (callKey && lastCallKey.current !== null && callKey !== lastCallKey.current) notifyCallRef.current();
+      lastCallKey.current = callKey ?? lastCallKey.current ?? '';
       
       // The rest is history, excluding the current one if it's there
       setHistory(data.filter(t => t.id !== calling.id));
@@ -139,6 +151,7 @@ export default function DisplayPage() {
         </div>
 
         <div className={styles.history}>
+          {mediaActive && mediaMode === 'minimized' && <div ref={setMediaSlot} className={styles.mediaSlot} />}
           <h2 className={styles.historyTitle}>Últimas Senhas</h2>
           {history.length > 0 ? (
             history.map((ticket) => (
@@ -160,6 +173,21 @@ export default function DisplayPage() {
           )}
         </div>
       </main>
+
+      <DisplayMediaLayer
+        mode={mediaActive ? mediaMode : 'hidden'}
+        media={media}
+        slot={mediaSlot}
+        ticketBadge={
+          currentTicket ? (
+            <div className={styles.mediaTicketBadge}>
+              <span>Senha</span>
+              <strong style={{ color: settings?.primary_color || '#fff' }}>{currentTicket.number.toString().padStart(2, '0')}</strong>
+              <span>Guichê {currentTicket.desk}</span>
+            </div>
+          ) : null
+        }
+      />
 
       <footer className={styles.footer}>
         <div className={styles.footerText}>
