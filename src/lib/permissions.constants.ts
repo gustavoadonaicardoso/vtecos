@@ -13,6 +13,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/': 'dashboard.view',
   '/projetos': 'admin.projects',
   '/planejamentos': 'planejamentos.view',
+  '/social': 'social.view',
   '/metas': 'dashboard.view',
   '/messages': 'messages.view',
   '/chat': 'messages.send',

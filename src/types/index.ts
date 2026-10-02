@@ -20,3 +20,4 @@ export * from './audit';
 export * from './whatsapp';
 export * from './branding';
 export * from './common';
+export * from './social';
