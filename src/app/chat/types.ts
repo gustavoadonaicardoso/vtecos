@@ -7,6 +7,7 @@ export interface Profile {
   isGroup?: boolean;
   createdBy?: string;
   avatar_url?: string;
+  last_seen_at?: string | null;
 }
 
 export interface InternalMessage {

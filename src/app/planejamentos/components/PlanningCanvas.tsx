@@ -25,6 +25,7 @@ import '@xyflow/react/dist/style.css';
 import { toPng, toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
 import styles from './PlanningCanvas.module.css';
+import { useTheme } from '@/components/ThemeProvider';
 import FunnelNode from './FunnelNode';
 import StickyNoteNode from './StickyNoteNode';
 import type { PlanningCanvasData, PlanningElementDef, PlanningNode, PlanningNodeData } from '../types';
@@ -77,37 +78,10 @@ function PlanningCanvasInner({
   forwardedRef,
 }: PlanningCanvasProps & { forwardedRef: React.ForwardedRef<PlanningCanvasHandle> }) {
   const { screenToFlowPosition } = useReactFlow();
-  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<PlanningNode>(initialData.nodes);
-  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>(initialData.edges);
+  const { theme } = useTheme();
+  const [nodes, setNodes, onNodesChange] = useNodesState<PlanningNode>(initialData.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialData.edges);
   const [viewport, setViewport] = React.useState<Viewport>(initialData.viewport);
-
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[planejamentos:diag] PlanningCanvas MONTOU', { nodes: initialData.nodes.length, edges: initialData.edges.length, ts: Date.now() });
-    return () => {
-      // eslint-disable-next-line no-console
-      console.log('[planejamentos:diag] PlanningCanvas DESMONTOU', { ts: Date.now() });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const onNodesChange = useCallback(
-    (changes: any[]) => {
-      // eslint-disable-next-line no-console
-      console.log('[planejamentos:diag] onNodesChange', changes.map((c) => c.type), { ts: Date.now() });
-      onNodesChangeRaw(changes);
-    },
-    [onNodesChangeRaw]
-  );
-
-  const onEdgesChange = useCallback(
-    (changes: any[]) => {
-      // eslint-disable-next-line no-console
-      console.log('[planejamentos:diag] onEdgesChange', changes.map((c) => c.type), { ts: Date.now() });
-      onEdgesChangeRaw(changes);
-    },
-    [onEdgesChangeRaw]
-  );
 
   useEffect(() => {
     onChange({ nodes, edges, viewport });
@@ -116,8 +90,6 @@ function PlanningCanvasInner({
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      // eslint-disable-next-line no-console
-      console.log('[planejamentos:diag] onConnect disparou', connection, { ts: Date.now() });
       setEdges((eds) =>
         addEdge(
           {
@@ -248,6 +220,7 @@ function PlanningCanvasInner({
         connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2.5 }}
         connectionRadius={32}
         connectionMode={ConnectionMode.Loose}
+        colorMode={theme === 'dark' ? 'dark' : 'light'}
       >
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} />
         <Controls showInteractive={false} />

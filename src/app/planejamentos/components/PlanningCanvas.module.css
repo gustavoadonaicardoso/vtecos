@@ -3,3 +3,14 @@
   min-width: 0;
   height: 100%;
 }
+
+/*
+ * O globals.css tem `svg { max-width: 100% }` (bom para ícones e imagens
+ * soltas na página). Dentro do React Flow isso quebrava as conexões: o
+ * <svg> das linhas fica num container de largura 0 e usa overflow visível,
+ * então o max-width zerava a largura dele e a linha -- salva e existente --
+ * nunca aparecia na tela. Aqui o canvas volta ao comportamento normal.
+ */
+.wrapper :global(.react-flow svg) {
+  max-width: none;
+}

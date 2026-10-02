@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import styles from '../chat.module.css';
 import { getInitials } from '../utils';
 import type { ConversationMeta, Profile } from '../types';
+import { usePresence } from '@/context/PresenceContext';
 
 interface ChatSidebarProps {
   filteredProfiles: Profile[];
@@ -20,6 +21,7 @@ interface ChatSidebarProps {
 }
 
 export default function ChatSidebar({ filteredProfiles, selectedProfileId, currentUserId, searchQuery, onSearchQueryChange, onSelectProfile, onNewGroup, pinnedChats, onTogglePin, onRequestDelete, hiddenOnMobile, conversationMeta }: ChatSidebarProps) {
+  const presence = usePresence();
   return (
     <aside className={`${styles.sidebar} ${hiddenOnMobile ? styles.hiddenOnMobile : ''}`}>
       <div className={styles.sidebarHeader}>
@@ -60,7 +62,12 @@ export default function ChatSidebar({ filteredProfiles, selectedProfileId, curre
                 {profile.isGroup ? (
                   profile.avatar_url ? <img src={profile.avatar_url} alt="Group" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <UsersIcon size={20} />
                 ) : getInitials(profile.name)}
-                {!profile.isGroup && <div className={styles.statusIndicator} />}
+                {!profile.isGroup && (
+                  <div
+                    className={`${styles.statusIndicator} ${presence.isOnline(profile.id, profile.last_seen_at) ? '' : styles.statusOffline}`}
+                    title={presence.statusLabel(profile.id, profile.last_seen_at)}
+                  />
+                )}
               </div>
               <div className={styles.userInfo}>
                 <span className={`${styles.userName} ${unreadCount > 0 ? styles.userNameUnread : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

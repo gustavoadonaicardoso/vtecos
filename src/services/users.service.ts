@@ -19,20 +19,21 @@ import type { ServiceResult } from '@/types';
  * `scope=team` é reservado para administradores e gerentes.
  */
 export async function fetchProfiles(scope: 'chat' | 'team'): Promise<ServiceResult<any[]>> {
-  let query = supabaseAdmin
-    .from('profiles')
-    .select(
-      scope === 'chat'
-        ? 'id, name, email, role, status, avatar_url'
-        : 'id, name, email, role, status, permissions, allowed_templates, phone, avatar_url, created_at'
-    )
-    .order('name');
+  const baseColumns = scope === 'chat'
+    ? 'id, name, email, role, status, avatar_url'
+    : 'id, name, email, role, status, permissions, allowed_templates, phone, avatar_url, created_at';
 
-  if (scope === 'chat') {
-    query = query.eq('status', 'ACTIVE');
-  }
+  const run = (columns: string) => {
+    let query = supabaseAdmin.from('profiles').select(columns).order('name');
+    if (scope === 'chat') query = query.eq('status', 'ACTIVE');
+    return query;
+  };
 
-  const { data, error } = await query;
+  // last_seen_at alimenta o "Visto há X min"; se a migration ainda não rodou,
+  // a coluna não existe e a lista sai sem ela em vez de quebrar.
+  let { data, error } = await run(`${baseColumns}, last_seen_at`);
+  if (error) ({ data, error } = await run(baseColumns));
+
   if (error) return { success: false, error: error.message };
   return { success: true, data: data || [] };
 }

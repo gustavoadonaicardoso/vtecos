@@ -11,7 +11,7 @@ import type { Lead, PipelineStage } from '@/types';
 export const WON_STAGE = 'ganho';
 const DAY = 86_400_000;
 
-export type ReportPeriod = 7 | 30 | 90 | 0; // 0 = todo o histórico
+export type ReportPeriod = number; // dias; 0 = todo o histórico
 
 /** createdAt (ISO) quando existe; senão a entryDate em dd/mm/aaaa. */
 export function leadDate(lead: Lead): Date | null {

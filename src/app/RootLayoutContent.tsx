@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import styles from "./layout.module.css";
 import NewLeadModal from "@/components/NewLeadModal";
 import { LeadProvider, useLeads } from "@/context/LeadContext";
+import { PresenceProvider } from "@/context/PresenceContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SidebarProvider } from "@/components/SidebarProvider";
 import { TwilioProvider, useTwilio } from "@/context/TwilioContext";
@@ -125,11 +126,13 @@ export default function RootLayoutContent({ children }: { children: React.ReactN
         <SidebarProvider>
           <TwilioProvider>
             <LeadProvider>
-              <BrowserNotificationListener />
-              <WhatsAppNotificationListener />
-              <AppGuard>
-                {children}
-              </AppGuard>
+              <PresenceProvider>
+                <BrowserNotificationListener />
+                <WhatsAppNotificationListener />
+                <AppGuard>
+                  {children}
+                </AppGuard>
+              </PresenceProvider>
             </LeadProvider>
           </TwilioProvider>
         </SidebarProvider>
