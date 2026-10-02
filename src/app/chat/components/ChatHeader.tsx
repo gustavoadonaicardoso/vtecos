@@ -5,6 +5,7 @@ import NotificationDropdown from '@/components/NotificationDropdown';
 import styles from '../chat.module.css';
 import { getInitials } from '../utils';
 import type { Profile } from '../types';
+import { usePresence } from '@/context/PresenceContext';
 
 interface ChatHeaderProps {
   selectedProfileId: string | null;
@@ -18,6 +19,11 @@ interface ChatHeaderProps {
 }
 
 export default function ChatHeader({ selectedProfileId, selectedProfile, onBack, showNotifications, onToggleNotifications, onCloseNotifications, unreadCount, onOpenGroupInfo }: ChatHeaderProps) {
+  const presence = usePresence();
+  const online = selectedProfile && !selectedProfile.isGroup
+    ? presence.isOnline(selectedProfile.id, selectedProfile.last_seen_at)
+    : false;
+
   return (
     <header className={styles.chatHeader}>
       <div className={styles.headerInfo}>
@@ -36,11 +42,15 @@ export default function ChatHeader({ selectedProfileId, selectedProfile, onBack,
               {selectedProfile.isGroup ? (
                 selectedProfile.avatar_url ? <img src={selectedProfile.avatar_url} alt="Group" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <UsersIcon size={20} />
               ) : getInitials(selectedProfile.name)}
-              {!selectedProfile.isGroup && <div className={styles.statusIndicator} />}
+              {!selectedProfile.isGroup && <div className={`${styles.statusIndicator} ${online ? '' : styles.statusOffline}`} />}
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1rem' }}>{selectedProfile.name}</h3>
-              <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Online</span>
+              {!selectedProfile.isGroup && (
+                <span style={{ fontSize: '0.75rem', opacity: online ? 1 : 0.6, color: online ? '#10b981' : undefined }}>
+                  {presence.statusLabel(selectedProfile.id, selectedProfile.last_seen_at)}
+                </span>
+              )}
             </div>
           </>
         ) : (

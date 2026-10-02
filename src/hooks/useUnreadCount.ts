@@ -27,9 +27,12 @@ export function useUnreadCount() {
     // Busca inicial
     fetchUnreadInternalChats(user.id).then(setUnreadCount);
 
-    // Subscrição Realtime com nome único por usuário
+    // Nome único por instância do hook: o Supabase devolve o MESMO canal
+    // para nomes iguais, e o segundo componente (ex.: Sidebar + Dashboard)
+    // quebrava ao adicionar callbacks num canal já inscrito.
+    const instance = Math.random().toString(36).slice(2, 8);
     const channel = supabase
-      .channel(`unread_internal_chat_${user.id}`)
+      .channel(`unread_internal_chat_${user.id}_${instance}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'internal_chat' },
