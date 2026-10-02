@@ -8,12 +8,12 @@
   gap: clamp(18px, 3vh, 34px);
   overflow: hidden;
   padding: clamp(20px, 3vw, 46px);
-  color: white;
-  /* Cores da marca Vórtice (#4F00CB) sobre fundo escuro, para leitura de longe. */
+  color: #160a33;
+  /* Fundo branco com toques da cor da marca Vórtice (#4F00CB). */
   background:
-    radial-gradient(circle at 12% 8%, rgba(79, 0, 203, 0.42), transparent 38%),
-    radial-gradient(circle at 92% 88%, rgba(124, 58, 237, 0.3), transparent 40%),
-    linear-gradient(145deg, #150a33 0%, #0d0821 52%, #08051a 100%);
+    radial-gradient(circle at 10% 6%, rgba(79, 0, 203, 0.08), transparent 38%),
+    radial-gradient(circle at 92% 92%, rgba(124, 58, 237, 0.1), transparent 40%),
+    #ffffff;
 }
 
 .container::before {
@@ -25,7 +25,7 @@
   left: 28%;
   top: 8%;
   border-radius: 50%;
-  background: rgba(79, 0, 203, 0.16);
+  background: rgba(79, 0, 203, 0.05);
   filter: blur(110px);
   pointer-events: none;
 }
@@ -59,15 +59,14 @@
   flex: none;
   min-width: 112px;
   padding: 10px clamp(18px, 2.5vw, 30px);
-  color: #cbd5e1;
-  background: rgba(3, 8, 18, 0.48);
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  color: #160a33;
+  background: #f6f2ff;
+  border: 1px solid rgba(79, 0, 203, 0.14);
   border-radius: 999px;
   font-size: clamp(1.05rem, 2vw, 1.45rem);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   text-align: center;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .mainDisplay {
@@ -80,12 +79,10 @@
 .currentTicketCard,
 .history {
   min-height: 0;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: #ffffff;
+  border: 1px solid rgba(79, 0, 203, 0.12);
   border-radius: clamp(24px, 3vw, 40px);
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  box-shadow: 0 24px 60px rgba(79, 0, 203, 0.1), 0 4px 14px rgba(22, 10, 51, 0.05);
 }
 
 .currentTicketCard {
@@ -101,7 +98,7 @@
 .label {
   display: block;
   margin-bottom: clamp(8px, 2vh, 20px);
-  color: #a8b5c9;
+  color: #6b6487;
   font-size: clamp(1rem, 2vw, 1.5rem);
   font-weight: 700;
   letter-spacing: clamp(0.14em, 0.5vw, 0.27em);
@@ -116,14 +113,14 @@
   font-weight: 900;
   letter-spacing: -0.07em;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 52px rgba(255, 255, 255, 0.18);
+  text-shadow: 0 10px 40px rgba(79, 0, 203, 0.18);
 }
 
 .clientName {
   max-width: 100%;
   margin-top: clamp(18px, 3vh, 30px);
   overflow: hidden;
-  color: #dbeafe;
+  color: #2a1a5e;
   font-size: clamp(1.4rem, 3.5vw, 3.2rem);
   line-height: 1.1;
   font-weight: 800;
@@ -153,7 +150,7 @@
 .historyTitle {
   flex: none;
   margin-bottom: 4px;
-  color: #a8b5c9;
+  color: #6b6487;
   font-size: clamp(0.9rem, 1.5vw, 1.15rem);
   font-weight: 750;
   letter-spacing: 0.08em;
@@ -167,8 +164,8 @@
   gap: 12px;
   min-width: 0;
   padding: clamp(13px, 1.8vw, 19px);
-  background: rgba(3, 8, 18, 0.38);
-  border: 1px solid rgba(255, 255, 255, 0.065);
+  background: #f8f5ff;
+  border: 1px solid rgba(79, 0, 203, 0.08);
   border-radius: 16px;
 }
 
@@ -184,21 +181,21 @@
 
 .historyName {
   margin-left: 8px;
-  color: #a5b4fc;
+  color: #7c3aed;
   font-size: 0.72em;
   text-transform: uppercase;
 }
 
-.historyTime { color: #8190a7; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.historyTime { color: #8a84a3; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
 
 .historyDesk {
   flex: none;
-  color: #94a3b8;
+  color: #4f00cb;
   font-size: clamp(0.85rem, 1.5vw, 1.1rem);
   font-weight: 650;
 }
 
-.emptyHistory { margin: auto; color: #64748b; text-align: center; }
+.emptyHistory { margin: auto; color: #8a84a3; text-align: center; }
 
 .footer {
   display: flex;
@@ -209,7 +206,7 @@
 }
 
 .footerText {
-  color: #94a3b8;
+  color: #6b6487;
   font-size: clamp(0.92rem, 1.6vw, 1.15rem);
   font-weight: 650;
   letter-spacing: 0.025em;
@@ -220,7 +217,7 @@
 .banner {
   max-width: min(100%, 900px);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(79, 0, 203, 0.12);
   border-radius: 16px;
 }
 
@@ -292,8 +289,8 @@
 .media_minimized {
   border-radius: 20px;
   opacity: 1;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 50px rgba(79, 0, 203, 0.18);
+  border: 1px solid rgba(79, 0, 203, 0.14);
 }
 
 .media_hidden {
@@ -326,11 +323,10 @@
   gap: 14px;
   padding: 12px 22px;
   border-radius: 18px;
-  background: rgba(3, 8, 18, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(79, 0, 203, 0.16);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  color: #6b6487;
   font-weight: 700;
   font-size: clamp(1rem, 1.6vw, 1.4rem);
   text-transform: uppercase;
@@ -347,7 +343,7 @@
 /* ── Destaque de chamada ────────────────────────────────── */
 
 .calling {
-  border-color: rgba(196, 181, 253, 0.65);
+  border-color: rgba(79, 0, 203, 0.55);
   animation: callPulse 1.2s ease-in-out 5;
 }
 
@@ -356,8 +352,8 @@
 }
 
 @keyframes callPulse {
-  0%, 100% { box-shadow: 0 26px 70px rgba(0, 0, 0, 0.38), 0 0 0 0 rgba(124, 58, 237, 0.55); }
-  50% { box-shadow: 0 26px 70px rgba(0, 0, 0, 0.38), 0 0 0 18px rgba(124, 58, 237, 0); }
+  0%, 100% { box-shadow: 0 24px 60px rgba(79, 0, 203, 0.12), 0 0 0 0 rgba(79, 0, 203, 0.4); }
+  50% { box-shadow: 0 24px 60px rgba(79, 0, 203, 0.12), 0 0 0 20px rgba(79, 0, 203, 0); }
 }
 
 @keyframes callPop {

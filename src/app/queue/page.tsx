@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase';
 import styles from './queue.module.css';
 import { logAudit } from '@/lib/audit';
 import { useAuth } from '@/context/AuthContext';
-import { sendWhatsApp } from '@/lib/messaging';
 import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
 import { 
   Monitor, 
@@ -52,6 +51,7 @@ export default function QueuePage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showMediaSettings, setShowMediaSettings] = useState(false);
+  const [whatsNotice, setWhatsNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const canManageDisplay = user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const fetchSettings = async () => {
@@ -144,15 +144,30 @@ export default function QueuePage() {
 
       setManualName('');
       
-      // WhatsApp Automation
-      if (manualWhatsapp) {
-        sendWhatsApp(manualWhatsapp, `✅ *Painel Estação Vórtice* ✅\n\nSua senha manual foi gerada!\n\nTicket: *#${nextNumber.toString().padStart(2, '0')}*\nAtendimento: *Gerencial*\n\nAguarde o chamado no telão.`);
-      }
+      // A confirmação no WhatsApp sai do servidor junto com a senha.
 
       setManualWhatsapp('');
       setManualDocument('');
     }
     fetchQueue();
+  };
+
+  /** Avisa a pessoa no WhatsApp que a senha foi chamada; mostra o resultado no cartão. */
+  const notifyByWhatsApp = async (ticketId: string, kind: 'call' | 'recall') => {
+    setWhatsNotice({ ok: true, text: 'Enviando aviso no WhatsApp…' });
+    try {
+      const response = await fetch(`/api/queue/tickets/${ticketId}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind }),
+      });
+      const result = await response.json().catch(() => ({}));
+      const data = result?.data as { sent?: boolean; reason?: string } | undefined;
+      if (response.ok && data?.sent) setWhatsNotice({ ok: true, text: 'Aviso enviado no WhatsApp ✓' });
+      else setWhatsNotice({ ok: false, text: data?.reason || result?.error || 'Aviso no WhatsApp não enviado.' });
+    } catch {
+      setWhatsNotice({ ok: false, text: 'Aviso no WhatsApp não enviado (sem conexão).' });
+    }
   };
 
   const callNext = async () => {
@@ -184,6 +199,7 @@ export default function QueuePage() {
       .eq('id', nextOne.id) || { error: 'Supabase client missing' };
 
     if (!error) {
+      void notifyByWhatsApp(nextOne.id, 'call');
       logAudit(
         user,
         'TICKET_CALL',
@@ -205,6 +221,7 @@ export default function QueuePage() {
       .eq('id', currentTicket.id) || { error: 'Supabase client missing' };
 
     if (!error) {
+      void notifyByWhatsApp(currentTicket.id, 'recall');
       logAudit(
         user,
         'TICKET_CALL',
@@ -284,6 +301,9 @@ export default function QueuePage() {
                 {currentTicket.number.toString().padStart(2, '0')}
               </div>
               <div className={styles.ticketName}>{currentTicket.name || 'Sem nome'}</div>
+              {whatsNotice && (
+                <div className={whatsNotice.ok ? styles.whatsOk : styles.whatsFail}>{whatsNotice.text}</div>
+              )}
               <div className={styles.actions}>
                 <button onClick={recallCurrent} className={styles.recallBtn}>
                   <RotateCcw size={18} /> Chamar Novamente

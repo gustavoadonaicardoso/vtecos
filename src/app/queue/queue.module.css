@@ -408,3 +408,22 @@
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+.whatsOk,
+.whatsFail {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.whatsOk {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.whatsFail {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}

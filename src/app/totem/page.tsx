@@ -4,7 +4,6 @@ import { useEffect, useState, FormEvent } from 'react';
 import { CheckCircle2, IdCard, Phone, ShieldCheck, Ticket, User } from 'lucide-react';
 import styles from './totem.module.css';
 import { logAudit } from '@/lib/audit';
-import { sendWhatsApp } from '@/lib/messaging';
 import {
   formatBrazilDocument,
   formatBrazilPhone,
@@ -97,13 +96,8 @@ export default function TotemPage() {
       const nextNumber = result.number;
       setIssuedTicket(nextNumber);
 
-      if (normalizedWhatsapp) {
-        setSentToWhatsapp(true);
-        sendWhatsApp(
-          normalizedWhatsapp,
-          `🌟 *Vórtice Tecnologia* 🌟\n\nSua senha foi retirada com sucesso!\n\nSenha: *#${nextNumber.toString().padStart(2, '0')}*\nCliente: *${name.trim()}*\n\nAcompanhe o painel. Você será chamado em breve!`
-        );
-      }
+      // A confirmação no WhatsApp sai do servidor, junto com a senha.
+      if (normalizedWhatsapp) setSentToWhatsapp(true);
 
       logAudit(null, 'TICKET_CREATE', `Nova senha #${nextNumber} gerada via Totem para ${name.trim()}.`, 'ticket', nextNumber.toString());
     } catch (err: unknown) {
