@@ -383,7 +383,16 @@ function MessagesContent() {
       setTimeout(() => drawWaveform(), 50);
       timerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
     } catch (err) {
-      alert("Erro ao acessar o microfone.");
+      const name = err instanceof DOMException ? err.name : '';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        alert('O acesso ao microfone foi bloqueado. Clique no cadeado ao lado do endereço do site, permita o Microfone e tente de novo.');
+      } else if (name === 'NotFoundError') {
+        alert('Nenhum microfone encontrado. Conecte um microfone e tente de novo.');
+      } else if (name === 'NotReadableError') {
+        alert('O microfone está sendo usado por outro programa. Feche-o e tente de novo.');
+      } else {
+        alert('Não foi possível acessar o microfone.');
+      }
     }
   };
 
