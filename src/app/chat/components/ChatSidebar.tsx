@@ -1,7 +1,7 @@
 import { LogOut, Pin, PinOff, Search, Trash2, Users as UsersIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import styles from '../chat.module.css';
-import { getInitials } from '../utils';
+import UserAvatar from './UserAvatar';
 import type { ConversationMeta, Profile } from '../types';
 import { usePresence } from '@/context/PresenceContext';
 
@@ -61,7 +61,7 @@ export default function ChatSidebar({ filteredProfiles, selectedProfileId, curre
               <div className={styles.userAvatar}>
                 {profile.isGroup ? (
                   profile.avatar_url ? <img src={profile.avatar_url} alt="Group" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <UsersIcon size={20} />
-                ) : getInitials(profile.name)}
+                ) : <UserAvatar name={profile.name} avatarUrl={profile.avatar_url} />}
                 {!profile.isGroup && (
                   <div
                     className={`${styles.statusIndicator} ${presence.isOnline(profile.id, profile.last_seen_at) ? '' : styles.statusOffline}`}

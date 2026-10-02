@@ -176,8 +176,15 @@ const Sidebar = () => {
             title="Clique para sair"
           >
              <div className={styles.avatar}>
-               {user?.name?.charAt(0) || 'U'}
-               {user?.name?.split(' ')[1]?.charAt(0) || ''}
+               {user?.avatar_url ? (
+                 // eslint-disable-next-line @next/next/no-img-element
+                 <img src={user.avatar_url} alt="" className={styles.avatarImage} />
+               ) : (
+                 <>
+                   {user?.name?.charAt(0) || 'U'}
+                   {user?.name?.split(' ')[1]?.charAt(0) || ''}
+                 </>
+               )}
              </div>
             {!isCollapsed && (
               <div className={styles.profileInfo}>

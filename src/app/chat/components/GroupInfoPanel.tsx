@@ -2,7 +2,8 @@ import React from 'react';
 import { Camera, FileText, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import styles from '../chat.module.css';
-import { FILE_MESSAGE_PATTERN, getInitials } from '../utils';
+import { FILE_MESSAGE_PATTERN } from '../utils';
+import UserAvatar from './UserAvatar';
 import type { GroupMember, InternalMessage, Profile } from '../types';
 
 interface GroupInfoPanelProps {
@@ -59,8 +60,8 @@ export default function GroupInfoPanel({ selectedProfile, groupMembers, currentU
           {groupMembers.map(m => (
             <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-color, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
-                  {getInitials(m.name)}
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-color, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, flex: 'none' }}>
+                  <UserAvatar name={m.name} avatarUrl={m.avatar_url} />
                 </div>
                 <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>
                   {m.name} {m.id === currentUserId && <span style={{ opacity: 0.6 }}>(Você)</span>}

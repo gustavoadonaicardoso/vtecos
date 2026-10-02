@@ -25,6 +25,7 @@ export interface InternalMessage {
 export interface GroupMember {
   id: string;
   name: string;
+  avatar_url?: string | null;
   isAdmin: boolean;
 }
 
