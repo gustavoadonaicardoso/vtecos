@@ -12,7 +12,8 @@ import {
   ChevronRight,
   ExternalLink,
   LifeBuoy,
-  LayoutGrid
+  LayoutGrid,
+  Share2
 } from 'lucide-react';
 import styles from './help.module.css';
 
@@ -20,7 +21,8 @@ const CATEGORIES = [
   { title: 'Primeiros Passos', icon: Zap, desc: 'Aprenda o básico para configurar seu CRM em minutos.', slug: 'primeiros-passos' },
   { title: 'Gestão de Leads', icon: Book, desc: 'Como capturar, organizar e converter leads no funil SSD.', slug: 'gestao-de-leads' },
   { title: 'Automações', icon: MessageCircle, desc: 'Configure fluxos de WhatsApp e e-mail automático.', slug: 'automacoes' },
-  { title: 'Segurança & Conta', icon: Shield, desc: 'Gerencie permissões, usuários e dados da empresa.', slug: 'seguranca-e-conta' }
+  { title: 'Segurança & Conta', icon: Shield, desc: 'Gerencie permissões, usuários e dados da empresa.', slug: 'seguranca-e-conta' },
+  { title: 'Instagram & Facebook', icon: Share2, desc: 'Crie o app da Meta e conecte as contas para agendar posts.', slug: 'conectar-redes-sociais' }
 ];
 
 const FAQS = [

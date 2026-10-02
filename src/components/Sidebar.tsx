@@ -26,7 +26,8 @@ import {
   Megaphone,
   Phone,
   Bell,
-  Workflow
+  Workflow,
+  Share2
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import { useSidebar } from '@/components/SidebarProvider';
@@ -55,6 +56,7 @@ const Sidebar = () => {
     { name: 'Início', icon: LayoutDashboard, path: '/', permission: 'dashboard.view' },
     { name: 'Projetos', icon: Briefcase, path: '/projetos', permission: 'admin.projects' },
     { name: 'Planejamentos', icon: Workflow, path: '/planejamentos', permission: 'planejamentos.view' },
+    { name: 'Redes Sociais', icon: Share2, path: '/social', permission: 'social.view' },
     { name: 'Metas', icon: Target, path: '/metas', permission: 'dashboard.view' },
     { name: 'Mensagens', icon: MessageSquare, path: '/messages', permission: 'messages.view' },
     { name: 'Chat Interno', icon: MessageCircle, path: '/chat', permission: 'messages.send' },
