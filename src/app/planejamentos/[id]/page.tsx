@@ -37,8 +37,6 @@ export default function PlanningEditorPage() {
 
   useEffect(() => {
     let active = true;
-    // eslint-disable-next-line no-console
-    console.log('[planejamentos:diag] fetch inicial do board disparado', { id: params.id, ts: Date.now() });
     (async () => {
       try {
         const response = await fetch(`/api/planejamentos/${params.id}`, { cache: 'no-store' });
@@ -49,13 +47,6 @@ export default function PlanningEditorPage() {
           setLoadError(result.error || 'Planejamento não encontrado.');
           return;
         }
-
-        // eslint-disable-next-line no-console
-        console.log('[planejamentos:diag] board carregado do servidor', {
-          edges: result.data?.canvas_data?.edges?.length,
-          nodes: result.data?.canvas_data?.nodes?.length,
-          ts: Date.now(),
-        });
 
         skipNextSaveRef.current = true;
         setBoard(result.data);
@@ -72,8 +63,6 @@ export default function PlanningEditorPage() {
   }, [params.id]);
 
   const handleCanvasChange = useCallback((data: PlanningCanvasData) => {
-    // eslint-disable-next-line no-console
-    console.log('[planejamentos:diag] canvasData mudou', { nodes: data.nodes.length, edges: data.edges.length, ts: Date.now() });
     setCanvasData(data);
   }, []);
 
@@ -82,35 +71,20 @@ export default function PlanningEditorPage() {
     if (!board || !canvasData) return;
     if (skipNextSaveRef.current) {
       skipNextSaveRef.current = false;
-      // eslint-disable-next-line no-console
-      console.log('[planejamentos:diag] primeiro canvasData ignorado (sem salvar)', { ts: Date.now() });
       return;
     }
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveStatus('saving');
-    const edgesAtSchedule = canvasData.edges.length;
     saveTimerRef.current = setTimeout(async () => {
-      // eslint-disable-next-line no-console
-      console.log('[planejamentos:diag] ENVIANDO autosave PUT', { edges: edgesAtSchedule, nodes: canvasData.nodes.length, ts: Date.now() });
       try {
         const response = await fetch(`/api/planejamentos/${board.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, canvas_data: canvasData }),
         });
-        const result = await response.json().catch(() => ({}));
-        // eslint-disable-next-line no-console
-        console.log('[planejamentos:diag] resposta do autosave', {
-          ok: response.ok,
-          status: response.status,
-          edgesRetornados: result?.data?.canvas_data?.edges?.length,
-          ts: Date.now(),
-        });
         setSaveStatus(response.ok ? 'saved' : 'error');
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.log('[planejamentos:diag] autosave falhou (exceção)', err, { ts: Date.now() });
+      } catch {
         setSaveStatus('error');
       }
     }, 1500);
