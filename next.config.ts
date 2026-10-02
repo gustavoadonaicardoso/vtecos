@@ -37,8 +37,11 @@ const nextConfig: NextConfig = {
             value: "strict-origin-when-cross-origin",
           },
           {
+            // microphone=(self): o próprio sistema grava áudio em Mensagens e
+            // faz ligações no Discador. Com "microphone=()" o navegador
+            // bloqueava o microfone sem nem pedir permissão.
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
+            value: "camera=(), microphone=(self), geolocation=()",
           },
         ],
       },
