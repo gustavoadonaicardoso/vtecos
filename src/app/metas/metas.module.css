@@ -2,6 +2,10 @@
    título 2.2rem, painéis de vidro com os tokens do tema, botões com --accent. */
 
 .container {
+  /* No tema escuro o contorno de vidro já aparece; no claro ele é branco
+     translúcido e some no fundo cinza, então ganha um traço e sombra próprios. */
+  --card-border: var(--glass-border);
+  --card-shadow: none;
   --ring-track: rgba(148, 163, 184, 0.18);
   --muted: var(--text-secondary, #64748b);
   padding: 2.5rem;
@@ -12,6 +16,11 @@
   flex-direction: column;
   gap: 1.5rem;
   color: var(--foreground);
+}
+
+:global([data-theme='light']) .container {
+  --card-border: rgba(15, 23, 42, 0.12);
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.05);
 }
 
 .loadingState {
@@ -81,7 +90,7 @@
   gap: 6px;
   padding: 10px 16px;
   border-radius: 12px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   background: var(--glass-bg);
   color: var(--foreground);
   font-size: 0.9rem;
@@ -94,7 +103,7 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   background: var(--glass-bg);
   color: var(--foreground);
   display: inline-flex;
@@ -193,8 +202,9 @@
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   border-radius: var(--glass-radius);
+  box-shadow: var(--card-shadow);
 }
 
 .healthCard {
@@ -395,7 +405,7 @@
 
 .segmented {
   display: inline-flex;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   overflow: hidden;
   background: var(--glass-bg);
@@ -428,7 +438,7 @@
   gap: 6px;
   padding: 7px 13px;
   border-radius: 999px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   background: transparent;
   color: var(--foreground);
   font-size: 0.85rem;
@@ -482,8 +492,9 @@
   gap: 18px;
   width: 100%;
   padding: 1.1rem 1.25rem;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   border-radius: var(--glass-radius);
+  box-shadow: var(--card-shadow);
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -622,8 +633,9 @@
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   border-radius: var(--glass-radius);
+  box-shadow: var(--card-shadow);
   max-height: calc(100vh - var(--header-height, 70px) - 2rem);
   overflow-y: auto;
 }
@@ -661,7 +673,7 @@
   padding: 1rem;
   border-radius: var(--glass-radius-sm, 12px);
   background: var(--glass-bg-medium, var(--glass-bg));
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
 }
 
 .heroStats {
@@ -678,7 +690,7 @@
   align-items: baseline;
   gap: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px dashed var(--glass-border);
+  border-bottom: 1px dashed var(--card-border);
 }
 
 .heroStats div:last-child {
@@ -703,7 +715,7 @@
   flex-direction: column;
   gap: 10px;
   padding-top: 1rem;
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid var(--card-border);
 }
 
 .detailSectionHeader {
@@ -868,7 +880,7 @@
   min-width: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   background: var(--glass-bg-input, var(--glass-bg));
   color: var(--foreground);
   font: inherit;
@@ -905,7 +917,7 @@
 }
 
 .stageChips .mutedChip {
-  border-color: var(--glass-border);
+  border-color: var(--card-border);
   background: transparent;
   color: var(--muted);
   font-weight: 500;
@@ -923,7 +935,7 @@
   gap: 6px;
   padding: 4px 10px 4px 4px;
   border-radius: 999px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   font-size: 0.85rem;
 }
 
@@ -946,7 +958,7 @@
   flex-direction: column;
   gap: 6px;
   padding-top: 1rem;
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid var(--card-border);
   font-size: 0.85rem;
   color: var(--muted);
 }
@@ -966,7 +978,7 @@
   text-align: center;
   gap: 0.75rem;
   padding: 4rem 1.5rem;
-  border: 2px dashed var(--glass-border);
+  border: 2px dashed var(--card-border);
   border-radius: var(--glass-radius);
   background: var(--glass-bg);
 }
@@ -1017,7 +1029,7 @@
   display: flex;
   flex-direction: column;
   background: var(--background);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   border-radius: var(--glass-radius);
   box-shadow: var(--glass-shadow-elevated, 0 20px 60px rgba(0, 0, 0, 0.3));
   overflow: hidden;
@@ -1028,7 +1040,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 18px 22px;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--card-border);
 }
 
 .modalHeader h2 {
@@ -1051,7 +1063,7 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 14px 22px;
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid var(--card-border);
 }
 
 .formGrid {
@@ -1078,7 +1090,7 @@
 .formGrid textarea {
   padding: 11px 12px;
   border-radius: 10px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   background: var(--glass-bg-input, var(--glass-bg));
   color: var(--foreground);
   font: inherit;
@@ -1131,7 +1143,7 @@
   gap: 7px;
   padding: 8px 13px;
   border-radius: 999px;
-  border: 1.5px solid var(--glass-border);
+  border: 1.5px solid var(--card-border);
   background: transparent;
   color: var(--foreground);
   font-size: 0.88rem;
@@ -1161,7 +1173,7 @@
   gap: 12px;
   padding: 14px;
   border-radius: 14px;
-  border: 1.5px solid var(--glass-border);
+  border: 1.5px solid var(--card-border);
   background: var(--glass-bg);
   color: var(--foreground);
   text-align: left;
@@ -1209,7 +1221,7 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   cursor: pointer;
 }
 

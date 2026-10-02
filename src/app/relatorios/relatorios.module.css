@@ -1,6 +1,10 @@
 /* Relatórios — mesmo vocabulário visual de Metas, Planejamentos e Redes Sociais. */
 
 .container {
+  /* No tema escuro o contorno de vidro já aparece; no claro ele é branco
+     translúcido e some no fundo cinza, então ganha um traço e sombra próprios. */
+  --card-border: var(--glass-border);
+  --card-shadow: none;
   --muted: var(--text-secondary, #64748b);
   --track: rgba(148, 163, 184, 0.18);
   padding: 2.5rem;
@@ -11,6 +15,11 @@
   flex-direction: column;
   gap: 1.5rem;
   color: var(--foreground);
+}
+
+:global([data-theme='light']) .container {
+  --card-border: rgba(15, 23, 42, 0.12);
+  --card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.05);
 }
 
 /* ── Cabeçalho ──────────────────────────────────────────── */
@@ -52,7 +61,7 @@
 
 .segmented {
   display: inline-flex;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   overflow: hidden;
   background: var(--glass-bg);
@@ -94,7 +103,7 @@
   gap: 8px;
   padding: 10px 16px;
   border-radius: 12px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   background: var(--glass-bg);
   color: var(--foreground);
   font-size: 0.9rem;
@@ -127,8 +136,9 @@
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   border-radius: var(--glass-radius);
+  box-shadow: var(--card-shadow);
 }
 
 .kpiTop {
@@ -225,8 +235,9 @@
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
   border-radius: var(--glass-radius);
+  box-shadow: var(--card-shadow);
 }
 
 .panelHeader {
@@ -316,7 +327,7 @@
   padding: 12px;
   border-radius: 14px;
   background: var(--glass-bg-medium, var(--glass-bg));
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-border);
 }
 
 .serviceStats svg {
@@ -617,7 +628,7 @@
   text-align: center;
   gap: 0.75rem;
   padding: 4rem 1.5rem;
-  border: 2px dashed var(--glass-border);
+  border: 2px dashed var(--card-border);
   border-radius: var(--glass-radius);
   background: var(--glass-bg);
 }
