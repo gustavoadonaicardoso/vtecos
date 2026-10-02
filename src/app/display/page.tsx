@@ -125,7 +125,7 @@ export default function DisplayPage() {
         <div className={styles.logo}>
           {/* Logo configurada no painel (queue_settings) ou a da Vórtice. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={settings?.logo_url || '/brand/vortice-logo-white.png'} alt={settings?.app_name || 'Vórtice Tecnologia'} className={styles.logoImage} />
+          <img src={settings?.logo_url || '/brand/vortice-logo.png'} alt={settings?.app_name || 'Vórtice Tecnologia'} className={styles.logoImage} />
         </div>
         <div className={styles.clock}>
           {currentTime
@@ -137,7 +137,7 @@ export default function DisplayPage() {
       <main className={styles.mainDisplay}>
         <div className={`${styles.currentTicketCard} ${highlightCall ? styles.calling : ''}`}>
           <span className={styles.label}>Senha Atual</span>
-          <h1 key={currentTicket?.id ?? 'none'} className={styles.ticketNumber} style={{ color: settings?.primary_color || 'white' }}>
+          <h1 key={currentTicket?.id ?? 'none'} className={styles.ticketNumber} style={{ color: settings?.primary_color || '#4f00cb' }}>
             {currentTicket ? currentTicket.number.toString().padStart(2, '0') : '--'}
           </h1>
           {currentTicket?.name && (
@@ -145,7 +145,7 @@ export default function DisplayPage() {
               {currentTicket.name}
             </div>
           )}
-          <div className={styles.deskInfo} style={{ color: settings?.primary_color || '#c4b5fd' }}>
+          <div className={styles.deskInfo} style={{ color: settings?.primary_color || '#7c3aed' }}>
             {currentTicket ? `GUICHÊ ${currentTicket.desk}` : 'AGUARDANDO...'}
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function DisplayPage() {
           currentTicket ? (
             <div className={styles.mediaTicketBadge}>
               <span>Senha</span>
-              <strong style={{ color: settings?.primary_color || '#fff' }}>{currentTicket.number.toString().padStart(2, '0')}</strong>
+              <strong style={{ color: settings?.primary_color || '#4f00cb' }}>{currentTicket.number.toString().padStart(2, '0')}</strong>
               <span>Guichê {currentTicket.desk}</span>
             </div>
           ) : null

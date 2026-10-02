@@ -7,6 +7,7 @@
  */
 
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { sendWhatsAppWebMessage } from '@/lib/whatsapp-web';
 
 export type TicketOrigin = 'totem' | 'recepcao';
 
@@ -120,5 +121,59 @@ export async function createQueueTicket(params: {
     origin: params.origin ?? 'totem',
   });
 
+  // Confirmação no WhatsApp sem segurar a resposta do Totem (o envio pode demorar).
+  if (params.whatsapp) {
+    void sendTicketWhatsApp(
+      params.whatsapp,
+      `🌟 *Vórtice Tecnologia* 🌟\n\n${firstName(params.name) ? `Olá, ${firstName(params.name)}!` : 'Olá!'} Sua senha foi retirada com sucesso.\n\nSenha: *#${ticketLabel(ticket.number)}*\n\nAcompanhe o painel. Quando for sua vez, avisaremos também por aqui.`
+    );
+  }
+
   return { number: ticket.number };
+}
+
+// ── WhatsApp da fila ───────────────────────────────────────────
+
+const ticketLabel = (value: number) => value.toString().padStart(2, '0');
+
+/** Primeiro nome para a saudação; vazio quando a senha não tem nome real. */
+function firstName(name: string | null | undefined) {
+  const first = (name || '').trim().split(/\s+/)[0];
+  return first && first !== 'Cliente' && first !== 'Visitante' ? first : '';
+}
+
+/** Envia pelo WhatsApp Web conectado no sistema. Nunca lança: devolve o motivo da falha. */
+async function sendTicketWhatsApp(phone: string, message: string): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    await sendWhatsAppWebMessage(phone, message);
+    return { sent: true };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Falha no envio.';
+    console.error('[QueueService] WhatsApp da senha não enviado:', reason);
+    return { sent: false, reason };
+  }
+}
+
+export type TicketNotifyKind = 'call' | 'recall';
+
+/**
+ * Avisa no WhatsApp que a senha foi chamada (ou chamada de novo) e em qual
+ * guichê. O número fica em attendance_queue_contacts, que só o servidor lê.
+ */
+export async function notifyTicketCall(ticketId: string, kind: TicketNotifyKind): Promise<{ sent: boolean; reason?: string }> {
+  const [{ data: ticket }, { data: contact }] = await Promise.all([
+    supabase.from('attendance_queue_tickets').select('number, name, desk, status').eq('id', ticketId).maybeSingle(),
+    supabase.from('attendance_queue_contacts').select('whatsapp').eq('ticket_id', ticketId).maybeSingle(),
+  ]);
+
+  if (!ticket) return { sent: false, reason: 'Senha não encontrada.' };
+  if (!contact?.whatsapp) return { sent: false, reason: 'Sem WhatsApp cadastrado.' };
+
+  const desk = ticket.desk ? `Guichê ${ticket.desk}` : 'atendimento';
+  const message =
+    kind === 'call'
+      ? `📢 *Vórtice Tecnologia*\n\n${firstName(ticket.name) ? `${firstName(ticket.name)}, chegou a sua vez!` : 'Chegou a sua vez!'}\n\nSenha *#${ticketLabel(ticket.number)}* chamada.\nDirija-se ao *${desk}*.`
+      : `🔔 *Vórtice Tecnologia*\n\nLembrete: sua senha *#${ticketLabel(ticket.number)}* está sendo chamada no *${desk}*.`;
+
+  return sendTicketWhatsApp(contact.whatsapp, message);
 }
