@@ -740,6 +740,244 @@
   background: #3b82f6;
 }
 
+/* ── Aprovação / contadores ─────────────────────────────── */
+
+.tabCount {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.approveButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.approveButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rejectionNote {
+  font-size: 0.78rem;
+  margin: 0;
+  color: #f59e0b;
+}
+
+.pageToolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.projectPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+  font-size: 0.72rem;
+  font-weight: 600;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Legenda com IA ─────────────────────────────────────── */
+
+.labelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.aiButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aiPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.aiPanel .textarea {
+  min-height: 80px;
+}
+
+.aiRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.aiResult {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--background);
+  border: 1px solid var(--glass-border);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.aiHashtags {
+  color: #3b82f6;
+}
+
+/* ── Insights ───────────────────────────────────────────── */
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.metricCard {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  background: var(--background);
+}
+
+.metricCard span {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #64748b);
+}
+
+.metricCard strong {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.chartBox {
+  width: 100%;
+  height: 260px;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.inlineMetrics {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.inlineMetrics b {
+  color: var(--foreground);
+}
+
+/* ── Configurações ──────────────────────────────────────── */
+
+.settingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.settingRow:last-of-type {
+  border-bottom: none;
+}
+
+.settingRow p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  max-width: 620px;
+}
+
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex: none;
+  border-radius: 999px;
+  border: none;
+  background: var(--glass-border);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.switchOn {
+  background: var(--accent, #3b82f6);
+}
+
+.switchOn::after {
+  transform: translateX(20px);
+}
+
+.switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
   .drawerBody {
     grid-template-columns: 1fr;

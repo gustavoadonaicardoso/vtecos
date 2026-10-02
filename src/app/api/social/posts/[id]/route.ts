@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireActiveProfile } from '@/lib/session';
-import { requirePostAccess } from '@/lib/social/access';
+import { needsApproval, requirePostAccess } from '@/lib/social/access';
 import { parsePostInput } from '@/lib/social/input';
-import { deletePost, getPost, updatePost } from '@/services/social.service';
+import { deletePost, getPost, getSocialSettings, transitionPostStatus, updatePost } from '@/services/social.service';
 import type { SocialPostStatus } from '@/types';
 
 /** Depois que começou a sair (ou saiu) pra rede, o post não muda mais por aqui. */
 const LOCKED_STATUSES: SocialPostStatus[] = ['publishing', 'published', 'published_late', 'partial'];
+const REAPPROVAL_STATUSES: SocialPostStatus[] = ['scheduled', 'failed'];
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireActiveProfile();
@@ -35,9 +36,22 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const parsed = parsePostInput(body);
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
+  // Quem precisa de aprovação não pode mudar um post já aprovado (agendado) ou
+  // que falhou e seria reenviado pelo "Tentar de novo": volta pra rascunho.
+  // Volta ANTES de gravar o conteúdo novo, senão o agendador poderia pegar o
+  // post editado entre as duas operações e publicar algo não aprovado.
+  const settings = await getSocialSettings();
+  const revertToDraft = needsApproval(access.profile, settings) && REAPPROVAL_STATUSES.includes(access.post.status);
+  if (revertToDraft) {
+    const moved = await transitionPostStatus(id, [access.post.status], 'draft', { approved_by: null, approved_at: null });
+    if (!moved) {
+      return NextResponse.json({ error: 'O post mudou de status enquanto você editava. Atualize a página.' }, { status: 409 });
+    }
+  }
+
   const result = await updatePost(id, parsed.input);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
-  return NextResponse.json({ success: true, data: result.data });
+  return NextResponse.json({ success: true, revertedToDraft: revertToDraft, data: result.data });
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { Link2, Unlink } from 'lucide-react';
 import styles from '../social.module.css';
 import PlatformIcon from './PlatformIcon';
-import type { SocialAccount } from '@/types';
+import type { SocialAccount, SocialProjectOption } from '@/types';
 
 interface AccountsPanelProps {
   accounts: SocialAccount[];
+  projects: SocialProjectOption[];
   metaConfigured: boolean;
   isAdmin: boolean;
   oauthError: string | null;
@@ -16,7 +17,7 @@ interface AccountsPanelProps {
   onChanged: () => void;
 }
 
-export default function AccountsPanel({ accounts, metaConfigured, isAdmin, oauthError, connectedCount, onChanged }: AccountsPanelProps) {
+export default function AccountsPanel({ accounts, projects, metaConfigured, isAdmin, oauthError, connectedCount, onChanged }: AccountsPanelProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -32,6 +33,24 @@ export default function AccountsPanel({ accounts, metaConfigured, isAdmin, oauth
     }
     onChanged();
   };
+
+  const linkProject = async (account: SocialAccount, projectId: string) => {
+    setBusyId(account.id);
+    setError('');
+    const response = await fetch(`/api/social/accounts/${account.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: projectId || null }),
+    });
+    setBusyId(null);
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      setError(result.error || 'Não foi possível vincular o projeto.');
+    }
+    onChanged();
+  };
+
+  const projectName = (id: string | null) => (id ? projects.find((project) => project.id === id)?.name || 'Projeto removido' : null);
 
   return (
     <div className={styles.panel} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -100,6 +119,21 @@ export default function AccountsPanel({ accounts, metaConfigured, isAdmin, oauth
                 </span>
                 {account.status === 'error' && account.last_error && (
                   <p className={styles.targetError} title={account.last_error}>{account.last_error}</p>
+                )}
+                {isAdmin ? (
+                  <select
+                    className={styles.select}
+                    style={{ marginTop: 8, width: '100%' }}
+                    value={account.project_id ?? ''}
+                    disabled={busyId === account.id}
+                    onChange={(event) => linkProject(account, event.target.value)}
+                    aria-label={`Projeto de ${account.name}`}
+                  >
+                    <option value="">Sem projeto vinculado</option>
+                    {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                  </select>
+                ) : (
+                  account.project_id && <span className={styles.projectPill} style={{ marginTop: 6 }}>{projectName(account.project_id)}</span>
                 )}
               </div>
               {isAdmin && (

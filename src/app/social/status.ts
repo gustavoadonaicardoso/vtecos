@@ -17,6 +17,12 @@ export function postCalendarDate(post: { scheduled_at: string | null; published_
   return post.published_at || post.scheduled_at;
 }
 
+/** null = métrica que a Meta não devolveu para esta conta/post. */
+export function formatMetric(value: number | null | undefined) {
+  if (value === null || value === undefined) return '—';
+  return value.toLocaleString('pt-BR');
+}
+
 export function formatDateTime(value: string | null) {
   if (!value) return 'Sem data';
   return new Date(value).toLocaleString('pt-BR', {
