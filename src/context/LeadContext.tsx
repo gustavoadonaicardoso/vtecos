@@ -10,7 +10,7 @@
  * ============================================================
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
@@ -69,6 +69,8 @@ type LeadContextType = {
   addTag: (tag: string) => void;
   deleteTag: (tag: string) => void;
   updatePipelineStages: (newStages: PipelineStage[]) => void;
+  /** Salva a estrutura do funil (criar, renomear, cor, excluir, reordenar etapas). */
+  savePipelineStructure: (newStages: PipelineStage[], options?: { debounce?: boolean }) => void;
   dbStatus: boolean;
   refreshDatabase: () => Promise<void>;
 };
@@ -260,6 +262,45 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     setPipelineStages(newStages);
   };
 
+  // ─── savePipelineStructure (etapas: nome, cor, ordem) ───────
+  // A tela muda na hora; a gravação vai para /api/pipeline/stages. Ao
+  // digitar o nome de uma etapa, espera uma pausa antes de salvar.
+  const stageSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingStages = useRef<PipelineStage[] | null>(null);
+
+  const savePipelineStructure = (newStages: PipelineStage[], options: { debounce?: boolean } = {}) => {
+    setPipelineStages(newStages);
+    if (!dbStatus) return;
+
+    pendingStages.current = newStages;
+    if (stageSaveTimer.current) clearTimeout(stageSaveTimer.current);
+    stageSaveTimer.current = setTimeout(async () => {
+      const stagesToSave = pendingStages.current;
+      pendingStages.current = null;
+      if (!stagesToSave) return;
+      try {
+        const resp = await fetch('/api/pipeline/stages', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stages: stagesToSave.map((stage) => ({ id: stage.id, name: stage.name, color: stage.color })),
+          }),
+        });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          alert(result.error || 'Não foi possível salvar as etapas do funil.');
+          await fetchDatabase(); // volta para o que está salvo
+          return;
+        }
+        // Leads de etapas excluídas mudaram de etapa no servidor.
+        if (result.data?.movedLeads > 0) await fetchDatabase();
+      } catch {
+        alert('Falha de conexão ao salvar as etapas do funil.');
+        await fetchDatabase();
+      }
+    }, options.debounce ? 700 : 0);
+  };
+
   // ─── Tags ────────────────────────────────────────────────────
   const addTag = (tag: string) => {
     if (!tags.includes(tag)) setTags((prev) => [...prev, tag]);
@@ -275,6 +316,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
       addLead, updateLead, deleteLead,
       tags, addTag, deleteTag,
       updatePipelineStages,
+      savePipelineStructure,
       dbStatus, refreshDatabase: fetchDatabase,
     }}>
       {children}
