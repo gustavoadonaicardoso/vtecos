@@ -38,6 +38,9 @@ export default function DisplayPage() {
   const notifyCallRef = useRef(notifyCall);
   notifyCallRef.current = notifyCall;
   const lastCallKey = useRef<string | null>(null);
+  // Destaque animado no cartão da senha logo depois de uma chamada.
+  const [highlightCall, setHighlightCall] = useState(false);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchTickets = async () => {
     if (!supabase) return;
@@ -55,7 +58,12 @@ export default function DisplayPage() {
 
       // Senha nova chamada (ou rechamada): tira a mídia da frente por alguns segundos.
       const callKey = calling.status === 'calling' ? `${calling.id}-${calling.updated_at}` : null;
-      if (callKey && lastCallKey.current !== null && callKey !== lastCallKey.current) notifyCallRef.current();
+      if (callKey && lastCallKey.current !== null && callKey !== lastCallKey.current) {
+        notifyCallRef.current();
+        setHighlightCall(true);
+        if (highlightTimer.current) clearTimeout(highlightTimer.current);
+        highlightTimer.current = setTimeout(() => setHighlightCall(false), 8000);
+      }
       lastCallKey.current = callKey ?? lastCallKey.current ?? '';
       
       // The rest is history, excluding the current one if it's there
@@ -115,17 +123,9 @@ export default function DisplayPage() {
 
       <header className={styles.header}>
         <div className={styles.logo}>
-          {settings?.logo_url ? (
-            <img src={settings.logo_url} alt="Logo" className={styles.logoImage} />
-          ) : (
-            <span style={{ 
-              background: `linear-gradient(135deg, ${settings?.primary_color || '#3b82f6'}, ${settings?.secondary_color || '#8b5cf6'})`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
-              {settings?.app_name || 'VÓRTICE PAINEL'}
-            </span>
-          )}
+          {/* Logo configurada no painel (queue_settings) ou a da Vórtice. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={settings?.logo_url || '/brand/vortice-logo-white.png'} alt={settings?.app_name || 'Vórtice Tecnologia'} className={styles.logoImage} />
         </div>
         <div className={styles.clock}>
           {currentTime
@@ -135,9 +135,9 @@ export default function DisplayPage() {
       </header>
 
       <main className={styles.mainDisplay}>
-        <div className={styles.currentTicketCard}>
+        <div className={`${styles.currentTicketCard} ${highlightCall ? styles.calling : ''}`}>
           <span className={styles.label}>Senha Atual</span>
-          <h1 className={styles.ticketNumber} style={{ color: settings?.primary_color || 'white' }}>
+          <h1 key={currentTicket?.id ?? 'none'} className={styles.ticketNumber} style={{ color: settings?.primary_color || 'white' }}>
             {currentTicket ? currentTicket.number.toString().padStart(2, '0') : '--'}
           </h1>
           {currentTicket?.name && (
@@ -145,7 +145,7 @@ export default function DisplayPage() {
               {currentTicket.name}
             </div>
           )}
-          <div className={styles.deskInfo} style={{ color: settings?.primary_color || '#3b82f6' }}>
+          <div className={styles.deskInfo} style={{ color: settings?.primary_color || '#c4b5fd' }}>
             {currentTicket ? `GUICHÊ ${currentTicket.desk}` : 'AGUARDANDO...'}
           </div>
         </div>

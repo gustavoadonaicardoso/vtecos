@@ -9,10 +9,11 @@
   overflow: hidden;
   padding: clamp(20px, 3vw, 46px);
   color: white;
+  /* Cores da marca Vórtice (#4F00CB) sobre fundo escuro, para leitura de longe. */
   background:
-    radial-gradient(circle at 12% 8%, rgba(59, 130, 246, 0.2), transparent 34%),
-    radial-gradient(circle at 92% 88%, rgba(139, 92, 246, 0.16), transparent 38%),
-    linear-gradient(145deg, #111c31 0%, #0b1220 52%, #080d18 100%);
+    radial-gradient(circle at 12% 8%, rgba(79, 0, 203, 0.42), transparent 38%),
+    radial-gradient(circle at 92% 88%, rgba(124, 58, 237, 0.3), transparent 40%),
+    linear-gradient(145deg, #150a33 0%, #0d0821 52%, #08051a 100%);
 }
 
 .container::before {
@@ -24,7 +25,7 @@
   left: 28%;
   top: 8%;
   border-radius: 50%;
-  background: rgba(59, 130, 246, 0.07);
+  background: rgba(79, 0, 203, 0.16);
   filter: blur(110px);
   pointer-events: none;
 }
@@ -49,7 +50,8 @@
 .logoImage {
   display: block;
   width: auto;
-  height: clamp(38px, 6vh, 58px);
+  max-width: 40vw;
+  height: clamp(44px, 7vh, 72px);
   object-fit: contain;
 }
 
@@ -340,4 +342,32 @@
   font-weight: 900;
   letter-spacing: -0.03em;
   line-height: 1;
+}
+
+/* ── Destaque de chamada ────────────────────────────────── */
+
+.calling {
+  border-color: rgba(196, 181, 253, 0.65);
+  animation: callPulse 1.2s ease-in-out 5;
+}
+
+.calling .ticketNumber {
+  animation: callPop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes callPulse {
+  0%, 100% { box-shadow: 0 26px 70px rgba(0, 0, 0, 0.38), 0 0 0 0 rgba(124, 58, 237, 0.55); }
+  50% { box-shadow: 0 26px 70px rgba(0, 0, 0, 0.38), 0 0 0 18px rgba(124, 58, 237, 0); }
+}
+
+@keyframes callPop {
+  from { transform: scale(0.7); opacity: 0.2; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calling,
+  .calling .ticketNumber {
+    animation: none;
+  }
 }

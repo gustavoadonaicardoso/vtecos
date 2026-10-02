@@ -120,6 +120,7 @@ export default function QueuePage() {
         name: manualName || 'Cliente (Manual)',
         whatsapp: manualWhatsapp,
         document: manualDocument,
+        origin: 'recepcao',
       }),
     });
     const result: { number?: number; error?: string } = await response.json();
@@ -139,22 +140,7 @@ export default function QueuePage() {
         nextNumber.toString()
       );
 
-      // Create lead automatically (fail-safe)
-      try {
-        const { data: stageData } = await (supabase?.from('pipeline_stages').select('id').order('position').limit(1) || { data: null });
-        const stageId = stageData?.[0]?.id || 'novo';
-
-        await supabase?.from('leads').insert([{
-          name: manualName || 'Cliente (Manual)',
-          phone: manualWhatsapp,
-          cpf_cnpj: manualDocument,
-          source: 'Painel Central',
-          stage_id: stageId,
-          tags: ['Manual', 'Fila']
-        }]);
-      } catch (leadErr) {
-        console.error('Error creating lead:', leadErr);
-      }
+      // O lead é criado/atualizado no servidor junto com a senha (/api/queue/tickets).
 
       setManualName('');
       
