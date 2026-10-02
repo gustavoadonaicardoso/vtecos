@@ -9,6 +9,8 @@ export type Lead = {
   tags: string[];
   pipelineStage: string;
   entryDate: string;
+  /** Data/hora de criação (ISO) — usada nos relatórios por período e horário. */
+  createdAt?: string;
   status: string;
   color: string;
   channels: string[];
