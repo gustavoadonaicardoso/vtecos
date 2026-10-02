@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState, FormEvent } from 'react';
+import { CheckCircle2, IdCard, Phone, ShieldCheck, Ticket, User } from 'lucide-react';
 import styles from './totem.module.css';
 import { logAudit } from '@/lib/audit';
 import { sendWhatsApp } from '@/lib/messaging';
@@ -15,27 +15,65 @@ import {
   validateBrazilPhone,
 } from '@/lib/brazilian-fields';
 
+/** Depois de mostrar a senha, o totem volta sozinho para o próximo cliente. */
+const AUTO_RESET_SECONDS = 15;
+
 export default function TotemPage() {
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [document, setDocument] = useState('');
   const [issuedTicket, setIssuedTicket] = useState<number | null>(null);
+  const [sentToWhatsapp, setSentToWhatsapp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [now, setNow] = useState<Date | null>(null);
+  const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
+
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 15_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleReset = () => {
+    setIssuedTicket(null);
+    setSentToWhatsapp(false);
+    setName('');
+    setWhatsapp('');
+    setDocument('');
+    setError('');
+  };
+
+  // Contagem regressiva da tela de sucesso.
+  useEffect(() => {
+    if (issuedTicket === null) return;
+    setCountdown(AUTO_RESET_SECONDS);
+    const timer = setInterval(() => {
+      setCountdown((value) => {
+        if (value <= 1) {
+          clearInterval(timer);
+          handleReset();
+          return AUTO_RESET_SECONDS;
+        }
+        return value - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [issuedTicket]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    
-    // Basic validation
+    setError('');
+
     if (!name.trim()) {
-      alert('Por favor, informe seu nome completo.');
+      setError('Informe seu nome completo.');
       return;
     }
 
-    const phoneError = validateBrazilPhone(whatsapp);
-    const documentError = validateBrazilDocument(document);
-    if (phoneError || documentError) {
-      alert(phoneError || documentError);
+    const validationError = validateBrazilPhone(whatsapp) || validateBrazilDocument(document);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -43,12 +81,12 @@ export default function TotemPage() {
     const normalizedDocument = parseBrazilDocumentInput(document);
 
     setIsLoading(true);
-
     try {
+      // A senha e o lead (nome, WhatsApp e documento) são gravados juntos no servidor.
       const response = await fetch('/api/queue/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, whatsapp: normalizedWhatsapp, document: normalizedDocument }),
+        body: JSON.stringify({ name, whatsapp: normalizedWhatsapp, document: normalizedDocument, origin: 'totem' }),
       });
       const result: { number?: number; error?: string } = await response.json();
 
@@ -57,138 +95,134 @@ export default function TotemPage() {
       }
 
       const nextNumber = result.number;
-        setIssuedTicket(nextNumber);
+      setIssuedTicket(nextNumber);
 
-        // Zap Automation
-        if (normalizedWhatsapp) {
-          sendWhatsApp(normalizedWhatsapp, `🌟 *Estação Vórtice* 🌟\n\nSua senha foi retirada com sucesso!\n\nTicket: *#${nextNumber.toString().padStart(2, '0')}*\nCliente: *${name.trim()}*\n\nPor favor, acompanhe o telão. Você será chamado em breve!`);
-        }
-
-        // Audit Log
-        logAudit(
-          null,
-          'TICKET_CREATE',
-          `Nova senha #${nextNumber} gerada via Totem para ${name.trim()}.`,
-          'ticket',
-          nextNumber.toString()
+      if (normalizedWhatsapp) {
+        setSentToWhatsapp(true);
+        sendWhatsApp(
+          normalizedWhatsapp,
+          `🌟 *Vórtice Tecnologia* 🌟\n\nSua senha foi retirada com sucesso!\n\nSenha: *#${nextNumber.toString().padStart(2, '0')}*\nCliente: *${name.trim()}*\n\nAcompanhe o painel. Você será chamado em breve!`
         );
+      }
 
-        // Automatically create a Lead (optional/fail-safe)
-        try {
-          const { data: stageData } = await (supabase?.from('pipeline_stages').select('id').order('position').limit(1) || { data: null });
-          const stageId = stageData?.[0]?.id || 'novo';
-
-          await supabase?.from('leads').insert([{
-            name: name.trim(),
-            phone: normalizedWhatsapp,
-            cpf_cnpj: normalizedDocument,
-            source: 'Totem',
-            stage_id: stageId,
-            tags: ['Totem', 'Presencial']
-          }]);
-        } catch (leadErr) {
-          console.error('Lead sync error:', leadErr);
-        }
+      logAudit(null, 'TICKET_CREATE', `Nova senha #${nextNumber} gerada via Totem para ${name.trim()}.`, 'ticket', nextNumber.toString());
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erro de conexão.';
-      console.error('Erro ao gerar senha:', message);
-      alert(`Erro ao gerar senha: ${message}`);
+      setError(err instanceof Error ? err.message : 'Erro de conexão. Tente de novo.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleReset = () => {
-    setIssuedTicket(null);
-    setName('');
-    setWhatsapp('');
-    setDocument('');
-  };
-
   return (
     <div className={styles.container}>
-      <div className={styles.card}>
-        <div className={styles.logo}>VÓRTICE TOTEM</div>
-        
+      <header className={styles.topBar}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/vortice-logo.png" alt="Vórtice Tecnologia" className={styles.logo} />
+        <div className={styles.clock}>
+          {now && (
+            <>
+              <strong>{now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong>
+              <span>{now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span>
+            </>
+          )}
+        </div>
+      </header>
+
+      <main className={styles.card}>
         {issuedTicket === null ? (
           <>
-            <h1 className={styles.title}>Retirar Senha</h1>
-            <p className={styles.subtitle}>Preencha os dados abaixo para entrar na fila</p>
-            
-            <form onSubmit={handleSubmit} className={styles.form}>
-              <div className={styles.inputGroup}>
-                <label className={styles.label} htmlFor="totem-name">NOME COMPLETO</label>
-                <input
-                  id="totem-name"
-                  type="text" 
-                  className={styles.input} 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Seu nome"
-                  required
-                  autoFocus
-                />
-              </div>
+            <span className={styles.eyebrow}><Ticket size={16} /> Atendimento presencial</span>
+            <h1 className={styles.title}>Retire sua senha</h1>
+            <p className={styles.subtitle}>Preencha seus dados e acompanhe o painel para ser chamado.</p>
+
+            <form onSubmit={handleSubmit} className={styles.form} noValidate>
+              <label className={styles.field} htmlFor="totem-name">
+                <span className={styles.label}>Nome completo</span>
+                <span className={styles.inputWrap}>
+                  <User size={22} />
+                  <input
+                    id="totem-name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Digite seu nome"
+                    autoComplete="name"
+                    autoFocus
+                  />
+                </span>
+              </label>
 
               <div className={styles.gridFields}>
-                <div className={styles.inputGroup}>
-                  <label className={styles.label} htmlFor="totem-whatsapp">WHATSAPP</label>
-                  <input
-                    id="totem-whatsapp"
-                    type="tel"
-                    className={styles.input} 
-                    value={formatBrazilPhone(whatsapp)}
-                    onChange={(e) => setWhatsapp(parseBrazilPhoneInput(e.target.value))}
-                    placeholder="+55 (00) 90000-0000"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    maxLength={19}
-                  />
-                  <small className={styles.fieldHint}>DDD + número; o prefixo +55 é automático.</small>
-                </div>
+                <label className={styles.field} htmlFor="totem-whatsapp">
+                  <span className={styles.label}>WhatsApp <small>(opcional)</small></span>
+                  <span className={styles.inputWrap}>
+                    <Phone size={22} />
+                    <input
+                      id="totem-whatsapp"
+                      type="tel"
+                      value={formatBrazilPhone(whatsapp)}
+                      onChange={(e) => setWhatsapp(parseBrazilPhoneInput(e.target.value))}
+                      placeholder="(00) 90000-0000"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      maxLength={19}
+                    />
+                  </span>
+                  <small className={styles.hint}>Enviamos sua senha por WhatsApp.</small>
+                </label>
 
-                <div className={styles.inputGroup}>
-                  <label className={styles.label} htmlFor="totem-document">DOCUMENTO (CPF/RG)</label>
-                  <input
-                    id="totem-document"
-                    type="text" 
-                    className={styles.input} 
-                    value={formatBrazilDocument(document)}
-                    onChange={(e) => setDocument(parseBrazilDocumentInput(e.target.value))}
-                    placeholder="CPF ou RG"
-                    autoComplete="off"
-                    maxLength={14}
-                  />
-                  <small className={styles.fieldHint}>CPF: 11 dígitos; RG: 7 a 9 caracteres.</small>
-                </div>
+                <label className={styles.field} htmlFor="totem-document">
+                  <span className={styles.label}>CPF ou RG <small>(opcional)</small></span>
+                  <span className={styles.inputWrap}>
+                    <IdCard size={22} />
+                    <input
+                      id="totem-document"
+                      type="text"
+                      value={formatBrazilDocument(document)}
+                      onChange={(e) => setDocument(parseBrazilDocumentInput(e.target.value))}
+                      placeholder="Somente números"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={14}
+                    />
+                  </span>
+                  <small className={styles.hint}>CPF com 11 dígitos ou RG.</small>
+                </label>
               </div>
-              
-              <button 
-                type="submit" 
-                className={styles.submitBtn}
-                disabled={isLoading}
-              >
-                {isLoading ? 'GERANDO...' : 'RETIRAR MINHA SENHA'}
+
+              {error && <div className={styles.error} role="alert">{error}</div>}
+
+              <button type="submit" className={styles.submitBtn} disabled={isLoading}>
+                {isLoading ? 'Gerando sua senha…' : 'Retirar minha senha'}
               </button>
+
+              <p className={styles.privacy}>
+                <ShieldCheck size={15} /> Seus dados são usados apenas para o seu atendimento.
+              </p>
             </form>
           </>
         ) : (
-          <div className={styles.successDisplay}>
-            <h1 className={styles.title}>Sua Senha</h1>
-            <div className={styles.ticketResult}>
-              #{issuedTicket.toString().padStart(2, '0')}
+          <div className={styles.success}>
+            <CheckCircle2 size={64} className={styles.successIcon} />
+            <h1 className={styles.title}>Senha gerada!</h1>
+            <div className={styles.ticketBox}>
+              <span>Sua senha</span>
+              <strong>{issuedTicket.toString().padStart(2, '0')}</strong>
             </div>
-            <p className={`${styles.subtitle} ${styles.successMessage}`}>
-              AGUARDE SER CHAMADO NO PAINEL
+            <p className={styles.subtitle}>
+              Aguarde ser chamado no painel.
+              {sentToWhatsapp && <><br />Também enviamos a senha para o seu WhatsApp.</>}
             </p>
-            
-            <button className={styles.resetBtn} onClick={handleReset}>
-              CONCLUÍDO / VOLTAR AO INÍCIO
-            </button>
+            <button type="button" className={styles.submitBtn} onClick={handleReset}>Concluir</button>
+            <div className={styles.countdown}>
+              <div className={styles.countdownBar} style={{ width: `${(countdown / AUTO_RESET_SECONDS) * 100}%` }} />
+            </div>
+            <small className={styles.hint}>Voltando ao início em {countdown}s</small>
           </div>
         )}
-      </div>
+      </main>
+
+      <footer className={styles.footer}>Vórtice Tecnologia · Atendimento</footer>
     </div>
   );
 }
-

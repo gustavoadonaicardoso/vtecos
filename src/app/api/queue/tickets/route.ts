@@ -30,7 +30,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    const ticket = await createQueueTicket({ name, whatsapp, document });
+    const origin = payload.origin === 'recepcao' ? 'recepcao' : 'totem';
+    const ticket = await createQueueTicket({ name, whatsapp: whatsapp || null, document: document || null, origin });
 
     return NextResponse.json({ number: ticket.number }, { status: 201 });
   } catch (error: unknown) {
