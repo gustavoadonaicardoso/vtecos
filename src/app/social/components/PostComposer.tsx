@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ImagePlus, Send, Trash2, X, CalendarClock, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ImagePlus, Send, Trash2, X, CalendarClock, Save, Sparkles, ShieldCheck } from 'lucide-react';
 import styles from '../social.module.css';
 import PlatformIcon from './PlatformIcon';
 import PostPreview from './PostPreview';
@@ -14,9 +14,17 @@ import {
   isInstagramRatioValid,
   validatePostForPublishing,
 } from '@/lib/social/rules';
-import type { SocialAccount, SocialMediaItem, SocialPost, SocialPostStatus } from '@/types';
+import type { SocialAccount, SocialMediaItem, SocialPost, SocialPostStatus, SocialProjectOption, SocialSettings } from '@/types';
 
 const LOCKED_STATUSES: SocialPostStatus[] = ['publishing', 'published', 'published_late', 'partial'];
+
+const AI_TONES = [
+  { value: 'profissional', label: 'Profissional' },
+  { value: 'descontraido', label: 'Descontraído' },
+  { value: 'inspirador', label: 'Inspirador' },
+  { value: 'vendedor', label: 'Vendedor' },
+  { value: 'educativo', label: 'Educativo' },
+];
 
 function toLocalInput(date: Date) {
   const pad = (value: number) => String(value).padStart(2, '0');
@@ -33,18 +41,49 @@ interface PostComposerProps {
   post: SocialPost | null;
   initialDate: Date | null;
   accounts: SocialAccount[];
+  projects: SocialProjectOption[];
+  settings: SocialSettings;
+  /** O usuário envia para aprovação em vez de agendar/publicar direto. */
+  needsApproval: boolean;
   onClose: () => void;
   onChanged: () => void;
 }
 
-export default function PostComposer({ post, initialDate, accounts, onClose, onChanged }: PostComposerProps) {
+function initialAccountIds(accounts: SocialAccount[], settings: SocialSettings) {
+  const active = accounts.filter((account) => account.status === 'active');
+  const defaults = active.filter((account) => settings.defaultAccountIds.includes(account.id));
+  return (defaults.length > 0 ? defaults : active).map((account) => account.id);
+}
+
+export default function PostComposer({
+  post,
+  initialDate,
+  accounts,
+  projects,
+  settings,
+  needsApproval,
+  onClose,
+  onChanged,
+}: PostComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [postId, setPostId] = useState<string | null>(post?.id ?? null);
   const [caption, setCaption] = useState(post?.caption ?? '');
   const [media, setMedia] = useState<SocialMediaItem[]>(post?.media ?? []);
   const [selectedIds, setSelectedIds] = useState<string[]>(
-    post ? post.targets.map((target) => target.account_id) : accounts.filter((a) => a.status === 'active').map((a) => a.id)
+    post ? post.targets.map((target) => target.account_id) : initialAccountIds(accounts, settings)
   );
+  const [projectId, setProjectId] = useState<string>(() => {
+    if (post) return post.project_id ?? '';
+    // Post novo herda o projeto da primeira conta marcada que tiver um.
+    const linked = accounts.find((account) => selectedIds.includes(account.id) && account.project_id);
+    return linked?.project_id ?? '';
+  });
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiBrief, setAiBrief] = useState('');
+  const [aiTone, setAiTone] = useState('profissional');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiResult, setAiResult] = useState<{ caption: string; hashtags: string[] } | null>(null);
   const [scheduledLocal, setScheduledLocal] = useState(
     toLocalInput(post?.scheduled_at ? new Date(post.scheduled_at) : defaultScheduleFor(initialDate))
   );
@@ -62,8 +101,44 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
   const hashtags = countHashtags(caption);
   const problems = validatePostForPublishing({ caption, media, platforms });
 
+  const isPending = post?.status === 'pending_approval';
+  const reviewingAsApprover = isPending && !needsApproval;
+
   const toggleAccount = (id: string) => {
+    const adding = !selectedIds.includes(id);
     setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+    const account = accounts.find((item) => item.id === id);
+    if (adding && !projectId && account?.project_id) setProjectId(account.project_id);
+  };
+
+  const generateCaption = async () => {
+    setAiBusy(true);
+    setAiError('');
+    try {
+      const response = await fetch('/api/social/ai/caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brief: aiBrief, tone: aiTone, platforms, currentCaption: aiBrief ? '' : caption }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setAiError(result.error || 'Não foi possível gerar a legenda.');
+        return;
+      }
+      setAiResult(result.data);
+    } catch {
+      setAiError('Falha de conexão com a IA.');
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const applyAiCaption = () => {
+    if (!aiResult) return;
+    if (caption.trim() && !confirm('Substituir a legenda atual pela sugestão da IA?')) return;
+    setCaption([aiResult.caption, aiResult.hashtags.join(' ')].filter(Boolean).join('\n\n'));
+    setAiOpen(false);
+    setAiResult(null);
   };
 
   const handleFiles = async (files: FileList | null) => {
@@ -106,7 +181,7 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
       media,
       accountIds: selectedIds,
       scheduledAt: scheduledLocal ? new Date(scheduledLocal).toISOString() : null,
-      projectId: post?.project_id ?? null,
+      projectId: projectId || null,
     };
     const response = await fetch(postId ? `/api/social/posts/${postId}` : '/api/social/posts', {
       method: postId ? 'PUT' : 'POST',
@@ -140,6 +215,9 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
           setError(result.error || 'Não foi possível enviar o post.');
           return;
         }
+        if (result.pendingApproval) {
+          alert('Post enviado para aprovação. Você será avisado quando um administrador ou gerente revisar.');
+        }
       }
       onChanged();
       onClose();
@@ -148,6 +226,12 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
     } finally {
       setBusy(null);
     }
+  };
+
+  /** Para quem precisa de aprovação: horário no futuro = agendar; senão, publicar assim que aprovado. */
+  const submitForApproval = () => {
+    const future = scheduledLocal && new Date(scheduledLocal).getTime() > Date.now();
+    return run(future ? 'schedule' : 'now');
   };
 
   const remove = async () => {
@@ -192,6 +276,27 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
               </div>
             )}
 
+            {post?.status === 'rejected' && post.rejection_reason && (
+              <div className={`${styles.banner} ${styles.bannerError}`} style={{ marginBottom: 18 }}>
+                <div><strong>Reprovado:</strong> {post.rejection_reason}<br />Ajuste o post e envie de novo.</div>
+              </div>
+            )}
+            {isPending && (
+              <div className={`${styles.banner} ${styles.bannerInfo}`} style={{ marginBottom: 18 }}>
+                {needsApproval
+                  ? 'Este post está aguardando aprovação. Você ainda pode ajustar e salvar.'
+                  : post?.scheduled_at
+                    ? 'Aguardando sua aprovação. Ao aprovar, ele fica agendado para o horário escolhido (ou sai na hora, se o horário já passou).'
+                    : 'Aguardando sua aprovação. O autor pediu para publicar assim que for aprovado.'}
+              </div>
+            )}
+
+            {needsApproval && (post?.status === 'scheduled' || post?.status === 'failed') && (
+              <div className={`${styles.banner} ${styles.bannerInfo}`} style={{ marginBottom: 18 }}>
+                Este post já foi aprovado. Se você salvar alterações, ele volta para rascunho e precisa ser aprovado de novo.
+              </div>
+            )}
+
             <div className={styles.field}>
               <span className={styles.fieldLabel}>Publicar em</span>
               {accounts.length === 0 ? (
@@ -215,7 +320,57 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
             </div>
 
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="social-caption">Legenda</label>
+              <div className={styles.labelRow}>
+                <label className={styles.fieldLabel} htmlFor="social-caption">Legenda</label>
+                {!locked && (
+                  <button type="button" className={styles.aiButton} onClick={() => setAiOpen((open) => !open)}>
+                    <Sparkles size={13} /> Gerar com IA
+                  </button>
+                )}
+              </div>
+              {aiOpen && !locked && (
+                <div className={styles.aiPanel}>
+                  <textarea
+                    className={styles.textarea}
+                    value={aiBrief}
+                    maxLength={1500}
+                    onChange={(event) => setAiBrief(event.target.value)}
+                    placeholder={caption.trim()
+                      ? 'Sobre o que é o post? (deixe vazio para a IA melhorar a legenda atual)'
+                      : 'Sobre o que é o post? Ex.: lançamento do novo plano de automação para clínicas, com 7 dias grátis.'}
+                  />
+                  <div className={styles.aiRow}>
+                    <select className={styles.select} value={aiTone} onChange={(event) => setAiTone(event.target.value)} aria-label="Tom da legenda">
+                      {AI_TONES.map((tone) => <option key={tone.value} value={tone.value}>{tone.label}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={generateCaption}
+                      disabled={aiBusy || (!aiBrief.trim() && !caption.trim())}
+                    >
+                      <Sparkles size={13} /> {aiBusy ? 'Gerando…' : aiResult ? 'Gerar outra' : 'Gerar legenda'}
+                    </button>
+                  </div>
+                  {aiError && <p className={styles.targetError}>{aiError}</p>}
+                  {aiResult && (
+                    <>
+                      <div className={styles.aiResult}>
+                        {aiResult.caption}
+                        {aiResult.hashtags.length > 0 && (
+                          <>{'\n\n'}<span className={styles.aiHashtags}>{aiResult.hashtags.join(' ')}</span></>
+                        )}
+                      </div>
+                      <div className={styles.aiRow}>
+                        <button type="button" className={styles.primaryButton} onClick={applyAiCaption}>Usar esta legenda</button>
+                        <span className={styles.subtitle} style={{ fontSize: '0.75rem', margin: 0 }}>
+                          Revise antes de publicar: a IA pode errar.
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <textarea
                 id="social-caption"
                 className={styles.textarea}
@@ -291,6 +446,23 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
               />
             </div>
 
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="social-project">Projeto (opcional)</label>
+              <select
+                id="social-project"
+                className={styles.input}
+                value={projectId}
+                disabled={locked}
+                onChange={(event) => setProjectId(event.target.value)}
+              >
+                <option value="">Nenhum</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                {projectId && !projects.some((project) => project.id === projectId) && (
+                  <option value={projectId}>Projeto removido</option>
+                )}
+              </select>
+            </div>
+
             {!locked && problems.length > 0 && (
               <div className={styles.field}>
                 <span className={styles.fieldLabel}>Antes de agendar ou publicar</span>
@@ -342,10 +514,28 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
               </button>
             )}
           </div>
-          {!locked && (
+          {!locked && needsApproval && (
             <div className={styles.footerActions}>
               <button type="button" className={styles.secondaryButton} onClick={() => run('draft')} disabled={busy !== null || uploading}>
-                <Save size={14} /> {busy === 'draft' ? 'Salvando…' : post?.status === 'scheduled' ? 'Salvar alterações' : 'Salvar rascunho'}
+                <Save size={14} /> {busy === 'draft' ? 'Salvando…' : isPending ? 'Salvar alterações' : 'Salvar rascunho'}
+              </button>
+              {!isPending && (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={submitForApproval}
+                  disabled={busy !== null || uploading || problems.length > 0}
+                  title="Um administrador ou gerente revisa antes de publicar"
+                >
+                  <ShieldCheck size={14} /> {busy === 'schedule' || busy === 'now' ? 'Enviando…' : 'Enviar para aprovação'}
+                </button>
+              )}
+            </div>
+          )}
+          {!locked && !needsApproval && (
+            <div className={styles.footerActions}>
+              <button type="button" className={styles.secondaryButton} onClick={() => run('draft')} disabled={busy !== null || uploading}>
+                <Save size={14} /> {busy === 'draft' ? 'Salvando…' : post?.status === 'scheduled' || isPending ? 'Salvar alterações' : 'Salvar rascunho'}
               </button>
               <button
                 type="button"
@@ -353,7 +543,7 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
                 onClick={() => run('schedule')}
                 disabled={busy !== null || uploading || problems.length > 0 || !scheduledLocal}
               >
-                <CalendarClock size={14} /> {busy === 'schedule' ? 'Agendando…' : 'Agendar'}
+                <CalendarClock size={14} /> {busy === 'schedule' ? 'Agendando…' : reviewingAsApprover ? 'Aprovar e agendar' : 'Agendar'}
               </button>
               <button
                 type="button"
@@ -361,7 +551,7 @@ export default function PostComposer({ post, initialDate, accounts, onClose, onC
                 onClick={() => run('now')}
                 disabled={busy !== null || uploading || problems.length > 0}
               >
-                <Send size={14} /> {busy === 'now' ? 'Publicando…' : 'Publicar agora'}
+                <Send size={14} /> {busy === 'now' ? 'Publicando…' : reviewingAsApprover ? 'Aprovar e publicar agora' : 'Publicar agora'}
               </button>
             </div>
           )}

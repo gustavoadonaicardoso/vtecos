@@ -18,6 +18,8 @@ import type {
   SocialPost,
   SocialPostStatus,
   SocialPlatform,
+  SocialProjectOption,
+  SocialSettings,
 } from '@/types';
 
 const ACCOUNT_PUBLIC_COLUMNS =
@@ -260,6 +262,27 @@ export async function setPostStatus(
 }
 
 /**
+ * Muda o status só se o post ainda estiver num dos status esperados.
+ * Devolve false se outra pessoa mexeu antes (ex.: dois aprovadores ao
+ * mesmo tempo) -- quem chamou decide o que responder.
+ */
+export async function transitionPostStatus(
+  id: string,
+  fromStatuses: SocialPostStatus[],
+  to: SocialPostStatus,
+  extra: Record<string, unknown> = {}
+): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('social_posts')
+    .update({ status: to, updated_at: new Date().toISOString(), ...extra })
+    .eq('id', id)
+    .in('status', fromStatuses)
+    .select('id')
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/**
  * Troca o status para 'publishing' só se o post ainda estiver num dos
  * status esperados. É um UPDATE condicional: se dois processos tentarem
  * ao mesmo tempo, só um recebe a linha de volta -- o outro desiste. É
@@ -330,4 +353,117 @@ export async function notifyUser(userId: string | null, title: string, content: 
     link,
   }]);
   if (error) console.error('[social] falha ao notificar usuário:', error.message);
+}
+
+/** Avisa todos os admins e gerentes ativos (quem pode aprovar posts). */
+export async function notifyApprovers(title: string, content: string, link: string, exceptUserId?: string) {
+  const { data: approvers, error } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .in('role', ['ADMIN', 'MANAGER'])
+    .eq('status', 'ACTIVE');
+
+  if (error || !approvers) {
+    console.error('[social] falha ao listar aprovadores:', error?.message);
+    return;
+  }
+
+  const rows = approvers
+    .filter((approver) => approver.id !== exceptUserId)
+    .map((approver) => ({ user_id: approver.id, type: 'task', title, content, is_read: false, link }));
+  if (rows.length === 0) return;
+
+  const { error: insertError } = await supabaseAdmin.from('system_notifications').insert(rows);
+  if (insertError) console.error('[social] falha ao notificar aprovadores:', insertError.message);
+}
+
+// ── Configurações ──────────────────────────────────────────────
+
+const SETTINGS_PROVIDER = 'social_settings';
+
+export const DEFAULT_SOCIAL_SETTINGS: SocialSettings = {
+  requireApproval: true,
+  defaultAccountIds: [],
+};
+
+function normalizeSettings(raw: unknown): SocialSettings {
+  const value = (raw && typeof raw === 'object' ? raw : {}) as Partial<SocialSettings>;
+  return {
+    requireApproval: typeof value.requireApproval === 'boolean' ? value.requireApproval : DEFAULT_SOCIAL_SETTINGS.requireApproval,
+    defaultAccountIds: Array.isArray(value.defaultAccountIds)
+      ? value.defaultAccountIds.filter((id): id is string => typeof id === 'string').slice(0, 50)
+      : [],
+  };
+}
+
+export async function getSocialSettings(): Promise<SocialSettings> {
+  const { data } = await supabaseAdmin
+    .from('integrations_config')
+    .select('config')
+    .eq('provider', SETTINGS_PROVIDER)
+    .maybeSingle();
+  return normalizeSettings(data?.config);
+}
+
+export async function saveSocialSettings(raw: unknown): Promise<ServiceResult<SocialSettings>> {
+  const settings = normalizeSettings(raw);
+  const { error } = await supabaseAdmin.from('integrations_config').upsert(
+    { provider: SETTINGS_PROVIDER, config: settings, updated_at: new Date().toISOString() },
+    { onConflict: 'provider' }
+  );
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: settings };
+}
+
+// ── Projetos ───────────────────────────────────────────────────
+
+/** Só id e nome: o suficiente para vincular posts e contas a um projeto. */
+export async function listProjectOptions(): Promise<ServiceResult<SocialProjectOption[]>> {
+  const { data, error } = await supabaseAdmin
+    .from('action_plans')
+    .select('id, client_name, project_name')
+    .order('client_name');
+
+  if (error) return { success: false, error: error.message };
+  return {
+    success: true,
+    data: (data || []).map((project) => ({
+      id: project.id,
+      name: [project.client_name, project.project_name].filter(Boolean).join(' — ') || 'Projeto sem nome',
+    })),
+  };
+}
+
+export async function setAccountProject(id: string, projectId: string | null): Promise<ServiceResult> {
+  const { error } = await supabaseAdmin
+    .from('social_accounts')
+    .update({ project_id: projectId, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+// ── Insights ───────────────────────────────────────────────────
+
+export interface PublishedTargetRow {
+  id: string;
+  account_id: string;
+  external_id: string;
+  permalink: string | null;
+  published_at: string | null;
+  post: { id: string; caption: string; media: SocialMediaItem[] } | null;
+}
+
+/** Destinos publicados de uma conta desde uma data, mais recentes primeiro. */
+export async function listPublishedTargets(accountId: string, since: string, limit: number): Promise<PublishedTargetRow[]> {
+  const { data } = await supabaseAdmin
+    .from('social_post_targets')
+    .select('id, account_id, external_id, permalink, published_at, post:social_posts(id, caption, media)')
+    .eq('account_id', accountId)
+    .eq('status', 'published')
+    .not('external_id', 'is', null)
+    .gte('published_at', since)
+    .order('published_at', { ascending: false })
+    .limit(limit);
+  return (data || []) as unknown as PublishedTargetRow[];
 }

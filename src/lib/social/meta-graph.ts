@@ -60,7 +60,7 @@ function humanizeGraphError(error: GraphErrorBody): string {
 
 type Params = Record<string, string>;
 
-async function graphRequest<T>(
+export async function graphRequest<T>(
   method: 'GET' | 'POST' | 'DELETE',
   path: string,
   params: Params = {},

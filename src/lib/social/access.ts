@@ -1,9 +1,14 @@
 import { requireActiveProfile } from '@/lib/session';
 import { getPost } from '@/services/social.service';
-import type { SocialPost, UserProfile } from '@/types';
+import type { SocialPost, SocialSettings, UserProfile } from '@/types';
 
 export function canManageAllPosts(profile: UserProfile) {
   return profile.role === 'ADMIN' || profile.role === 'MANAGER';
+}
+
+/** Admins e gerentes nunca precisam de aprovação; os demais, se a configuração exigir. */
+export function needsApproval(profile: UserProfile, settings: SocialSettings) {
+  return settings.requireApproval && !canManageAllPosts(profile);
 }
 
 /** Sessão ativa + post existe + (é o autor ou é admin/gerente). */

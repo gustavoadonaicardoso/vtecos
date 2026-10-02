@@ -87,3 +87,6 @@ revoke all on public.social_post_targets from anon, authenticated;
 insert into storage.buckets (id, name, public)
 values ('social-media', 'social-media', true)
 on conflict (id) do nothing;
+
+-- Faz a API do Supabase (PostgREST) enxergar as tabelas e relações novas na hora.
+notify pgrst, 'reload schema';
