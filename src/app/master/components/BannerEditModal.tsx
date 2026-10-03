@@ -1,4 +1,5 @@
-import { Save, Sparkles, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Loader2, Save, Sparkles, Trash2, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import styles from '../master.module.css';
 import { BANNER_PRESET_COLORS, BANNER_PRESET_ICONS } from '../constants';
@@ -6,174 +7,182 @@ import type { BannerItem } from '../types';
 
 interface BannerEditModalProps {
   banner: BannerItem;
-  onUpdateField: (field: keyof BannerItem, value: any) => void;
-  onToggleRole: (role: string) => void;
   onClose: () => void;
-  onRemove: () => void;
-  onSave: () => void;
+  /** Devolve a mensagem de erro, ou null se salvou. */
+  onSave: (banner: BannerItem) => Promise<string | null>;
+  onRemove: (banner: BannerItem) => Promise<string | null>;
 }
 
-export default function BannerEditModal({ banner, onUpdateField, onToggleRole, onClose, onRemove, onSave }: BannerEditModalProps) {
-  const PreviewIcon = BANNER_PRESET_ICONS.find(i => i.id === banner.iconName)?.icon || Sparkles;
+const ROLES = [
+  { value: 'ADMIN', label: 'Administradores' },
+  { value: 'MANAGER', label: 'Gerentes' },
+  { value: 'SELLER', label: 'Vendedores' },
+];
+
+/**
+ * Edita uma cópia do banner: nada muda na lista até salvar, e fechar
+ * descarta a edição (ou o banner novo que ainda não foi gravado).
+ */
+export default function BannerEditModal({ banner, onClose, onSave, onRemove }: BannerEditModalProps) {
+  const [draft, setDraft] = useState<BannerItem>(banner);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const PreviewIcon = BANNER_PRESET_ICONS.find(i => i.id === draft.iconName)?.icon || Sparkles;
+  const isNew = !banner.id;
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+
+  const set = <K extends keyof BannerItem>(field: K, value: BannerItem[K]) => setDraft(prev => ({ ...prev, [field]: value }));
+
+  const toggleRole = (role: string) => {
+    const current = draft.target_roles ?? [];
+    set('target_roles', current.includes(role) ? current.filter(r => r !== role) : [...current, role]);
+  };
+
+  const run = async (action: () => Promise<string | null>) => {
+    setBusy(true);
+    setError('');
+    const message = await action();
+    setBusy(false);
+    if (message) setError(message);
+  };
+
+  const save = () => {
+    if (!draft.title.trim()) { setError('Informe o título do banner.'); return; }
+    run(() => onSave({ ...draft, title: draft.title.trim() }));
+  };
+
+  const remove = () => {
+    if (!confirm('Remover este banner permanentemente?')) return;
+    run(() => onRemove(draft));
+  };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+    <div className={styles.overlay} onClick={() => !busy && onClose()}>
       <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 20 }}
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="banner-modal-title"
+        initial={{ opacity: 0, scale: 0.95, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.92, y: 20 }}
-        style={{ background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 24, width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto', padding: '2rem', position: 'relative' }}
+        exit={{ opacity: 0, scale: 0.95, y: 16 }}
+        onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontWeight: 700, fontSize: '1.15rem' }}>Editar Banner</h2>
-          <button style={{ background: 'rgba(128,128,128,0.1)', border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--foreground)' }} onClick={onClose}>
+        <div className={styles.modalHead}>
+          <h2 id="banner-modal-title">{isNew ? 'Novo banner' : 'Editar banner'}</h2>
+          <button className={styles.iconButton} onClick={onClose} disabled={busy} aria-label="Fechar">
             <X size={18} />
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Título e Tipo */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.6, display: 'block', marginBottom: 6 }}>Título</label>
-              <input
-                value={banner.title}
-                onChange={e => onUpdateField('title', e.target.value)}
-                className={styles.input}
-                placeholder="Título do banner"
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.6, display: 'block', marginBottom: 6 }}>Tipo / Badge</label>
-              <input
-                value={banner.type}
-                onChange={e => onUpdateField('type', e.target.value)}
-                className={styles.input}
-                placeholder="Ex: Comunicado"
-              />
-            </div>
-          </div>
+        {error && <div className={styles.errorBanner}>{error}</div>}
 
-          {/* Descrição */}
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.6, display: 'block', marginBottom: 6 }}>Descrição</label>
-            <textarea
-              value={banner.description}
-              onChange={e => onUpdateField('description', e.target.value)}
-              className={styles.input}
-              rows={3}
-              style={{ resize: 'vertical', width: '100%' }}
-              placeholder="Descrição curta para o card..."
-            />
+        <div className={styles.formRow2}>
+          <div className={styles.field}>
+            <label htmlFor="banner-title">Título</label>
+            <input id="banner-title" value={draft.title} maxLength={80} onChange={e => set('title', e.target.value)} className={styles.input} placeholder="Título do banner" />
           </div>
-
-          {/* Data */}
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.6, display: 'block', marginBottom: 6 }}>Data de Exibição</label>
-            <input
-              value={banner.date}
-              onChange={e => onUpdateField('date', e.target.value)}
-              className={styles.input}
-              placeholder="Ex: 23 Mai 2026"
-            />
-          </div>
-
-          {/* Audiência (target_roles) */}
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.6, display: 'block', marginBottom: 10 }}>Audiência (quem vê este banner)</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(['ADMIN', 'MANAGER', 'SELLER'] as const).map(role => {
-                const isSelected = (banner.target_roles ?? []).includes(role);
-                return (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => onToggleRole(role)}
-                    style={{
-                      padding: '6px 16px', borderRadius: 100, border: '1px solid',
-                      fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
-                      transition: 'all 0.15s',
-                      background: isSelected ? 'var(--accent)' : 'rgba(128,128,128,0.08)',
-                      borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
-                      color: isSelected ? 'white' : 'var(--foreground)',
-                    }}
-                  >
-                    {role}
-                  </button>
-                );
-              })}
-              <span style={{ fontSize: '0.78rem', opacity: 0.45, alignSelf: 'center' }}>
-                {(banner.target_roles ?? []).length === 0 ? '→ Nenhum selecionado = todos verão' : ''}
-              </span>
-            </div>
-          </div>
-
-          {/* Cores */}
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.6, display: 'block', marginBottom: 10 }}>Cor do Card</label>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {BANNER_PRESET_COLORS.map(c => (
-                <div
-                  key={c}
-                  onClick={() => onUpdateField('color', c)}
-                  style={{
-                    width: 36, height: 36, borderRadius: 10, background: c, cursor: 'pointer',
-                    border: banner.color === c ? '3px solid white' : '3px solid transparent',
-                    boxShadow: banner.color === c ? '0 0 0 2px var(--accent)' : 'none',
-                    transition: 'all 0.15s',
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Ícones */}
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, opacity: 0.6, display: 'block', marginBottom: 10 }}>Ícone</label>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {BANNER_PRESET_ICONS.map(({ id, icon: Ico }) => (
-                <div
-                  key={id}
-                  onClick={() => onUpdateField('iconName', id)}
-                  style={{
-                    width: 40, height: 40, borderRadius: 10,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', transition: 'all 0.15s',
-                    background: banner.iconName === id ? 'var(--accent)' : 'rgba(128,128,128,0.08)',
-                    border: banner.iconName === id ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    color: banner.iconName === id ? 'white' : 'var(--foreground)',
-                  }}
-                >
-                  <Ico size={18} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Preview */}
-          <div style={{ borderRadius: 16, padding: '1.25rem', background: banner.color, color: 'white', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', right: -8, bottom: -12, opacity: 0.12, transform: 'rotate(-12deg)' }}>
-              <PreviewIcon size={80} />
-            </div>
-            <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', background: 'rgba(255,255,255,0.2)', padding: '3px 10px', borderRadius: 100 }}>{banner.type}</span>
-            <h3 style={{ marginTop: 10, marginBottom: 6, fontWeight: 700 }}>{banner.title}</h3>
-            <p style={{ fontSize: '0.82rem', opacity: 0.9 }}>{banner.description}</p>
+          <div className={styles.field}>
+            <label htmlFor="banner-type">Selo</label>
+            <input id="banner-type" value={draft.type} maxLength={30} onChange={e => set('type', e.target.value)} className={styles.input} placeholder="Ex: Comunicado" />
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
-          <button
-            onClick={onRemove}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}
-          >
-            <Trash2 size={16} /> Remover
-          </button>
-          <button
-            onClick={onSave}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, background: 'var(--accent)', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 700 }}
-          >
-            <Save size={16} /> Salvar Banner
-          </button>
+        <div className={styles.field}>
+          <label htmlFor="banner-description">Descrição</label>
+          <textarea
+            id="banner-description"
+            value={draft.description}
+            maxLength={280}
+            onChange={e => set('description', e.target.value)}
+            className={styles.input}
+            rows={3}
+            style={{ resize: 'vertical' }}
+            placeholder="Texto curto exibido no card"
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="banner-date">Data exibida</label>
+          <input id="banner-date" value={draft.date} maxLength={30} onChange={e => set('date', e.target.value)} className={styles.input} placeholder="Ex: 23 Mai 2026" />
+        </div>
+
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Quem vê (nenhum marcado = todos)</span>
+          <div className={styles.chipRow}>
+            {ROLES.map(role => (
+              <button
+                key={role.value}
+                type="button"
+                className={`${styles.chip} ${(draft.target_roles ?? []).includes(role.value) ? styles.chipActive : ''}`}
+                onClick={() => toggleRole(role.value)}
+              >
+                {role.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Cor do card</span>
+          <div className={styles.swatchRow}>
+            {BANNER_PRESET_COLORS.map(color => (
+              <button
+                key={color}
+                type="button"
+                aria-label="Escolher cor"
+                className={`${styles.swatch} ${draft.color === color ? styles.swatchActive : ''}`}
+                style={{ background: color }}
+                onClick={() => set('color', color)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Ícone</span>
+          <div className={styles.swatchRow}>
+            {BANNER_PRESET_ICONS.map(({ id, icon: Ico }) => (
+              <button
+                key={id}
+                type="button"
+                aria-label={`Ícone ${id}`}
+                className={`${styles.iconChoice} ${draft.iconName === id ? styles.iconChoiceActive : ''}`}
+                onClick={() => set('iconName', id)}
+              >
+                <Ico size={18} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.bannerCard} style={{ background: draft.color, cursor: 'default', transform: 'none' }}>
+          <div className={styles.bannerBgIcon}><PreviewIcon size={90} /></div>
+          <div className={styles.bannerTop}>
+            <span className={styles.bannerBadge}>{draft.type || 'Selo'}</span>
+            <span style={{ fontSize: '0.72rem', opacity: 0.85 }}>{draft.date}</span>
+          </div>
+          <h3>{draft.title || 'Título'}</h3>
+          <p>{draft.description}</p>
+        </div>
+
+        <div className={styles.modalActions}>
+          {isNew ? <span /> : (
+            <button className={styles.dangerBtn} onClick={remove} disabled={busy}>
+              <Trash2 size={16} /> Remover
+            </button>
+          )}
+          <div className={styles.actionButtons}>
+            <button className={styles.resetBtn} onClick={onClose} disabled={busy}>Cancelar</button>
+            <button className={styles.saveBtn} onClick={save} disabled={busy}>
+              {busy ? <Loader2 size={16} className={styles.spin} /> : <Save size={16} />} Salvar banner
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>

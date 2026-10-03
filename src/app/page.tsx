@@ -175,14 +175,9 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.from('platform_banners').select('*').then(({ data }) => {
-      if (data && data.length > 0) setBanners(data);
-      else {
-        try {
-          const saved = localStorage.getItem('vortice_banners');
-          if (saved) setBanners(JSON.parse(saved));
-        } catch {}
-      }
+    // O banco guarda o ícone em icon_name; o carrossel lê iconName.
+    supabase.from('platform_banners').select('*').order('created_at', { ascending: false }).then(({ data }) => {
+      setBanners((data || []).map((row) => ({ ...row, iconName: row.icon_name ?? undefined })));
     });
     supabase
       .from('system_updates')

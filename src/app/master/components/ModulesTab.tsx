@@ -3,8 +3,9 @@ import { ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import styles from '../master.module.css';
 import { MASTER_MODULES } from '../constants';
+import type { TabId } from '../types';
 
-export default function ModulesTab() {
+export default function ModulesTab({ onOpenTab }: { onOpenTab: (tab: TabId) => void }) {
   const router = useRouter();
 
   return (
@@ -16,13 +17,14 @@ export default function ModulesTab() {
       className={styles.modulesGrid}
     >
       {MASTER_MODULES.map(mod => (
-        <div
+        <button
           key={mod.id}
+          type="button"
           className={styles.moduleCard}
-          onClick={() => router.push(mod.path)}
+          onClick={() => (mod.tab ? onOpenTab(mod.tab) : router.push(mod.path || '/'))}
         >
           <div className={styles.cardHeaderSmall}>
-            <div className={styles.iconBox} style={{ color: mod.color, background: `${mod.color}15` }}>
+            <div className={styles.iconBox} style={{ color: mod.color, background: `${mod.color}1f` }}>
               <mod.icon size={22} />
             </div>
             <ChevronRight size={18} className={styles.arrowIcon} />
@@ -31,7 +33,7 @@ export default function ModulesTab() {
             <h3>{mod.title}</h3>
             <p>{mod.desc}</p>
           </div>
-        </div>
+        </button>
       ))}
     </motion.div>
   );
