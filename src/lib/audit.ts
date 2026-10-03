@@ -14,9 +14,11 @@ export async function logAudit(
   details: string,
   entityType?: string,
   entityId?: string,
-  // Chamadas do navegador usam a sessão do usuário (client anon); chamadas
-  // de rotas de API/webhooks (sem sessão) devem passar o client admin.
-  dbClient: any = supabase
+  // Chamadas do navegador usam a sessão do usuário (o banco preenche a
+  // empresa sozinho); rotas de API/webhooks passam o client admin E a
+  // empresa (tenantId), senão o registro não é gravado.
+  dbClient: any = supabase,
+  tenantId?: string
 ) {
   if (!dbClient || isTableMissing) return;
 
@@ -26,6 +28,7 @@ export async function logAudit(
     const userId = user?.id && UUID_PATTERN.test(user.id) ? user.id : null;
 
     const { error } = await dbClient.from('audit_logs').insert([{
+      ...(tenantId ? { tenant_id: tenantId } : {}),
       user_id: userId,
       user_name: user?.name || 'Sistema/Visitante',
       action,

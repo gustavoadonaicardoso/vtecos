@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireActiveProfile } from '@/lib/session';
 
 const GRAPH_VERSION = 'v21.0';
 
@@ -20,11 +21,15 @@ export interface MetaTemplateComponent {
 }
 
 export async function GET() {
+  const auth = await requireActiveProfile({ module: 'crm' });
+  if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const supabase = supabaseAdmin;
 
+  // Configuração da Meta DESTA empresa.
   const { data: item, error } = await supabase
     .from('integrations_config')
     .select('config')
+    .eq('tenant_id', auth.tenantId)
     .eq('provider', 'whatsapp_meta')
     .maybeSingle();
 

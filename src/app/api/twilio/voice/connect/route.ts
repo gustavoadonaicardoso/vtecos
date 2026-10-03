@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { twilioService } from '@/services/twilio.service';
+import { profileIdFromTwilioIdentity, twilioService } from '@/services/twilio.service';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { verifyTwilioRequest, twilioRejectResponse } from '@/lib/twilio-webhook';
 
@@ -12,10 +12,17 @@ export async function POST(request: Request) {
     const identity = params.ApplicationSid ? params.From : null;
     const callSid = params.CallSid;
 
-    // Log the call
-    if (to && callSid) {
+    // Registra a ligação na empresa de quem ligou (identidade = id do perfil).
+    const profileId = profileIdFromTwilioIdentity(identity);
+    const { data: caller } = profileId
+      // tenant-scope: ok (descobre a empresa a partir do perfil que ligou)
+      ? await supabase.from('profiles').select('id, tenant_id').eq('id', profileId).maybeSingle()
+      : { data: null };
+
+    if (to && callSid && caller?.tenant_id) {
       await supabase.from('call_logs').insert([{
-        user_id: identity?.startsWith('user_') ? null : identity, // This needs proper mapping
+        tenant_id: caller.tenant_id,
+        user_id: caller.id,
         contact_number: to,
         direction: 'outbound',
         status: 'in-progress',

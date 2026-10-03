@@ -14,7 +14,7 @@ import { requireActiveProfile } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ module: 'fiscal' });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }

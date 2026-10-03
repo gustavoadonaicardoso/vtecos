@@ -5,7 +5,7 @@ import { requireActiveProfile } from '@/lib/session';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'planejamentos' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const safeName = (file.name || 'imagem').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storagePath = `${auth.profile.id}/${Date.now()}-${safeName}`;
+    const storagePath = `${auth.tenantId}/${auth.profile.id}/${Date.now()}-${safeName}`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from('planning-media')

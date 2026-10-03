@@ -16,6 +16,7 @@ import BrowserNotificationListener from "@/components/BrowserNotificationListene
 import WhatsAppNotificationListener from "@/components/WhatsAppNotificationListener";
 // FIX #7: hook centralizado de permissões — sem duplicação
 import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
+import { isRouteAllowed } from "@/lib/plans";
 
 function AppGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -36,9 +37,17 @@ function AppGuard({ children }: { children: React.ReactNode }) {
   // precisa de prefixo em vez de igualdade exata como as demais.
   const isFullPage = fullPageRoutes.includes(pathname) || pathname.startsWith('/planejamentos/');
 
+  // Cada empresa só abre as páginas dos módulos do seu plano
+  // (a empresa da plataforma tem todos).
+  const modules = user?.workspace?.modules;
+
   // Verifica acesso à rota atual
   const checkRouteAccess = () => {
     if (isPublicPage || !user) return true;
+    if (pathname === '/master' || pathname.startsWith('/admin')) {
+      return user.role === 'ADMIN' && Boolean(user.workspace?.is_platform);
+    }
+    if (modules && !isRouteAllowed(pathname, modules)) return false;
     if (pathname === '/') return true;
 
     const requiredPermission = ROUTE_PERMISSIONS[pathname];

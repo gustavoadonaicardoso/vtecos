@@ -46,8 +46,8 @@ export function parseStagesInput(body: unknown): { stages: StageInput[] } | { er
   return { stages };
 }
 
-export async function savePipelineStages(stages: StageInput[]): Promise<ServiceResult<{ movedLeads: number }>> {
-  const { data: existing, error: existingError } = await supabaseAdmin.from('pipeline_stages').select('id');
+export async function savePipelineStages(tenantId: string, stages: StageInput[]): Promise<ServiceResult<{ movedLeads: number }>> {
+  const { data: existing, error: existingError } = await supabaseAdmin.from('pipeline_stages').select('id').eq('tenant_id', tenantId);
   if (existingError) return { success: false, error: existingError.message };
 
   const incomingIds = new Set(stages.map((stage) => stage.id));
@@ -58,8 +58,9 @@ export async function savePipelineStages(stages: StageInput[]): Promise<ServiceR
   }
 
   // 1. Cria/atualiza na ordem nova (precisa vir antes de mover leads para a etapa de destino).
-  const rows = stages.map((stage, index) => ({ id: stage.id, name: stage.name, color: stage.color, position: index + 1 }));
-  const { error: upsertError } = await supabaseAdmin.from('pipeline_stages').upsert(rows, { onConflict: 'id' });
+  const rows = stages.map((stage, index) => ({ tenant_id: tenantId, id: stage.id, name: stage.name, color: stage.color, position: index + 1 }));
+  // Etapas são únicas por empresa (tenant_id + id).
+  const { error: upsertError } = await supabaseAdmin.from('pipeline_stages').upsert(rows, { onConflict: 'tenant_id,id' });
   if (upsertError) return { success: false, error: upsertError.message };
 
   let movedLeads = 0;
@@ -69,15 +70,32 @@ export async function savePipelineStages(stages: StageInput[]): Promise<ServiceR
     const { data: moved, error: moveError } = await supabaseAdmin
       .from('leads')
       .update({ stage_id: fallback })
+      .eq('tenant_id', tenantId)
       .in('stage_id', removed)
       .select('id');
     if (moveError) return { success: false, error: moveError.message };
     movedLeads = moved?.length ?? 0;
 
     // 3. Agora as etapas removidas podem sair sem violar a chave estrangeira.
-    const { error: deleteError } = await supabaseAdmin.from('pipeline_stages').delete().in('id', removed);
+    const { error: deleteError } = await supabaseAdmin.from('pipeline_stages').delete().eq('tenant_id', tenantId).in('id', removed);
     if (deleteError) return { success: false, error: deleteError.message };
   }
 
   return { success: true, data: { movedLeads } };
+}
+
+/** Funil inicial de uma empresa nova (mesmas etapas que a Vórtice começou). */
+export const DEFAULT_STAGES: StageInput[] = [
+  { id: 'novo', name: 'Novo lead', color: '#3b82f6' },
+  { id: 'contato', name: 'Em contato', color: '#8b5cf6' },
+  { id: 'proposta', name: 'Proposta', color: '#f59e0b' },
+  { id: WON_STAGE_ID, name: 'Ganhos', color: '#10b981' },
+];
+
+export async function seedDefaultStages(tenantId: string) {
+  const { count } = await supabaseAdmin.from('pipeline_stages').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId);
+  if (count) return;
+  await supabaseAdmin.from('pipeline_stages').insert(
+    DEFAULT_STAGES.map((stage, index) => ({ ...stage, tenant_id: tenantId, position: index + 1 }))
+  );
 }

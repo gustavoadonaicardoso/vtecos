@@ -17,5 +17,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!result.claimed) {
     return NextResponse.json({ error: 'Só dá pra tentar de novo posts que falharam.' }, { status: 409 });
   }
-  return NextResponse.json({ success: true, data: await getPost(id) });
+  return NextResponse.json({ success: true, data: await getPost(access.tenantId, id) });
 }

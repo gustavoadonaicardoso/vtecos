@@ -13,7 +13,7 @@
  */
 
 import { claimAndPublishPost, consolidatePostStatus } from '@/lib/social/publisher';
-import { getPost, listDuePostIds, listStuckPublishingPostIds, updateTarget } from '@/services/social.service';
+import { getPost, getPostTenant, listDuePostIds, listStuckPublishingPostIds, updateTarget } from '@/services/social.service';
 
 const TICK_INTERVAL_MS = 60_000;
 const MAX_POSTS_PER_TICK = 10;
@@ -65,14 +65,16 @@ async function tick() {
 async function recoverStuckPosts() {
   const stuckIds = await listStuckPublishingPostIds(STUCK_AFTER_MINUTES);
   for (const postId of stuckIds) {
-    const post = await getPost(postId);
+    const tenantId = await getPostTenant(postId);
+    if (!tenantId) continue;
+    const post = await getPost(tenantId, postId);
     if (!post) continue;
     for (const target of post.targets.filter((t) => t.status === 'pending')) {
-      await updateTarget(target.id, {
+      await updateTarget(tenantId, target.id, {
         status: 'failed',
         error: 'Publicação interrompida (o servidor reiniciou). Confira na rede antes de tentar de novo.',
       });
     }
-    await consolidatePostStatus(postId);
+    await consolidatePostStatus(tenantId, postId);
   }
 }

@@ -18,6 +18,7 @@ export async function POST() {
   const { error } = await supabaseAdmin
     .from('profiles')
     .update({ last_seen_at: lastSeenAt })
+    .eq('tenant_id', auth.tenantId)
     .eq('id', auth.profile.id);
 
   // Coluna ainda não criada (migration pendente): não quebra o app.

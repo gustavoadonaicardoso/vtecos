@@ -38,6 +38,21 @@ interface Ticket {
 export default function QueuePage() {
   const { user } = useAuth();
   const [desk, setDesk] = useState('01');
+
+  // Totem e painel levam a chave da empresa na URL (cada empresa, sua fila).
+  const openQueueLink = async (kind: 'display' | 'totem') => {
+    const popup = window.open('', '_blank');
+    try {
+      const response = await fetch('/api/queue/links', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Não foi possível abrir.');
+      if (popup) popup.location.href = result.data[kind];
+      else window.open(result.data[kind], '_blank');
+    } catch (error) {
+      popup?.close();
+      alert(error instanceof Error ? error.message : 'Não foi possível abrir.');
+    }
+  };
   const [totalDesks, setTotalDesks] = useState(5);
   const [waitingTickets, setWaitingTickets] = useState<Ticket[]>([]);
   const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
@@ -56,7 +71,8 @@ export default function QueuePage() {
 
   const fetchSettings = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from('queue_settings').select('*').eq('id', 'default').single();
+    // O banco devolve só a configuração da empresa logada (RLS).
+    const { data } = await supabase.from('queue_settings').select('*').limit(1).maybeSingle();
     if (data) setTotalDesks(data.total_desks);
   };
 
@@ -263,10 +279,10 @@ export default function QueuePage() {
         
         <div className={styles.headerActions}>
 
-           <button onClick={() => window.open('/display', '_blank')} className={styles.linkBtn}>
+           <button onClick={() => openQueueLink('display')} className={styles.linkBtn}>
             <ExternalLink size={18} /> Ver Display
            </button>
-           <button onClick={() => window.open('/totem', '_blank')} className={styles.linkBtn}>
+           <button onClick={() => openQueueLink('totem')} className={styles.linkBtn}>
             <ExternalLink size={18} /> Ver Totem
            </button>
            {canManageDisplay && (

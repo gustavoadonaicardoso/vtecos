@@ -27,7 +27,11 @@ export interface SignInResult {
  */
 export async function signIn(
   email: string,
-  password: string
+  password: string,
+  lookup: {
+    byId: (id: string) => Promise<UserProfile | null>;
+    byEmail: (email: string) => Promise<UserProfile | null>;
+  }
 ): Promise<ServiceResult<SignInResult>> {
   try {
     const normalizedEmail = email.trim().toLowerCase();
@@ -64,8 +68,8 @@ export async function signIn(
     // correspondente. Sem esse fallback por e-mail, esses usuários
     // simplesmente nunca conseguiriam logar.
     const profile =
-      (await fetchProfileById(authData.user.id)) ||
-      (authData.user.email ? await fetchProfileByEmail(authData.user.email) : null);
+      (await lookup.byId(authData.user.id)) ||
+      (authData.user.email ? await lookup.byEmail(authData.user.email) : null);
 
     if (!profile) {
       return {
@@ -103,62 +107,6 @@ export async function signIn(
           ? err.message
           : 'Falha na autenticação. Tente novamente.',
     };
-  }
-}
-
-/**
- * Busca o perfil completo de um usuário pelo ID.
- */
-export async function fetchProfileById(
-  userId: string
-): Promise<UserProfile | null> {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('[AuthService] fetchProfileById:', error);
-      return null;
-    }
-
-    if (!data) {
-      return null;
-    }
-
-    return data as UserProfile;
-  } catch (err: unknown) {
-    console.error('[AuthService] fetchProfileById:', err);
-    return null;
-  }
-}
-
-/**
- * Busca o perfil completo de um usuário pelo e-mail -- fallback usado
- * no login quando profiles.id não bate com o auth.users.id (ver
- * comentário em signIn).
- */
-export async function fetchProfileByEmail(
-  email: string
-): Promise<UserProfile | null> {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
-
-    if (error) {
-      console.error('[AuthService] fetchProfileByEmail:', error);
-      return null;
-    }
-
-    return (data as UserProfile) ?? null;
-  } catch (err: unknown) {
-    console.error('[AuthService] fetchProfileByEmail:', err);
-    return null;
   }
 }
 
@@ -210,6 +158,7 @@ export async function fetchUnreadInternalChats(
 ): Promise<number> {
   try {
     const { count, error } = await supabase
+      // tenant-scope: ok (roda no navegador com a sessão do usuário; o RLS filtra a empresa)
       .from('internal_chat')
       .select('*', {
         count: 'exact',

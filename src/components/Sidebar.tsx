@@ -27,7 +27,8 @@ import {
   Phone,
   Bell,
   Workflow,
-  Share2
+  Share2,
+  Calculator
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import { useSidebar } from '@/components/SidebarProvider';
@@ -36,6 +37,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { usePermissions } from '@/lib/permissions';
 // Hook centralizado de não lidos — não duplicamos lógica de Realtime aqui
 import { useUnreadCount } from '@/hooks/useUnreadCount';
+import { isRouteAllowed } from '@/lib/plans';
 
 
 const Sidebar = () => {
@@ -43,7 +45,7 @@ const Sidebar = () => {
   const { isCollapsed, toggleSidebar, isMobileOpen, closeMobileMenu } = useSidebar();
   const { user, logout } = useAuth();
   const { config } = useTheme();
-  const { hasPermission, isAdmin } = usePermissions();
+  const { hasPermission, isPlatformAdmin } = usePermissions();
   const [mounted, setMounted] = React.useState(false);
   // Hook centralizado — toda lógica de Realtime fica em useUnreadCount
   const unreadChatCount = useUnreadCount();
@@ -57,6 +59,7 @@ const Sidebar = () => {
     { name: 'Projetos', icon: Briefcase, path: '/projetos', permission: 'admin.projects' },
     { name: 'Planejamentos', icon: Workflow, path: '/planejamentos', permission: 'planejamentos.view' },
     { name: 'Redes Sociais', icon: Share2, path: '/social', permission: 'social.view' },
+    { name: 'Custos e Precificação', icon: Calculator, path: '/financeiro', permission: 'financeiro.view' },
     { name: 'Metas', icon: Target, path: '/metas', permission: 'dashboard.view' },
     { name: 'Mensagens', icon: MessageSquare, path: '/messages', permission: 'messages.view' },
     { name: 'Chat Interno', icon: MessageCircle, path: '/chat', permission: 'messages.send' },
@@ -78,6 +81,13 @@ const Sidebar = () => {
   ], []);
 
   // FIX #7: hasPermission vem do hook centralizado usePermissions()
+  // Cada empresa vê só os módulos do seu plano (e, dentro deles, o que o cargo permite).
+  const modules = user?.workspace?.modules;
+  const visibleItems = React.useMemo(
+    () => navItems.filter((item) => (!modules || isRouteAllowed(item.path, modules)) && hasPermission(item.permission)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [navItems, modules, user]
+  );
 
   const handleLinkClick = () => {
     if (window.innerWidth <= 768) {
@@ -120,7 +130,7 @@ const Sidebar = () => {
         </div>
 
         <nav className={styles.nav}>
-          {mounted && navItems.filter(item => hasPermission(item.permission)).map((item) => (
+          {mounted && visibleItems.map((item) => (
             <Link 
               key={item.path} 
               href={item.path}
@@ -144,7 +154,7 @@ const Sidebar = () => {
           ))}
 
           {/* FIX #20: Seção Admin visível apenas para ADMIN */}
-          {mounted && isAdmin && (
+          {mounted && isPlatformAdmin && (
             <>
               <div className={styles.navSeparator}>{!isCollapsed && <span>Admin</span>}</div>
 

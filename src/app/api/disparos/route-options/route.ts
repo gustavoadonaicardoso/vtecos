@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireActiveProfile } from '@/lib/session';
 
 export async function GET(req: NextRequest) {
+  const auth = await requireActiveProfile({ module: 'crm' });
+  if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const type = req.nextUrl.searchParams.get('type');
   const supabase = supabaseAdmin;
 
@@ -9,6 +12,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, name, role')
+      .eq('tenant_id', auth.tenantId)
       .eq('status', 'ACTIVE')
       .order('name');
 
@@ -26,6 +30,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('pipeline_stages')
       .select('id, name, color')
+      .eq('tenant_id', auth.tenantId)
       .order('position');
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

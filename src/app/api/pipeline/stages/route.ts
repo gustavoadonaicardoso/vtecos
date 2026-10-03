@@ -7,7 +7,7 @@ import { parseStagesInput, savePipelineStages } from '@/services/pipeline.servic
  * Só admin e gerente: as etapas são compartilhadas por toda a equipe.
  */
 export async function PUT(request: Request) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'crm' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -19,7 +19,7 @@ export async function PUT(request: Request) {
   const parsed = parseStagesInput(body);
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-  const result = await savePipelineStages(parsed.stages);
+  const result = await savePipelineStages(auth.tenantId, parsed.stages);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true, data: result.data });
 }

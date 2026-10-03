@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'O motivo pode ter no máximo 500 caracteres.' }, { status: 400 });
   }
 
-  const moved = await transitionPostStatus(id, ['pending_approval'], 'rejected', {
+  const moved = await transitionPostStatus(access.tenantId, id, ['pending_approval'], 'rejected', {
     rejection_reason: reason,
     approved_by: null,
     approved_at: null,
@@ -43,5 +43,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     '/social?tab=posts&status=rejected'
   );
 
-  return NextResponse.json({ success: true, data: await getPost(id) });
+  return NextResponse.json({ success: true, data: await getPost(access.tenantId, id) });
 }

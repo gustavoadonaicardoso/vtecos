@@ -59,7 +59,7 @@ function mapLeadUpdateToDb(updates: Partial<Lead>): Record<string, any> {
  * Busca todos os leads e stages do banco.
  * Retorna dados mapeados para o formato da aplicação.
  */
-export async function fetchLeadsAndStages(filters?: {
+export async function fetchLeadsAndStages(tenantId: string, filters?: {
   userId?: string;
   role?: string;
 }): Promise<{
@@ -67,14 +67,14 @@ export async function fetchLeadsAndStages(filters?: {
   stages: PipelineStage[];
 } | null> {
   try {
-    let leadsQuery = supabase.from('leads').select('*').order('created_at', { ascending: false });
+    let leadsQuery = supabase.from('leads').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false });
 
     if (filters?.role === 'SELLER' && filters?.userId) {
       leadsQuery = leadsQuery.eq('assigned_to', filters.userId);
     }
 
     const [stagesRes, leadsRes] = await Promise.all([
-      supabase.from('pipeline_stages').select('*').order('position'),
+      supabase.from('pipeline_stages').select('*').eq('tenant_id', tenantId).order('position'),
       leadsQuery,
     ]);
 
@@ -101,6 +101,7 @@ export async function fetchLeadsAndStages(filters?: {
  * Cria um novo lead no banco e retorna o objeto mapeado.
  */
 export async function createLead(
+  tenantId: string,
   leadData: Omit<Lead, 'id' | 'entryDate' | 'status' | 'color' | 'channels' | 'lastMsg'>
 ): Promise<ServiceResult<Lead>> {
   try {
@@ -110,6 +111,7 @@ export async function createLead(
     const { data, error } = await supabase
       .from('leads')
       .insert([{
+        tenant_id: tenantId,
         name: leadData.name,
         email: leadData.email,
         phone: leadData.phone,
@@ -148,6 +150,7 @@ export async function createLead(
  * Atualiza campos de um lead no banco.
  */
 export async function updateLeadInDb(
+  tenantId: string,
   leadId: string,
   updates: Partial<Lead>
 ): Promise<ServiceResult> {
@@ -158,6 +161,7 @@ export async function updateLeadInDb(
     const { error } = await supabase
       .from('leads')
       .update(dbUpdates)
+      .eq('tenant_id', tenantId)
       .eq('id', leadId);
 
     if (error) return { success: false, error: error.message };
@@ -172,6 +176,7 @@ export async function updateLeadInDb(
  * Move um lead para outra stage no banco.
  */
 export async function moveLeadToStage(
+  tenantId: string,
   leadId: string,
   stageId: string
 ): Promise<ServiceResult> {
@@ -179,6 +184,7 @@ export async function moveLeadToStage(
     const { error } = await supabase
       .from('leads')
       .update({ stage_id: stageId })
+      .eq('tenant_id', tenantId)
       .eq('id', leadId);
 
     if (error) return { success: false, error: error.message };
@@ -192,9 +198,9 @@ export async function moveLeadToStage(
 /**
  * Remove um lead permanentemente do banco.
  */
-export async function deleteLeadFromDb(leadId: string): Promise<ServiceResult> {
+export async function deleteLeadFromDb(tenantId: string, leadId: string): Promise<ServiceResult> {
   try {
-    const { error } = await supabase.from('leads').delete().eq('id', leadId);
+    const { error } = await supabase.from('leads').delete().eq('tenant_id', tenantId).eq('id', leadId);
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (err: any) {
@@ -207,8 +213,8 @@ export async function deleteLeadFromDb(leadId: string): Promise<ServiceResult> {
  * Busca só o dono (assigned_to) de um lead -- usado pra checar
  * propriedade antes de deixar um SELLER editar/apagar.
  */
-export async function fetchLeadOwner(leadId: string): Promise<string | null> {
-  const { data } = await supabase.from('leads').select('assigned_to').eq('id', leadId).maybeSingle();
+export async function fetchLeadOwner(tenantId: string, leadId: string): Promise<string | null> {
+  const { data } = await supabase.from('leads').select('assigned_to').eq('tenant_id', tenantId).eq('id', leadId).maybeSingle();
   return data?.assigned_to ?? null;
 }
 

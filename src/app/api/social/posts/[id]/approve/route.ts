@@ -25,13 +25,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Este post não está aguardando aprovação.' }, { status: 409 });
   }
 
-  const problem = await checkPostReady(post);
+  const problem = await checkPostReady(access.tenantId, post);
   if (problem) return NextResponse.json({ error: `Não dá pra aprovar ainda: ${problem}` }, { status: 400 });
 
   const now = new Date().toISOString();
   const publishNow = !post.scheduled_at || new Date(post.scheduled_at).getTime() <= Date.now();
 
-  const moved = await transitionPostStatus(id, ['pending_approval'], 'scheduled', {
+  const moved = await transitionPostStatus(access.tenantId, id, ['pending_approval'], 'scheduled', {
     approved_by: profile.id,
     approved_at: now,
     rejection_reason: null,
@@ -53,5 +53,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   if (publishNow) await claimAndPublishPost(id, ['scheduled']);
 
-  return NextResponse.json({ success: true, data: await getPost(id) });
+  return NextResponse.json({ success: true, data: await getPost(access.tenantId, id) });
 }

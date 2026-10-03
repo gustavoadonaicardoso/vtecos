@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
  * WhatsApp da empresa. As mensagens da fila agora saem do servidor.
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'crm' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Campos obrigatórios: phone, message.' }, { status: 400 });
     }
 
-    const result = await sendWhatsAppWebMessage(phone, message.trim());
+    const result = await sendWhatsAppWebMessage(auth.tenantId, phone, message.trim());
     return NextResponse.json({ success: true, messageId: result?.key?.id ?? null });
   } catch (error) {
     return NextResponse.json(

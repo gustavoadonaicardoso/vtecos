@@ -35,7 +35,10 @@ export function usePermissions() {
     return (user.permissions as any)?.[category]?.[field] === true;
   };
 
+  // Admin da própria empresa (equipe, integrações, configurações).
   const isAdmin = user?.role === 'ADMIN';
+  // Admin da empresa dona da plataforma: Painel Master (empresas, planos).
+  const isPlatformAdmin = isAdmin && Boolean(user?.workspace?.is_platform);
 
-  return { hasPermission, isAdmin, user };
+  return { hasPermission, isAdmin, isPlatformAdmin, user };
 }

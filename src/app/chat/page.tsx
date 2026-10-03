@@ -462,7 +462,8 @@ function ChatContent() {
       setIsUploading(true);
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-      const filePath = `chat_attachments/${user.id}/${fileName}`;
+      // Pasta da empresa primeiro: a policy do storage só aceita upload na pasta da própria empresa.
+      const filePath = `${user.workspace?.tenant_id || user.tenant_id}/chat_attachments/${user.id}/${fileName}`;
 
       const { error } = await supabase.storage.from('files').upload(filePath, file);
 
@@ -577,7 +578,7 @@ function ChatContent() {
     if (!file || !user || !selectedProfileId || !supabase) return;
     try {
       const fileExt = file.name.split('.').pop();
-      const filePath = `chat_attachments/${user.id}/group_avatar_${selectedProfileId}_${Date.now()}.${fileExt}`;
+      const filePath = `${user.workspace?.tenant_id || user.tenant_id}/chat_attachments/${user.id}/group_avatar_${selectedProfileId}_${Date.now()}.${fileExt}`;
       const { error } = await supabase.storage.from('files').upload(filePath, file);
       if (!error) {
         const { data } = supabase.storage.from('files').getPublicUrl(filePath);

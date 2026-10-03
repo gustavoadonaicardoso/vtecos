@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { signIn } from '@/services/auth.service';
+import { fetchProfileByEmail, fetchProfileById } from '@/services/profile-lookup.server';
 import { setSessionCookies } from '@/lib/session';
+import { withWorkspace } from '@/services/workspace.service';
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +15,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await signIn(email.trim(), password);
+    const result = await signIn(email.trim(), password, { byId: fetchProfileById, byEmail: fetchProfileByEmail });
 
     if (!result.success || !result.data) {
       console.error('Erro no login:', result.error);
@@ -28,7 +30,7 @@ export async function POST(request: Request) {
     await setSessionCookies(session.access_token, session.refresh_token, session.expires_in);
 
     return NextResponse.json(
-      { data: profile },
+      { data: await withWorkspace(profile) },
       { status: 200 }
     );
   } catch (error) {

@@ -18,34 +18,59 @@ function tableForMessageType(type: MessageType) {
   return type === 'group' ? 'chat_group_messages' : 'internal_chat';
 }
 
+/** Os ids informados são todos usuários desta empresa? */
+async function allInTenant(tenantId: string, userIds: string[]) {
+  const unique = Array.from(new Set(userIds.filter(Boolean)));
+  if (unique.length === 0) return true;
+  const { data } = await supabase.from('profiles').select('id').eq('tenant_id', tenantId).in('id', unique);
+  return (data || []).length === unique.length;
+}
+
+async function isGroupMember(tenantId: string, groupId: string, userId: string) {
+  const { data } = await supabase
+    .from('chat_group_members')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/**
+ * Envia mensagem do chat interno. Remetente e empresa vêm da sessão; o
+ * destinatário (ou o grupo) precisa ser da mesma empresa.
+ */
 export async function sendInternalMessage(
+  tenantId: string,
+  senderId: string,
   type: MessageType,
-  payload: Record<string, unknown>
+  payload: { receiver_id?: string; group_id?: string; text: string } & Record<string, unknown>
 ): Promise<ServiceResult> {
-  const { data, error } = await supabase
-    .from(tableForMessageType(type))
-    .insert([payload])
-    .select()
-    .single();
+  if (type === 'direct') {
+    if (!payload.receiver_id || !(await allInTenant(tenantId, [payload.receiver_id]))) {
+      return { success: false, error: 'Destinatário não encontrado.' };
+    }
+  } else if (!payload.group_id || !(await isGroupMember(tenantId, payload.group_id, senderId))) {
+    return { success: false, error: 'Grupo não encontrado.' };
+  }
+
+  const row = { ...payload, sender_id: senderId, tenant_id: tenantId };
+  const { data, error } = await supabase.from(tableForMessageType(type)).insert([row]).select().single();
 
   if (error) return { success: false, error: error.message };
 
-  await notifyMessageRecipients(type, payload);
+  await notifyMessageRecipients(tenantId, type, row);
 
   return { success: true, data };
 }
 
 /**
- * Cria as notificações (system_notifications) para quem deve saber
- * de uma nova mensagem interna. Roda com supabaseAdmin (service_role)
- * porque o navegador nunca tem sessão real do Supabase Auth (login
- * é próprio/localStorage) -- inserir isso direto do cliente com a
- * anon key ficaria refém de RLS/grants exatamente certos, então
- * fazemos aqui, no mesmo lugar que já envia a mensagem com
- * privilégio total. Falhas aqui nunca devem derrubar o envio da
- * mensagem em si, por isso não propagam erro.
+ * Cria as notificações (system_notifications) para quem deve saber de
+ * uma nova mensagem interna. Falhas aqui nunca derrubam o envio.
  */
 async function notifyMessageRecipients(
+  tenantId: string,
   type: MessageType,
   payload: Record<string, unknown>
 ): Promise<void> {
@@ -55,6 +80,7 @@ async function notifyMessageRecipients(
     const { data: senderProfile } = await supabase
       .from('profiles')
       .select('name')
+      .eq('tenant_id', tenantId)
       .eq('id', senderId)
       .single();
     const senderName = senderProfile?.name || 'Alguém';
@@ -79,8 +105,8 @@ async function notifyMessageRecipients(
     if (!groupId) return;
 
     const [{ data: group }, { data: members }] = await Promise.all([
-      supabase.from('chat_groups').select('name').eq('id', groupId).single(),
-      supabase.from('chat_group_members').select('user_id').eq('group_id', groupId).neq('user_id', senderId),
+      supabase.from('chat_groups').select('name').eq('tenant_id', tenantId).eq('id', groupId).single(),
+      supabase.from('chat_group_members').select('user_id').eq('tenant_id', tenantId).eq('group_id', groupId).neq('user_id', senderId),
     ]);
 
     if (!members || members.length === 0) return;
@@ -101,36 +127,52 @@ async function notifyMessageRecipients(
   }
 }
 
-export async function editInternalMessage(type: MessageType, id: string, text: string): Promise<ServiceResult> {
-  const { error } = await supabase
+/** Só o autor edita/apaga a própria mensagem, e só dentro da empresa. */
+export async function editInternalMessage(tenantId: string, senderId: string, type: MessageType, id: string, text: string): Promise<ServiceResult> {
+  const { data, error } = await supabase
     .from(tableForMessageType(type))
     .update({ text: text.trim(), is_edited: true })
-    .eq('id', id);
+    .eq('tenant_id', tenantId)
+    .eq('sender_id', senderId)
+    .eq('id', id)
+    .select('id');
 
   if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: 'Mensagem não encontrada.' };
   return { success: true };
 }
 
-export async function deleteInternalMessage(type: MessageType, id: string): Promise<ServiceResult> {
-  const { error } = await supabase.from(tableForMessageType(type)).delete().eq('id', id);
+export async function deleteInternalMessage(tenantId: string, senderId: string, type: MessageType, id: string): Promise<ServiceResult> {
+  const { data, error } = await supabase
+    .from(tableForMessageType(type))
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('sender_id', senderId)
+    .eq('id', id)
+    .select('id');
   if (error) return { success: false, error: error.message };
+  if (!data || data.length === 0) return { success: false, error: 'Mensagem não encontrada.' };
   return { success: true };
 }
 
 /**
  * Cria um grupo de chat interno e adiciona os membros (incluindo o
- * criador como admin). Se a criação do grupo falhar por completo,
- * retorna erro; se só a inserção dos membros falhar, retorna o grupo
- * com um aviso (`warning`) para o chamador decidir como lidar.
+ * criador como admin). Todos precisam ser da mesma empresa.
  */
 export async function createChatGroup(
+  tenantId: string,
   name: string,
   createdBy: string,
   members: string[]
-): Promise<ServiceResult<{ group: any; warning?: string }>> {
+): Promise<ServiceResult<{ group: Record<string, unknown>; warning?: string }>> {
+  const memberIds = Array.from(new Set([...members, createdBy]));
+  if (!(await allInTenant(tenantId, memberIds))) {
+    return { success: false, error: 'Algum membro não faz parte da sua empresa.' };
+  }
+
   const { data: groupData, error: groupError } = await supabase
     .from('chat_groups')
-    .insert([{ name: name.trim(), created_by: createdBy }])
+    .insert([{ tenant_id: tenantId, name: name.trim(), created_by: createdBy }])
     .select()
     .single();
 
@@ -138,13 +180,14 @@ export async function createChatGroup(
     return { success: false, error: groupError?.message || 'Erro ao criar grupo.' };
   }
 
-  const memberIds = Array.from(new Set([...members, createdBy]));
   const membersToInsert = memberIds.map((userId) => ({
+    tenant_id: tenantId,
     group_id: groupData.id,
     user_id: userId,
     is_admin: userId === createdBy,
   }));
 
+  // tenant-scope: ok (cada linha de membersToInsert leva tenant_id)
   const { error: membersError } = await supabase.from('chat_group_members').insert(membersToInsert);
 
   if (membersError) {

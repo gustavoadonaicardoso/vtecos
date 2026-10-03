@@ -14,6 +14,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/projetos': 'admin.projects',
   '/planejamentos': 'planejamentos.view',
   '/social': 'social.view',
+  '/financeiro': 'financeiro.view',
   '/metas': 'dashboard.view',
   '/messages': 'messages.view',
   '/chat': 'messages.send',

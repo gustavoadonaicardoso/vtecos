@@ -1,0 +1,337 @@
+/* Empresas e Planos (painel Master). Tokens do tema, contorno visível no claro. */
+
+.wrap {
+  --card-border: var(--glass-border);
+  --muted: var(--text-secondary, #94a3b8);
+  --soft: var(--glass-bg-medium);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: var(--foreground);
+}
+
+:global([data-theme='light']) .wrap {
+  --card-border: rgba(15, 23, 42, 0.12);
+  --muted: #64748b;
+  --soft: rgba(15, 23, 42, 0.04);
+}
+
+.card {
+  background: var(--glass-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--glass-radius, 20px);
+  padding: 24px;
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.cardHead h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  color: var(--foreground);
+}
+
+.cardHead p {
+  margin: 0;
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.muted { color: var(--muted); font-size: 0.85rem; margin: 0; }
+
+.error,
+.warn {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  font-size: 0.88rem;
+}
+
+.warn {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #d97706;
+  font-size: 0.8rem;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.primary { border: none; background: var(--accent, #3b82f6); color: #fff; }
+.primary:disabled { opacity: 0.6; cursor: wait; }
+
+.secondary {
+  border: 1px solid var(--card-border);
+  background: var(--glass-bg);
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1px solid var(--card-border);
+  background: var(--glass-bg);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.icon:hover { border-color: var(--accent, #3b82f6); color: var(--accent, #3b82f6); }
+.iconDanger:hover { border-color: #ef4444; color: #ef4444; }
+
+.input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--glass-bg-input, transparent);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.input:focus { border-color: var(--accent, #3b82f6); }
+.input option { color: #111; }
+
+.ok { color: #10b981 !important; }
+.bad { color: #ef4444 !important; }
+
+/* ── Planos ── */
+
+.planGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  background: var(--soft);
+}
+
+.planInactive { opacity: 0.55; }
+
+.plan header { display: flex; justify-content: space-between; gap: 10px; }
+.plan h3 { margin: 0 0 4px; font-size: 1.05rem; }
+
+.price { font-size: 1.35rem; font-weight: 800; color: var(--accent, #3b82f6); }
+.price small { font-size: 0.8rem; font-weight: 500; color: var(--muted); margin-left: 2px; }
+
+.rowActions { display: flex; gap: 6px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.chipClient {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.plan footer { margin-top: auto; font-size: 0.78rem; }
+
+/* ── Empresas ── */
+
+.inlineForm {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.createForm { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.createForm .inlineForm { margin-bottom: 0; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+
+.adminRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--card-border);
+}
+
+.adminRow > span { grid-column: 1 / -1; font-size: 0.8rem; }
+
+.tenantList { display: flex; flex-direction: column; gap: 10px; }
+
+.tenant {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: var(--soft);
+}
+
+.tenantRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.8fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.tenantName { display: flex; flex-direction: column; gap: 3px; min-width: 0; align-self: center; }
+.tenantName strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.inlineField { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; color: var(--muted); }
+
+.users {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.userList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.userList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.userList li > div { display: flex; flex-direction: column; min-width: 0; }
+.userList li > div span { overflow: hidden; text-overflow: ellipsis; }
+
+.userForm {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 8px;
+}
+
+/* ── Modal ── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  width: min(640px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 20px;
+  border: 1px solid var(--card-border);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.modalHead { display: flex; justify-content: space-between; align-items: center; }
+.modalHead h3 { margin: 0; }
+
+.formGrid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+
+.moduleList { display: flex; flex-direction: column; gap: 8px; }
+
+.moduleOption {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.moduleOption > span:last-child { display: flex; flex-direction: column; gap: 3px; }
+.moduleOption strong { font-size: 0.9rem; }
+.moduleOption small { color: var(--muted); font-size: 0.78rem; }
+
+.moduleChecked { border-color: var(--accent, #3b82f6); background: rgba(59, 130, 246, 0.06); }
+
+.check {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  color: #fff;
+}
+
+.moduleChecked .check { background: var(--accent, #3b82f6); border-color: var(--accent, #3b82f6); }
+
+.tagClient,
+.tagStaff { font-style: normal; font-size: 0.7rem; font-weight: 600; }
+.tagClient { color: #10b981; }
+.tagStaff { color: var(--muted); }
+
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+
+.modalActions { display: flex; justify-content: flex-end; gap: 10px; }
+
+@media (max-width: 900px) {
+  .inlineForm,
+  .createForm .inlineForm,
+  .adminRow,
+  .tenantRow,
+  .userForm,
+  .formGrid { grid-template-columns: 1fr; }
+  .userList li { grid-template-columns: 1fr auto auto auto; }
+  .userList li select { grid-column: 1 / -1; grid-row: 2; }
+}

@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
-    const result = await fetchProfiles(scope);
+    const result = await fetchProfiles(auth.tenantId, scope);
     if (!result.success) {
       console.error('List profiles error:', result.error);
       return NextResponse.json({ error: result.error }, { status: 500 });
@@ -77,7 +77,8 @@ export async function POST(request: Request) {
       ? body.permissions
       : {};
 
-    const result = await createUserWithProfile({ name, email, password, role, permissions });
+    // O usuário novo entra sempre na empresa de quem está criando.
+    const result = await createUserWithProfile({ tenantId: auth.tenantId, name, email, password, role, permissions });
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });

@@ -27,7 +27,7 @@ export const ANONYMOUS_TICKET_NAME = 'Cliente (Manual)';
  * não aceita escrita anônima -- antes, a criação pelo navegador falhava
  * em silêncio. Nunca derruba a emissão da senha.
  */
-export async function syncLeadFromTicket(params: {
+export async function syncLeadFromTicket(tenantId: string, params: {
   name: string;
   whatsapp: string | null;
   document: string | null;
@@ -43,11 +43,11 @@ export async function syncLeadFromTicket(params: {
   try {
     let existing: { id: string; name: string | null; phone: string | null; cpf_cnpj: string | null; tags: string[] | null } | null = null;
     if (params.whatsapp) {
-      const { data } = await supabase.from('leads').select('id, name, phone, cpf_cnpj, tags').eq('phone', params.whatsapp).limit(1).maybeSingle();
+      const { data } = await supabase.from('leads').select('id, name, phone, cpf_cnpj, tags').eq('tenant_id', tenantId).eq('phone', params.whatsapp).limit(1).maybeSingle();
       existing = data;
     }
     if (!existing && params.document) {
-      const { data } = await supabase.from('leads').select('id, name, phone, cpf_cnpj, tags').eq('cpf_cnpj', params.document).limit(1).maybeSingle();
+      const { data } = await supabase.from('leads').select('id, name, phone, cpf_cnpj, tags').eq('tenant_id', tenantId).eq('cpf_cnpj', params.document).limit(1).maybeSingle();
       existing = data;
     }
 
@@ -63,13 +63,15 @@ export async function syncLeadFromTicket(params: {
           last_activity_at: now,
           last_msg: `Retirou senha (${originLabel})`,
         })
+        .eq('tenant_id', tenantId)
         .eq('id', existing.id);
       if (error) console.error('[QueueService] Falha ao atualizar lead da senha:', error.message);
       return;
     }
 
-    const { data: firstStage } = await supabase.from('pipeline_stages').select('id').order('position').limit(1).maybeSingle();
+    const { data: firstStage } = await supabase.from('pipeline_stages').select('id').eq('tenant_id', tenantId).order('position').limit(1).maybeSingle();
     const { error } = await supabase.from('leads').insert([{
+      tenant_id: tenantId,
       name: name || 'Visitante',
       phone: params.whatsapp,
       cpf_cnpj: params.document,
@@ -86,7 +88,7 @@ export async function syncLeadFromTicket(params: {
 }
 
 /** Lança o erro do Postgres como veio (código/detalhe/hint incluídos) para a rota logar. */
-export async function createQueueTicket(params: {
+export async function createQueueTicket(tenant: { id: string; name: string }, params: {
   name: string;
   whatsapp: string | null;
   document: string | null;
@@ -94,7 +96,7 @@ export async function createQueueTicket(params: {
 }): Promise<{ number: number }> {
   const { data: ticket, error } = await supabase
     .from('attendance_queue_tickets')
-    .insert({ name: params.name, status: 'waiting' })
+    .insert({ tenant_id: tenant.id, name: params.name, status: 'waiting' })
     .select('id, number')
     .single();
 
@@ -107,14 +109,14 @@ export async function createQueueTicket(params: {
   if (params.whatsapp || params.document) {
     const { error: contactError } = await supabase
       .from('attendance_queue_contacts')
-      .insert({ ticket_id: ticket.id, whatsapp: params.whatsapp, document: params.document });
+      .insert({ tenant_id: tenant.id, ticket_id: ticket.id, whatsapp: params.whatsapp, document: params.document });
 
     if (contactError) {
       console.error('[QueueService] Erro ao salvar contato da senha:', contactError.message);
     }
   }
 
-  await syncLeadFromTicket({
+  await syncLeadFromTicket(tenant.id, {
     name: params.name,
     whatsapp: params.whatsapp,
     document: params.document,
@@ -124,8 +126,9 @@ export async function createQueueTicket(params: {
   // Confirmação no WhatsApp sem segurar a resposta do Totem (o envio pode demorar).
   if (params.whatsapp) {
     void sendTicketWhatsApp(
+      tenant.id,
       params.whatsapp,
-      `🌟 *Vórtice Tecnologia* 🌟\n\n${firstName(params.name) ? `Olá, ${firstName(params.name)}!` : 'Olá!'} Sua senha foi retirada com sucesso.\n\nSenha: *#${ticketLabel(ticket.number)}*\n\nAcompanhe o painel. Quando for sua vez, avisaremos também por aqui.`
+      `🌟 *${tenant.name}* 🌟\n\n${firstName(params.name) ? `Olá, ${firstName(params.name)}!` : 'Olá!'} Sua senha foi retirada com sucesso.\n\nSenha: *#${ticketLabel(ticket.number)}*\n\nAcompanhe o painel. Quando for sua vez, avisaremos também por aqui.`
     );
   }
 
@@ -143,9 +146,10 @@ function firstName(name: string | null | undefined) {
 }
 
 /** Envia pelo WhatsApp Web conectado no sistema. Nunca lança: devolve o motivo da falha. */
-async function sendTicketWhatsApp(phone: string, message: string): Promise<{ sent: boolean; reason?: string }> {
+async function sendTicketWhatsApp(tenantId: string, phone: string, message: string): Promise<{ sent: boolean; reason?: string }> {
   try {
-    await sendWhatsAppWebMessage(phone, message);
+    // Sai pelo WhatsApp da própria empresa.
+    await sendWhatsAppWebMessage(tenantId, phone, message);
     return { sent: true };
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'Falha no envio.';
@@ -160,10 +164,10 @@ export type TicketNotifyKind = 'call' | 'recall';
  * Avisa no WhatsApp que a senha foi chamada (ou chamada de novo) e em qual
  * guichê. O número fica em attendance_queue_contacts, que só o servidor lê.
  */
-export async function notifyTicketCall(ticketId: string, kind: TicketNotifyKind): Promise<{ sent: boolean; reason?: string }> {
+export async function notifyTicketCall(tenant: { id: string; name: string }, ticketId: string, kind: TicketNotifyKind): Promise<{ sent: boolean; reason?: string }> {
   const [{ data: ticket }, { data: contact }] = await Promise.all([
-    supabase.from('attendance_queue_tickets').select('number, name, desk, status').eq('id', ticketId).maybeSingle(),
-    supabase.from('attendance_queue_contacts').select('whatsapp').eq('ticket_id', ticketId).maybeSingle(),
+    supabase.from('attendance_queue_tickets').select('number, name, desk, status').eq('tenant_id', tenant.id).eq('id', ticketId).maybeSingle(),
+    supabase.from('attendance_queue_contacts').select('whatsapp').eq('tenant_id', tenant.id).eq('ticket_id', ticketId).maybeSingle(),
   ]);
 
   if (!ticket) return { sent: false, reason: 'Senha não encontrada.' };
@@ -172,8 +176,8 @@ export async function notifyTicketCall(ticketId: string, kind: TicketNotifyKind)
   const desk = ticket.desk ? `Guichê ${ticket.desk}` : 'atendimento';
   const message =
     kind === 'call'
-      ? `📢 *Vórtice Tecnologia*\n\n${firstName(ticket.name) ? `${firstName(ticket.name)}, chegou a sua vez!` : 'Chegou a sua vez!'}\n\nSenha *#${ticketLabel(ticket.number)}* chamada.\nDirija-se ao *${desk}*.`
-      : `🔔 *Vórtice Tecnologia*\n\nLembrete: sua senha *#${ticketLabel(ticket.number)}* está sendo chamada no *${desk}*.`;
+      ? `📢 *${tenant.name}*\n\n${firstName(ticket.name) ? `${firstName(ticket.name)}, chegou a sua vez!` : 'Chegou a sua vez!'}\n\nSenha *#${ticketLabel(ticket.number)}* chamada.\nDirija-se ao *${desk}*.`
+      : `🔔 *${tenant.name}*\n\nLembrete: sua senha *#${ticketLabel(ticket.number)}* está sendo chamada no *${desk}*.`;
 
-  return sendTicketWhatsApp(contact.whatsapp, message);
+  return sendTicketWhatsApp(tenant.id, contact.whatsapp, message);
 }

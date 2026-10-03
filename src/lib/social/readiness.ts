@@ -7,8 +7,8 @@ import type { SocialPlatform, SocialPost } from '@/types';
  * Devolve a mensagem do problema, ou null se estiver tudo certo. Usado ao
  * enviar e ao aprovar, pra não aprovar algo que já nasceria falhando.
  */
-export async function checkPostReady(post: SocialPost): Promise<string | null> {
-  const accounts = await getAccountsWithTokens(post.targets.map((target) => target.account_id));
+export async function checkPostReady(tenantId: string, post: SocialPost): Promise<string | null> {
+  const accounts = await getAccountsWithTokens(tenantId, post.targets.map((target) => target.account_id));
   if (accounts.some((account) => account.status === 'disconnected')) {
     return 'Uma das contas de destino está desconectada. Reconecte ou remova ela do post.';
   }

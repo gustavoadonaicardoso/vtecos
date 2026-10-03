@@ -6,7 +6,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 
 /** Vincula (ou desvincula, com projectId null) a conta a um Projeto. */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminProfile();
+  const auth = await requireAdminProfile({ module: 'social' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -18,19 +18,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const { id } = await params;
-  const result = await setAccountProject(id, projectId);
+  const result = await setAccountProject(auth.tenantId, id, projectId);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true });
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminProfile();
+  const auth = await requireAdminProfile({ module: 'social' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
 
   const { id } = await params;
-  const result = await disconnectAccount(id);
+  const result = await disconnectAccount(auth.tenantId, id);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true });
 }

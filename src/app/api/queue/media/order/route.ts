@@ -10,7 +10,7 @@ export async function PUT(request: Request) {
   const ids = Array.isArray(body?.ids) ? body.ids.filter((id: unknown): id is string => typeof id === 'string').slice(0, 200) : [];
   if (ids.length === 0) return NextResponse.json({ error: 'Ordem inválida.' }, { status: 400 });
 
-  const result = await reorderDisplayMedia(ids);
+  const result = await reorderDisplayMedia(auth.tenantId, ids);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true });
 }

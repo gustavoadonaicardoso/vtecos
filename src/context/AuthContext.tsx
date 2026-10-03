@@ -6,6 +6,13 @@ import { useRouter, usePathname } from 'next/navigation';
 // Paramos de importar services e sb diretamente, para não levar libs pesadas e segredos ao client
 // Tipos centralizados em @/types
 import type { UserProfile, UserPermissions } from '@/types';
+import { resetSupabaseSession, supabase } from '@/lib/supabase';
+
+/** Troca de usuário: o client do banco passa a usar o token da nova sessão. */
+function refreshDatabaseSession() {
+  resetSupabaseSession();
+  supabase.realtime.setAuth().catch(() => {});
+}
 
 // Re-exporta para compatibilidade com imports existentes
 export type { UserProfile, UserPermissions };
@@ -51,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
        await fetch('/api/auth/logout', { method: 'POST' });
     } catch(e) {}
 
+    refreshDatabaseSession();
     setUser(null);
     setIsAuthenticated(false);
     router.push('/login');
@@ -123,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = (userData: UserProfile) => {
     localStorage.setItem('vortice_user', JSON.stringify(userData));
+    refreshDatabaseSession();
     setUser(userData);
     setIsAuthenticated(true);
     router.push('/');

@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' }, { status: 400 });
     }
 
-    const result = await adminResetPassword(id, newPassword);
+    const result = await adminResetPassword(auth.tenantId, id, newPassword);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -36,7 +36,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       `Redefiniu a senha do membro ${id} sem exigir a senha atual.`,
       'profile',
       id,
-      supabaseAdmin
+      supabaseAdmin,
+      auth.tenantId
     );
 
     return NextResponse.json({ success: true }, { status: 200 });

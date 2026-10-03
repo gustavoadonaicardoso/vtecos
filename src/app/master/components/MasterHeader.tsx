@@ -16,7 +16,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'modules', label: 'Módulo de Comando' },
   { id: 'branding', label: 'Identidade Visual' },
   { id: 'permissions', label: 'Gestão de Menu' },
-  { id: 'tenants', label: 'Múltiplas Empresas' },
+  { id: 'tenants', label: 'Empresas e Planos' },
   { id: 'banners', label: 'Banners' },
 ];
 

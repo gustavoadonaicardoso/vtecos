@@ -10,18 +10,34 @@
  * ============================================================
  */
 
-import { WhatsAppService, getWhatsAppConfig } from '@/lib/whatsapp';
+import { WhatsAppService, resolveMetaTenant } from '@/lib/whatsapp';
 import { logAudit } from '@/lib/audit';
 import { applyBlastRouting } from '@/lib/messaging';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WhatsAppWebhookPayload, WhatsAppInboundMessage, WhatsAppMessageStatus } from '@/types';
 
-export async function getService(supabaseClient?: any) {
-  const config = await getWhatsAppConfig(supabaseClient);
-  return new WhatsAppService(config);
+/** phone_number_id de todos os eventos do payload (para achar a empresa). */
+export function phoneNumberIdsOf(payload: WhatsAppWebhookPayload): string[] {
+  const ids = new Set<string>();
+  for (const entry of payload.entry || []) {
+    for (const change of entry.changes || []) {
+      const id = change.value?.metadata?.phone_number_id;
+      if (id) ids.add(id);
+    }
+  }
+  return Array.from(ids);
 }
 
-export async function processWebhookEntries(payload: WhatsAppWebhookPayload, service: WhatsAppService) {
+/**
+ * Processa os eventos de UMA empresa: só os do número que é dela.
+ * Leads e mensagens entram com o tenant_id dessa empresa.
+ */
+export async function processWebhookEntries(
+  payload: WhatsAppWebhookPayload,
+  service: WhatsAppService,
+  tenantId: string,
+  phoneNumberId: string
+) {
   const supabase = supabaseAdmin;
 
   for (const entry of payload.entry) {
@@ -29,32 +45,33 @@ export async function processWebhookEntries(payload: WhatsAppWebhookPayload, ser
       if (change.field !== 'messages') continue;
 
       const value = change.value;
-      const phoneNumberId = value.metadata.phone_number_id;
+      if (value.metadata.phone_number_id !== phoneNumberId) continue;
 
-      // Processa mensagens recebidas
       if (value.messages?.length) {
         for (const message of value.messages) {
           const senderName = value.contacts?.find(c => c.wa_id === message.from)?.profile.name
             ?? 'Cliente WhatsApp';
-          await handleInboundMessage(supabase, message, senderName, phoneNumberId, service);
+          await handleInboundMessage(supabase, tenantId, message, senderName, phoneNumberId, service);
         }
       }
 
-      // Processa atualizações de status de mensagens enviadas
       if (value.statuses?.length) {
         for (const status of value.statuses) {
-          await handleMessageStatus(supabase, status);
+          await handleMessageStatus(supabase, tenantId, status);
         }
       }
     }
   }
 }
 
+export { resolveMetaTenant };
+
 // ─────────────────────────────────────────────────────────────
 // Processamento de Mensagem Recebida
 // ─────────────────────────────────────────────────────────────
 async function handleInboundMessage(
   supabase: typeof supabaseAdmin,
+  tenantId: string,
   message: WhatsAppInboundMessage,
   senderName: string,
   phoneNumberId: string,
@@ -69,24 +86,16 @@ async function handleInboundMessage(
     const messageType = mapMessageType(message.type);
     const wamid = message.id; // WhatsApp Message ID
 
-    // 1. Busca lead existente pelo telefone
-    let targetLead: any = null;
-
-    // Tentativa via RPC (se definida no Supabase)
-    const { data: rpcLead } = await supabase
-      .rpc('find_lead_by_phone', { search_phone: cleanPhone })
-      .maybeSingle();
-    targetLead = rpcLead;
-
-    // Fallback: busca por sufixo do telefone
-    if (!targetLead) {
-      const { data: leads } = await supabase
-        .from('leads')
-        .select('id, name, phone');
-      targetLead = leads?.find((l: any) =>
-        l.phone.replace(/\D/g, '').endsWith(searchSuffix)
-      );
-    }
+    // 1. Lead DESTA empresa com o mesmo telefone
+    const { data: candidates } = await supabase
+      .from('leads')
+      .select('id, name, phone')
+      .eq('tenant_id', tenantId)
+      .ilike('phone', `%${searchSuffix}`)
+      .limit(20);
+    const targetLead = (candidates || []).find((l: { phone?: string }) =>
+      (l.phone || '').replace(/\D/g, '').endsWith(searchSuffix)
+    );
 
     let leadId: string | null = targetLead?.id ?? null;
     let isNewLead = false;
@@ -96,6 +105,7 @@ async function handleInboundMessage(
       const { data: stages } = await supabase
         .from('pipeline_stages')
         .select('id')
+        .eq('tenant_id', tenantId)
         .order('position')
         .limit(1);
       const firstStageId = stages?.[0]?.id ?? null;
@@ -103,6 +113,7 @@ async function handleInboundMessage(
       const { data: newLead, error: leadError } = await supabase
         .from('leads')
         .insert([{
+          tenant_id: tenantId,
           name: senderName,
           phone: cleanPhone,
           stage_id: firstStageId,
@@ -122,7 +133,8 @@ async function handleInboundMessage(
           `Lead "${senderName}" criado via WhatsApp Business API (Meta). Phone: ${cleanPhone}`,
           'lead',
           newLead.id,
-          supabaseAdmin
+          supabaseAdmin,
+          tenantId
         );
       }
     }
@@ -136,6 +148,7 @@ async function handleInboundMessage(
     const { error: msgError } = await supabase
       .from('chat_messages')
       .insert([{
+        tenant_id: tenantId,
         lead_id: leadId,
         text: messageText,
         sent_by_me: false,
@@ -158,6 +171,7 @@ async function handleInboundMessage(
         last_msg: messageText || getMediaLabel(message.type),
         last_activity_at: new Date().toISOString(),
       })
+      .eq('tenant_id', tenantId)
       .eq('id', leadId);
 
     // 5. Marca mensagem como lida (envia duplo-check azul)
@@ -168,7 +182,7 @@ async function handleInboundMessage(
     }
 
     // 6. Aplica roteamento de campanha blast (se houver)
-    await applyBlastRouting(supabase, cleanPhone, searchSuffix, leadId);
+    await applyBlastRouting(supabase, cleanPhone, searchSuffix, leadId, tenantId);
 
     console.log(`[Webhook Meta] ✅ Mensagem de ${senderName} (${cleanPhone}) processada. Lead: ${leadId} | Novo: ${isNewLead}`);
   } catch (err: any) {
@@ -181,6 +195,7 @@ async function handleInboundMessage(
 // ─────────────────────────────────────────────────────────────
 async function handleMessageStatus(
   supabase: typeof supabaseAdmin,
+  tenantId: string,
   status: WhatsAppMessageStatus
 ) {
   try {
@@ -201,6 +216,7 @@ async function handleMessageStatus(
         status: internalStatus,
         ...(status.errors?.length ? { error_details: status.errors } : {}),
       })
+      .eq('tenant_id', tenantId)
       .eq('external_id', status.id);
 
     if (error) {

@@ -12,6 +12,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const result = await createUploadUrl(
+    auth.tenantId,
     typeof body?.fileName === 'string' ? body.fileName : '',
     typeof body?.contentType === 'string' ? body.contentType : '',
     Number(body?.size)

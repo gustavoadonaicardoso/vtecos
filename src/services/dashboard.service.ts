@@ -34,9 +34,15 @@ async function safe<T>(load: () => Promise<T>): Promise<T | null> {
   }
 }
 
-/** count exato sem trazer linhas. */
-async function count(table: string, apply: (query: any) => any = (query) => query): Promise<number> {
-  const { count: total, error } = await apply(supabaseAdmin.from(table).select('id', { count: 'exact', head: true }));
+/** count exato sem trazer linhas -- sempre só da empresa informada. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CountQuery = any;
+
+async function countIn(tenantId: string, table: string, apply: (query: CountQuery) => CountQuery = (query) => query): Promise<number> {
+  // Notificações são por usuário (user_id), não têm tenant_id.
+  const base = supabaseAdmin.from(table).select('id', { count: 'exact', head: true });
+  const scoped = table === 'system_notifications' ? base : base.eq('tenant_id', tenantId);
+  const { count: total, error } = await apply(scoped);
   if (error) throw new Error(`${table}: ${error.message}`);
   return total ?? 0;
 }
@@ -69,13 +75,16 @@ export interface DashboardSummary {
   team: null | Array<{ id: string; name: string; role: string; avatar_url: string | null; last_seen_at: string | null }>;
 }
 
-export async function buildDashboardSummary(profile: UserProfile): Promise<DashboardSummary> {
+export async function buildDashboardSummary(profile: UserProfile, tenantId: string, modules: string[]): Promise<DashboardSummary> {
+  const count = (table: string, apply?: (query: CountQuery) => CountQuery) => countIn(tenantId, table, apply);
+  // Bloco só aparece se o módulo está no plano da empresa E o cargo permite.
+  const allowed = (module: string, permission: string) => modules.includes(module) && hasPermission(profile, permission);
   const now = Date.now();
   const iso = (offsetDays: number) => new Date(now + offsetDays * DAY).toISOString();
   const canManage = profile.role === 'ADMIN' || profile.role === 'MANAGER';
 
   const [social, agenda, queue, blasts, calls, projects, planning, notifications, team] = await Promise.all([
-    hasPermission(profile, 'social.view')
+    allowed('social', 'social.view')
       ? safe(async () => {
           const [scheduledNext7, pendingApproval, publishedLast30, failed, next] = await Promise.all([
             count('social_posts', (q) => q.eq('status', 'scheduled').lte('scheduled_at', iso(7))),
@@ -85,6 +94,7 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
             supabaseAdmin
               .from('social_posts')
               .select('caption, scheduled_at')
+              .eq('tenant_id', tenantId)
               .eq('status', 'scheduled')
               .gte('scheduled_at', iso(0))
               .order('scheduled_at')
@@ -101,7 +111,7 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
         })
       : null,
 
-    hasPermission(profile, 'integrations.view')
+    allowed('agendamento', 'integrations.view')
       ? safe(async () => {
           const today = todayKey();
           const [tasksToday, openTasks, messagesPending, messagesToday] = await Promise.all([
@@ -114,7 +124,7 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
         })
       : null,
 
-    hasPermission(profile, 'integrations.view')
+    allowed('senhas', 'integrations.view')
       ? safe(async () => {
           const [waiting, calling, completedToday] = await Promise.all([
             count('attendance_queue_tickets', (q) => q.eq('status', 'waiting')),
@@ -125,11 +135,12 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
         })
       : null,
 
-    hasPermission(profile, 'messages.send')
+    allowed('crm', 'messages.send')
       ? safe(async () => {
           const { data, error } = await supabaseAdmin
             .from('blast_campaigns')
             .select('status, sent_count, failed_count, created_at')
+            .eq('tenant_id', tenantId)
             .gte('created_at', iso(-30));
           if (error) throw new Error(error.message);
           const rows = data || [];
@@ -142,9 +153,9 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
         })
       : null,
 
-    hasPermission(profile, 'leads.view')
+    allowed('crm', 'leads.view')
       ? safe(async () => {
-          let query = supabaseAdmin.from('call_logs').select('duration, created_at').gte('created_at', iso(-7));
+          let query = supabaseAdmin.from('call_logs').select('duration, created_at').eq('tenant_id', tenantId).gte('created_at', iso(-7));
           // Vendedor vê as próprias ligações; gestores, as da equipe.
           if (!canManage) query = query.eq('user_id', profile.id);
           const { data, error } = await query;
@@ -162,9 +173,9 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
         })
       : null,
 
-    hasPermission(profile, 'admin.projects')
+    allowed('planejamentos', 'admin.projects')
       ? safe(async () => {
-          const { data, error } = await supabaseAdmin.from('action_plans').select('status');
+          const { data, error } = await supabaseAdmin.from('action_plans').select('status').eq('tenant_id', tenantId);
           if (error) throw new Error(error.message);
           const byStatus = new Map<string, number>();
           for (const row of data || []) byStatus.set(row.status || 'Sem status', (byStatus.get(row.status || 'Sem status') || 0) + 1);
@@ -175,7 +186,7 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
         })
       : null,
 
-    hasPermission(profile, 'planejamentos.view')
+    allowed('planejamentos', 'planejamentos.view')
       ? safe(async () => {
           const [boards, updatedLast7] = await Promise.all([
             count('planning_boards'),
@@ -192,7 +203,7 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
     // Equipe com "visto por último". select('*') porque last_seen_at/avatar_url podem
     // ainda não existir no banco (migration pendente) -- aí vêm como null.
     safe(async () => {
-      const { data, error } = await supabaseAdmin.from('profiles').select('*').eq('status', 'ACTIVE').order('name');
+      const { data, error } = await supabaseAdmin.from('profiles').select('*').eq('tenant_id', tenantId).eq('status', 'ACTIVE').order('name');
       if (error) throw new Error(error.message);
       return (data || []).map((row) => ({
         id: row.id as string,

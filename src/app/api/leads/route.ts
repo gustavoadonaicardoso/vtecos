@@ -10,12 +10,12 @@ import { requireActiveProfile } from '@/lib/session';
  */
 export async function GET() {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ module: 'crm' });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
-    const data = await fetchLeadsAndStages({ userId: auth.profile.id, role: auth.profile.role });
+    const data = await fetchLeadsAndStages(auth.tenantId, { userId: auth.profile.id, role: auth.profile.role });
     if (!data) return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
     return NextResponse.json({ data }, { status: 200 });
   } catch (error: unknown) {
@@ -25,13 +25,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ module: 'crm' });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
     const leadData = await request.json();
-    const result = await createLead(leadData);
+    const result = await createLead(auth.tenantId, leadData);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });

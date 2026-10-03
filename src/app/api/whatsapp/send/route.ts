@@ -49,8 +49,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { WhatsAppService, getWhatsAppConfig } from '@/lib/whatsapp';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createOutboundMessageRecord, markMessageFailed, markMessageResult } from '@/services/whatsapp-send.service';
+import { requireActiveProfile } from '@/lib/session';
 
 export async function POST(request: NextRequest) {
+  // Antes esta rota não exigia login: qualquer pessoa enviava WhatsApp pela
+  // conta oficial da empresa. Agora exige sessão e usa a conta DA empresa.
+  const auth = await requireActiveProfile({ module: 'crm' });
+  if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+
   let body: any;
   try {
     body = await request.json();
@@ -71,7 +77,7 @@ export async function POST(request: NextRequest) {
   let service: WhatsAppService;
 
   try {
-    const config = await getWhatsAppConfig(supabase);
+    const config = await getWhatsAppConfig(supabase, auth.tenantId);
     service = new WhatsAppService(config);
   } catch (err: any) {
     return NextResponse.json({
@@ -84,7 +90,7 @@ export async function POST(request: NextRequest) {
   let dbMessageId: string | null = null;
   if (leadId) {
     const messageText = text || (template ? `[Template: ${template}]` : '') || url || bodyText || '';
-    dbMessageId = await createOutboundMessageRecord({ leadId, text: messageText, type });
+    dbMessageId = await createOutboundMessageRecord(auth.tenantId, { leadId, text: messageText, type });
   }
 
   // 2. Envia via Meta Cloud API
@@ -138,14 +144,14 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     // Atualiza status para 'failed' se havia registro
     if (dbMessageId) {
-      await markMessageFailed(dbMessageId);
+      await markMessageFailed(auth.tenantId, dbMessageId);
     }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 
   // 3. Atualiza status no banco
   if (dbMessageId) {
-    await markMessageResult(dbMessageId, result.success, (result as any).messageId);
+    await markMessageResult(auth.tenantId, dbMessageId, result.success, (result as any).messageId);
   }
 
   if (!result.success) {

@@ -112,7 +112,12 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.id, user?.role]);
 
+  // Empresa sem o módulo de CRM no plano: nada de leads/pipeline.
+  const hasCrm = !user?.workspace || user.workspace.modules.includes('crm');
+
   useEffect(() => {
+    // Sem usuário ainda (sessão carregando) ou sem CRM no plano: não busca.
+    if (!user || !hasCrm) return;
     fetchDatabase();
     if (!supabase) return;
 
@@ -124,7 +129,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
       .subscribe();
 
     return () => { supabase?.removeChannel(channel); };
-  }, [fetchDatabase]);
+  }, [fetchDatabase, hasCrm, user]);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);

@@ -14,6 +14,7 @@ export async function POST(request: Request) {
 
     if (callSid && recordingUrl) {
       // Update the call log with the recording URL
+      // tenant-scope: ok (CallSid é único no Twilio e só o Twilio assina esta chamada)
       await supabase
         .from('call_logs')
         .update({

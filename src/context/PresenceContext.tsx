@@ -50,6 +50,8 @@ function sendHeartbeat(useBeacon = false) {
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id;
+  // Um canal de presença por empresa: ninguém vê quem está online em outra.
+  const tenantId = user?.workspace?.tenant_id || user?.tenant_id || 'sem-empresa';
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
   const [leftAt, setLeftAt] = useState<Record<string, string>>({});
   const [realtime, setRealtime] = useState(false);
@@ -77,7 +79,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('pagehide', onPageHide);
     document.addEventListener('visibilitychange', onVisible);
 
-    const channel = supabase?.channel('vortice-presence', { config: { presence: { key: userId } } });
+    const channel = supabase?.channel(`presence:${tenantId}`, { config: { presence: { key: userId } } });
 
     channel
       ?.on('presence', { event: 'sync' }, () => {
@@ -109,7 +111,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         supabase?.removeChannel(channel);
       }
     };
-  }, [userId]);
+  }, [userId, tenantId]);
 
   const lastSeen = useCallback(
     (id: string | null | undefined, lastSeenAt?: string | null) => {
