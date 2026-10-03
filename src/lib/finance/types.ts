@@ -1,0 +1,102 @@
+/** Custos & Precificação — tipos compartilhados (navegador e servidor). */
+
+export type FinUnit = 'kg' | 'g' | 'l' | 'ml' | 'un' | 'dz';
+export type IngredientCategory = 'ingrediente' | 'embalagem' | 'outro';
+
+export interface FinSettings {
+  tax_pct: number;
+  commission_pct: number;
+  target_margin_pct: number;
+  labor_hour_cost: number;
+  expected_monthly_revenue: number;
+}
+
+export interface FinIngredient {
+  id: string;
+  name: string;
+  category: IngredientCategory;
+  purchase_unit: FinUnit;
+  purchase_qty: number;
+  purchase_price: number;
+  supplier: string;
+  updated_at?: string;
+}
+
+export interface FinProductItem {
+  id?: string;
+  ingredient_id: string | null;
+  component_product_id: string | null;
+  quantity: number;
+  unit: FinUnit;
+}
+
+export interface FinProduct {
+  id: string;
+  name: string;
+  category: string;
+  /** product = vendido; base = preparo usado dentro de outras fichas (massa, recheio...). */
+  kind: 'product' | 'base';
+  yield_qty: number;
+  yield_unit: string;
+  prep_minutes: number;
+  loss_pct: number;
+  sale_price: number;
+  channel_prices: Record<string, number>;
+  target_margin_pct: number | null;
+  notes: string;
+  active: boolean;
+  items: FinProductItem[];
+}
+
+export interface FinChannel {
+  id: string;
+  name: string;
+  fee_pct: number;
+  fixed_fee: number;
+  extra_cost: number;
+  position: number;
+  active: boolean;
+}
+
+export interface FinFixedCost {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  recurrence: 'monthly' | 'once';
+  /** YYYY-MM-01 quando recurrence = once. */
+  month: string | null;
+  active: boolean;
+}
+
+export interface FinSale {
+  id: string;
+  sold_at: string;
+  product_id: string | null;
+  channel_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  discount: number;
+  unit_cost: number;
+  fee_amount: number;
+  tax_amount: number;
+  source: 'manual' | 'import';
+  created_at?: string;
+}
+
+export interface FinMonthRevenue {
+  month: string; // YYYY-MM
+  revenue: number;
+}
+
+export interface FinWorkspace {
+  tenant: { id: string; name: string };
+  settings: FinSettings;
+  ingredients: FinIngredient[];
+  products: FinProduct[];
+  channels: FinChannel[];
+  fixedCosts: FinFixedCost[];
+  revenueHistory: FinMonthRevenue[];
+  access: { canManage: boolean; canSell: boolean; isClient: boolean };
+}

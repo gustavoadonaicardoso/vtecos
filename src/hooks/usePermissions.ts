@@ -35,7 +35,8 @@ export function usePermissions() {
     return (user.permissions as any)?.[category]?.[field] === true;
   };
 
-  const isAdmin = user?.role === 'ADMIN';
+  // Admin de empresa cliente administra só a própria empresa, não o sistema.
+  const isAdmin = user?.role === 'ADMIN' && user?.account_type !== 'CLIENT';
 
   return { hasPermission, isAdmin, user };
 }

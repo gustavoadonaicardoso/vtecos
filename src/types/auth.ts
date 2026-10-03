@@ -9,6 +9,18 @@ export interface UserPermissions {
   automations?: { view?: boolean; manage?: boolean };
   integrations?: { view?: boolean; manage?: boolean };
   admin?: { settings?: boolean; projects?: boolean; banners?: boolean; root?: boolean };
+  financeiro?: { view?: boolean };
+}
+
+/** Empresa e plano de um login de cliente (account_type CLIENT). */
+export interface ClientWorkspace {
+  tenant_id: string;
+  tenant_name: string;
+  tenant_status: string;
+  plan_id: string | null;
+  plan_name: string | null;
+  /** Módulos do plano que o cliente pode abrir (já filtrados pelo catálogo). */
+  modules: string[];
 }
 
 export interface Tenant {
@@ -21,7 +33,10 @@ export interface Tenant {
 
 export interface UserProfile {
   id: string;
-  tenant_id: string;
+  tenant_id: string | null;
+  /** STAFF = equipe Vórtice; CLIENT = login de cliente, preso à própria empresa. */
+  account_type?: 'STAFF' | 'CLIENT';
+  workspace?: ClientWorkspace | null;
   is_super_admin?: boolean;
   name: string;
   email: string;

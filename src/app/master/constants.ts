@@ -19,6 +19,7 @@ import {
   Sparkles,
   Star,
   Share2,
+  Calculator,
   Users as UsersIcon,
   Workflow,
   Zap,
@@ -37,9 +38,9 @@ export const DEFAULT_SETTINGS: MasterSettings = {
 };
 
 export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
-  ADMIN: { dashboard: { view: true, kpis: true }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: true }, team: { view: true }, automations: { view: true }, integrations: { view: true }, admin: { projects: true, settings: true }, planejamentos: { view: true }, social: { view: true } },
-  MANAGER: { dashboard: { view: true, kpis: true }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: true }, team: { view: true }, automations: { view: false }, integrations: { view: true }, admin: { projects: true, settings: false }, planejamentos: { view: true }, social: { view: true } },
-  SELLER: { dashboard: { view: true, kpis: false }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: false }, team: { view: false }, automations: { view: false }, integrations: { view: false }, admin: { projects: false, settings: false }, planejamentos: { view: true }, social: { view: true } },
+  ADMIN: { dashboard: { view: true, kpis: true }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: true }, team: { view: true }, automations: { view: true }, integrations: { view: true }, admin: { projects: true, settings: true }, planejamentos: { view: true }, social: { view: true }, financeiro: { view: true } },
+  MANAGER: { dashboard: { view: true, kpis: true }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: true }, team: { view: true }, automations: { view: false }, integrations: { view: true }, admin: { projects: true, settings: false }, planejamentos: { view: true }, social: { view: true }, financeiro: { view: true } },
+  SELLER: { dashboard: { view: true, kpis: false }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: false }, team: { view: false }, automations: { view: false }, integrations: { view: false }, admin: { projects: false, settings: false }, planejamentos: { view: true }, social: { view: true }, financeiro: { view: false } },
 };
 
 export const SIDEBAR_PRESETS = [
@@ -133,6 +134,7 @@ export const MENU_PERMISSION_ITEMS = [
   { id: 'admin.projects', label: 'Projetos', icon: ClipboardList, cat: 'admin', field: 'projects' },
   { id: 'planejamentos.view', label: 'Planejamentos (Funis)', icon: Workflow, cat: 'planejamentos', field: 'view' },
   { id: 'social.view', label: 'Redes Sociais', icon: Share2, cat: 'social', field: 'view' },
+  { id: 'financeiro.view', label: 'Custos e Precificação', icon: Calculator, cat: 'financeiro', field: 'view' },
   { id: 'messages.view', label: 'Mensagens (WhatsApp)', icon: MessageSquare, cat: 'messages', field: 'view' },
   { id: 'messages.send', label: 'Chat Interno', icon: MessageCircle, cat: 'messages', field: 'send' },
   { id: 'pipeline.view', label: 'Pipeline/Kanban', icon: RotateCcw, cat: 'pipeline', field: 'view' },

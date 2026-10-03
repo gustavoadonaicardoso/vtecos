@@ -60,13 +60,15 @@ const Navbar = () => {
           <HelpCircle size={22} />
         </Link>
 
-        <button 
-          className={styles.actionButton} 
-          onClick={toggleDialer}
-          title="Abrir Discador"
-        >
-          <Phone size={20} />
-        </button>
+        {user?.account_type !== 'CLIENT' && (
+          <button
+            className={styles.actionButton}
+            onClick={toggleDialer}
+            title="Abrir Discador"
+          >
+            <Phone size={20} />
+          </button>
+        )}
 
         <button
           className={`${styles.actionButton} ${styles.notificationBtn}`}

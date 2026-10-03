@@ -24,7 +24,9 @@ export async function fetchProfiles(scope: 'chat' | 'team'): Promise<ServiceResu
     : 'id, name, email, role, status, permissions, allowed_templates, phone, avatar_url, created_at';
 
   const run = (columns: string) => {
-    let query = supabaseAdmin.from('profiles').select(columns).order('name');
+    // Logins de clientes (account_type CLIENT) são geridos no painel Master,
+    // por empresa -- não aparecem na equipe nem no chat interno.
+    let query = supabaseAdmin.from('profiles').select(columns).neq('account_type', 'CLIENT').order('name');
     if (scope === 'chat') query = query.eq('status', 'ACTIVE');
     return query;
   };
@@ -53,8 +55,10 @@ export async function createUserWithProfile(params: {
   password: string;
   role: string;
   permissions: Record<string, unknown>;
+  /** Login de cliente: preso à empresa informada. */
+  clientTenantId?: string;
 }): Promise<CreateUserResult> {
-  const { name, email, password, role, permissions } = params;
+  const { name, email, password, role, permissions, clientTenantId } = params;
 
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
@@ -89,6 +93,7 @@ export async function createUserWithProfile(params: {
         role,
         status: 'ACTIVE',
         permissions,
+        ...(clientTenantId ? { account_type: 'CLIENT', tenant_id: clientTenantId } : {}),
       }, { onConflict: 'id' })
       .select()
       .single();
@@ -109,17 +114,19 @@ export async function createUserWithProfile(params: {
 async function isLastActiveAdmin(userId: string): Promise<boolean> {
   const { data: target } = await supabaseAdmin
     .from('profiles')
-    .select('role, status')
+    .select('role, status, account_type')
     .eq('id', userId)
     .maybeSingle();
 
-  if (!target || target.role !== 'ADMIN' || target.status !== 'ACTIVE') return false;
+  // Admin de uma empresa cliente não conta como admin da Vórtice.
+  if (!target || target.role !== 'ADMIN' || target.status !== 'ACTIVE' || target.account_type === 'CLIENT') return false;
 
   const { count } = await supabaseAdmin
     .from('profiles')
     .select('id', { count: 'exact', head: true })
     .eq('role', 'ADMIN')
-    .eq('status', 'ACTIVE');
+    .eq('status', 'ACTIVE')
+    .neq('account_type', 'CLIENT');
 
   return (count ?? 0) <= 1;
 }
@@ -270,7 +277,8 @@ export async function notifyAdminsOfPasswordResetRequest(userProfile: { id: stri
     .from('profiles')
     .select('id')
     .eq('role', 'ADMIN')
-    .eq('status', 'ACTIVE');
+    .eq('status', 'ACTIVE')
+    .neq('account_type', 'CLIENT');
 
   if (adminsError || !admins || admins.length === 0) {
     console.warn('Nenhum administrador ativo encontrado no sistema para receber a demanda.');

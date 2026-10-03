@@ -41,6 +41,7 @@ export default function PowerDialerPage() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, name, status, role')
+        .neq('account_type', 'CLIENT')
         .order('name');
       
       if (data) {

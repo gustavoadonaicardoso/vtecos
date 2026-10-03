@@ -61,7 +61,7 @@ export default function LeadsPage() {
   React.useEffect(() => {
     const fetchProfiles = async () => {
       if (!supabase) return;
-      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').order('name');
+      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').neq('account_type', 'CLIENT').order('name');
       if (data) setProfiles(data);
     };
     fetchProfiles();

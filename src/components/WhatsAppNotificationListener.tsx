@@ -19,7 +19,7 @@ export default function WhatsAppNotificationListener() {
   leadsRef.current = leads;
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.account_type === 'CLIENT') return;
 
     const channel = supabase
       .channel('whatsapp_new_message_alert')

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedProfile } from '@/lib/session';
+import { withWorkspace } from '@/services/workspace.service';
 
 /**
  * Antes: aceitava ?id=<qualquer-uuid> e devolvia o perfil completo sem
@@ -14,7 +15,7 @@ export async function GET() {
     if (!profile) {
       return NextResponse.json({ error: 'Sessão inválida ou expirada.' }, { status: 401 });
     }
-    return NextResponse.json({ data: profile }, { status: 200 });
+    return NextResponse.json({ data: await withWorkspace(profile) }, { status: 200 });
   } catch {
     return NextResponse.json({ error: 'Failed to refresh user' }, { status: 500 });
   }

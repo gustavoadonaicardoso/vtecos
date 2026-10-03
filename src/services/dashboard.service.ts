@@ -192,7 +192,7 @@ export async function buildDashboardSummary(profile: UserProfile): Promise<Dashb
     // Equipe com "visto por último". select('*') porque last_seen_at/avatar_url podem
     // ainda não existir no banco (migration pendente) -- aí vêm como null.
     safe(async () => {
-      const { data, error } = await supabaseAdmin.from('profiles').select('*').eq('status', 'ACTIVE').order('name');
+      const { data, error } = await supabaseAdmin.from('profiles').select('*').eq('status', 'ACTIVE').neq('account_type', 'CLIENT').order('name');
       if (error) throw new Error(error.message);
       return (data || []).map((row) => ({
         id: row.id as string,

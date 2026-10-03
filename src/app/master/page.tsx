@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
 import { AnimatePresence } from 'framer-motion';
 import { DEFAULT_ROLE_PERMISSIONS, DEFAULT_SETTINGS } from './constants';
-import type { BannerItem, MasterSettings, Role, RolePermissions, TabId, Tenant } from './types';
+import type { BannerItem, MasterSettings, Role, RolePermissions, TabId } from './types';
 import MasterHeader from './components/MasterHeader';
 import ModulesTab from './components/ModulesTab';
 import PermissionsTab from './components/PermissionsTab';
@@ -20,8 +20,6 @@ export default function MasterPage() {
   const [settings, setSettings] = useState<MasterSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('modules');
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [newTenantName, setNewTenantName] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role>('SELLER');
   const [loading, setLoading] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -173,7 +171,8 @@ export default function MasterPage() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('role, permissions');
+        .select('role, permissions')
+        .neq('account_type', 'CLIENT');
 
       if (data && !error) {
         const perms: any = { ...rolePermissions };
@@ -188,39 +187,6 @@ export default function MasterPage() {
 
     fetchPermissions();
   }, []);
-
-  // Fetch Tenants
-  useEffect(() => {
-    if (activeTab === 'tenants') {
-      const fetchTenants = async () => {
-        const res = await fetch('/api/tenants');
-        const json = await res.json();
-        if (json.data) setTenants(json.data);
-      };
-      fetchTenants();
-    }
-  }, [activeTab]);
-
-  const handleCreateTenant = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTenantName.trim()) return;
-    setLoading(true);
-
-    const res = await fetch('/api/tenants', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newTenantName.trim() }),
-    });
-    const json = await res.json();
-
-    if (!res.ok || json.error) {
-      alert(`Erro ao criar empresa:\n${json.error}`);
-    } else if (json.data) {
-      setTenants(prev => [json.data, ...prev]);
-      setNewTenantName('');
-    }
-    setLoading(false);
-  };
 
   // Notificações não lidas -- a leitura passa pela API autenticada
   // (/api/notifications), então atualiza por polling.
@@ -317,7 +283,8 @@ export default function MasterPage() {
     const { error } = await supabase
       .from('profiles')
       .update({ permissions: rolePermissions[selectedRole] })
-      .eq('role', selectedRole);
+      .eq('role', selectedRole)
+      .neq('account_type', 'CLIENT');
 
     if (error) {
       alert("Erro ao aplicar permissões: " + error.message);
@@ -371,14 +338,7 @@ export default function MasterPage() {
             onRemoveBanner={removeBanner}
           />
         ) : activeTab === 'tenants' ? (
-          <TenantsTab
-            key="tenants"
-            tenants={tenants}
-            newTenantName={newTenantName}
-            onNewTenantNameChange={setNewTenantName}
-            onCreateTenant={handleCreateTenant}
-            loading={loading}
-          />
+          <TenantsTab key="tenants" />
         ) : (
           <BrandingTab
             key="branding"

@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
       .from('profiles')
       .select('id, name, role')
       .eq('status', 'ACTIVE')
+      .neq('account_type', 'CLIENT')
       .order('name');
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

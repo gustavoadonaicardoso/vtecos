@@ -259,7 +259,7 @@ export default function MetasPage() {
     let cancelled = false;
     const fetchUsers = async () => {
       if (supabase) {
-        const { data } = await supabase.from('profiles').select('id,name,email,role').order('name');
+        const { data } = await supabase.from('profiles').select('id,name,email,role').neq('account_type', 'CLIENT').order('name');
         if (!cancelled && data?.length) {
           setUsers(data.map(profile => ({ id: profile.id, name: profile.name, email: profile.email, role: profile.role })));
           return;

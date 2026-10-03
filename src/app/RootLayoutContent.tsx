@@ -16,6 +16,8 @@ import BrowserNotificationListener from "@/components/BrowserNotificationListene
 import WhatsAppNotificationListener from "@/components/WhatsAppNotificationListener";
 // FIX #7: hook centralizado de permissões — sem duplicação
 import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
+import { clientRoutes, isClientRouteAllowed } from "@/lib/plans";
+import { useEffect } from "react";
 
 function AppGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -36,9 +38,19 @@ function AppGuard({ children }: { children: React.ReactNode }) {
   // precisa de prefixo em vez de igualdade exata como as demais.
   const isFullPage = fullPageRoutes.includes(pathname) || pathname.startsWith('/planejamentos/');
 
+  // Login de cliente: só os módulos do plano da empresa (+ ajuda e notificações).
+  const isClient = user?.account_type === 'CLIENT';
+  const clientModules = user?.workspace?.modules ?? [];
+  const clientHome = clientRoutes(clientModules)[0] || '/help';
+
+  useEffect(() => {
+    if (isClient && pathname === '/') router.replace(clientHome);
+  }, [isClient, pathname, clientHome, router]);
+
   // Verifica acesso à rota atual
   const checkRouteAccess = () => {
     if (isPublicPage || !user) return true;
+    if (isClient) return pathname === '/' || isClientRouteAllowed(pathname, clientModules);
     if (pathname === '/') return true;
 
     const requiredPermission = ROUTE_PERMISSIONS[pathname];

@@ -19,7 +19,8 @@ export function useUnreadCount() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (!user) {
+    // Chat interno é da equipe Vórtice; login de cliente não participa.
+    if (!user || user.account_type === 'CLIENT') {
       setUnreadCount(0);
       return;
     }

@@ -6,7 +6,7 @@ import { requireActiveProfile } from '@/lib/session';
 
 export async function PATCH(request: Request) {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ allowClient: true });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }

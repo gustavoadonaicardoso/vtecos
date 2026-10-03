@@ -49,7 +49,8 @@ function sendHeartbeat(useBeacon = false) {
 
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const userId = user?.id;
+  // Presença é da equipe Vórtice; logins de cliente ficam fora do canal.
+  const userId = user?.account_type === 'CLIENT' ? undefined : user?.id;
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
   const [leftAt, setLeftAt] = useState<Record<string, string>>({});
   const [realtime, setRealtime] = useState(false);

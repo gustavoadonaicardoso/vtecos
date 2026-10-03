@@ -11,7 +11,7 @@ import { requireActiveProfile } from '@/lib/session';
  * passa por aqui, sempre restrito à sessão autenticada.
  */
 export async function GET(request: Request) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ allowClient: true });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ allowClient: true });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -75,7 +75,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE() {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ allowClient: true });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

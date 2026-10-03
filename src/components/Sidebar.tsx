@@ -27,7 +27,8 @@ import {
   Phone,
   Bell,
   Workflow,
-  Share2
+  Share2,
+  Calculator
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import { useSidebar } from '@/components/SidebarProvider';
@@ -36,6 +37,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { usePermissions } from '@/lib/permissions';
 // Hook centralizado de não lidos — não duplicamos lógica de Realtime aqui
 import { useUnreadCount } from '@/hooks/useUnreadCount';
+import { isClientRouteAllowed } from '@/lib/plans';
 
 
 const Sidebar = () => {
@@ -57,6 +59,7 @@ const Sidebar = () => {
     { name: 'Projetos', icon: Briefcase, path: '/projetos', permission: 'admin.projects' },
     { name: 'Planejamentos', icon: Workflow, path: '/planejamentos', permission: 'planejamentos.view' },
     { name: 'Redes Sociais', icon: Share2, path: '/social', permission: 'social.view' },
+    { name: 'Custos e Precificação', icon: Calculator, path: '/financeiro', permission: 'financeiro.view' },
     { name: 'Metas', icon: Target, path: '/metas', permission: 'dashboard.view' },
     { name: 'Mensagens', icon: MessageSquare, path: '/messages', permission: 'messages.view' },
     { name: 'Chat Interno', icon: MessageCircle, path: '/chat', permission: 'messages.send' },
@@ -78,6 +81,16 @@ const Sidebar = () => {
   ], []);
 
   // FIX #7: hasPermission vem do hook centralizado usePermissions()
+  // Login de cliente vê só o que o plano da empresa libera.
+  const isClient = user?.account_type === 'CLIENT';
+  const clientModules = user?.workspace?.modules;
+  const visibleItems = React.useMemo(
+    () => navItems.filter((item) =>
+      isClient ? isClientRouteAllowed(item.path, clientModules || []) : hasPermission(item.permission)
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [navItems, isClient, clientModules, user]
+  );
 
   const handleLinkClick = () => {
     if (window.innerWidth <= 768) {
@@ -120,7 +133,7 @@ const Sidebar = () => {
         </div>
 
         <nav className={styles.nav}>
-          {mounted && navItems.filter(item => hasPermission(item.permission)).map((item) => (
+          {mounted && visibleItems.map((item) => (
             <Link 
               key={item.path} 
               href={item.path}

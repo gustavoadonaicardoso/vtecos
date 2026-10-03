@@ -361,7 +361,8 @@ export async function notifyApprovers(title: string, content: string, link: stri
     .from('profiles')
     .select('id')
     .in('role', ['ADMIN', 'MANAGER'])
-    .eq('status', 'ACTIVE');
+    .eq('status', 'ACTIVE')
+    .neq('account_type', 'CLIENT');
 
   if (error || !approvers) {
     console.error('[social] falha ao listar aprovadores:', error?.message);

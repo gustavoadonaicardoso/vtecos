@@ -112,7 +112,12 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.id, user?.role]);
 
+  // Login de cliente não usa o CRM da Vórtice: nada de leads/pipeline no navegador dele.
+  const isClient = user?.account_type === 'CLIENT';
+
   useEffect(() => {
+    // Sem usuário ainda (sessão carregando) ou login de cliente: não busca o CRM.
+    if (!user || isClient) return;
     fetchDatabase();
     if (!supabase) return;
 
@@ -124,7 +129,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
       .subscribe();
 
     return () => { supabase?.removeChannel(channel); };
-  }, [fetchDatabase]);
+  }, [fetchDatabase, isClient, user]);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);

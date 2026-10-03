@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { fetchTenants, createTenant } from '@/services/tenants.service';
+import { fetchTenants, createTenant, parseTenantInput } from '@/services/tenants.service';
 import { requireAdminProfile } from '@/lib/session';
 
 // GET: Lista todos os tenants (só admin -- painel Master)
@@ -22,12 +22,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
-    const { name } = await request.json();
-    if (!name?.trim()) {
-      return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 });
-    }
+    const parsed = parseTenantInput(await request.json(), false);
+    if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-    const result = await createTenant(name);
+    const result = await createTenant(parsed.data);
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (err: unknown) {

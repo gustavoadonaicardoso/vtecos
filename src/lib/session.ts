@@ -89,8 +89,14 @@ export async function getAuthenticatedProfile(): Promise<UserProfile | null> {
 
 /**
  * Helper para rotas que exigem qualquer usuário ativo logado.
+ *
+ * Logins de cliente (account_type CLIENT) são barrados por padrão: as
+ * rotas da equipe trabalham com dados da Vórtice que não são separados
+ * por empresa. Só as rotas preparadas para isso (módulos por empresa,
+ * notificações e o próprio perfil) passam `{ allowClient: true }` e
+ * filtram pelo tenant_id da sessão.
  */
-export async function requireActiveProfile(): Promise<
+export async function requireActiveProfile(options: { allowClient?: boolean } = {}): Promise<
   { profile: UserProfile } | { error: { message: string; status: number } }
 > {
   const profile = await getAuthenticatedProfile();
@@ -100,6 +106,9 @@ export async function requireActiveProfile(): Promise<
   }
   if (profile.status !== 'ACTIVE') {
     return { error: { message: 'Conta desativada. Contate o administrador.', status: 403 } };
+  }
+  if (profile.account_type === 'CLIENT' && !options.allowClient) {
+    return { error: { message: 'Este recurso não está disponível para a sua conta.', status: 403 } };
   }
 
   return { profile };
