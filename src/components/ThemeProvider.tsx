@@ -23,6 +23,32 @@ const DEFAULT_CONFIG: BrandingConfig = {
   sidebar_bg: ''
 };
 
+/**
+ * A cor principal do Painel Master vira o --accent do sistema (botões,
+ * links, abas). Com a cor padrão, os temas claro/escuro mantêm os tons
+ * próprios definidos em globals.css.
+ */
+function applyBrandColors(primary?: string | null, secondary?: string | null) {
+  const root = document.documentElement.style;
+  const custom = /^#[0-9a-f]{6}$/i.test(primary || '') && primary!.toLowerCase() !== DEFAULT_CONFIG.primary_color;
+
+  if (custom) {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(primary!.slice(i, i + 2), 16));
+    root.setProperty('--accent', primary!);
+    root.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.25)`);
+    root.setProperty('--glass-border-focus', `rgba(${r}, ${g}, ${b}, 0.4)`);
+    root.setProperty('--brand-primary', primary!);
+    root.setProperty('--primary', primary!);
+  } else {
+    ['--accent', '--accent-glow', '--glass-border-focus', '--brand-primary', '--primary'].forEach((name) => root.removeProperty(name));
+  }
+
+  if (secondary) {
+    root.setProperty('--secondary', secondary);
+    root.setProperty('--brand-accent', secondary);
+  }
+}
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -35,9 +61,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const { data } = await supabase.from('system_config').select('*').eq('id', 'branding').single();
     if (data) {
       setConfig(data);
-      // Apply CSS variables
-      document.documentElement.style.setProperty('--primary', data.primary_color);
-      document.documentElement.style.setProperty('--secondary', data.secondary_color);
+      applyBrandColors(data.primary_color, data.secondary_color);
       if (data.sidebar_bg) {
         document.documentElement.style.setProperty('--sidebar-bg', data.sidebar_bg);
       } else {

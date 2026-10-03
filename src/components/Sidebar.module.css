@@ -168,10 +168,10 @@
 
 
 .navItemActive {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
   font-weight: 600;
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   box-shadow: 0 0 20px rgba(59, 130, 246, 0.08), var(--glass-inset);
   backdrop-filter: var(--glass-blur-light);
   -webkit-backdrop-filter: var(--glass-blur-light);
@@ -349,3 +349,28 @@
   border-radius: inherit;
   display: block;
 }
+
+/* Fundo personalizado (Painel Master): texto e bordas acompanham o fundo. */
+.toneDark {
+  --foreground: #f1f5f9;
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-hover: rgba(255, 255, 255, 0.18);
+}
+
+.toneLight {
+  --foreground: #1a1a1a;
+  --glass-bg: rgba(15, 23, 42, 0.03);
+  --glass-bg-hover: rgba(15, 23, 42, 0.05);
+  --glass-border: rgba(15, 23, 42, 0.1);
+  --glass-border-hover: rgba(15, 23, 42, 0.18);
+}
+
+.sidebar.toneDark .logoLight,
+.sidebar.toneLight .logoDark { display: none; }
+
+.sidebar.toneDark .logoDark,
+.sidebar.toneLight .logoLight { display: block; }
+
+.toneDark .navItemActive { color: #fff; background: color-mix(in srgb, var(--accent) 45%, transparent); }

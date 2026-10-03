@@ -2,15 +2,11 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar, X, Send, CheckCircle2, Megaphone, Sparkles } from 'lucide-react';
+import { Calendar, X, Send, CheckCircle2 } from 'lucide-react';
 import type { PlatformBanner, UserProfile } from '@/types';
 import styles from './BannerCarousel.module.css';
+import { BANNER_ICON_MAP } from './bannerIcons';
 
-// Map de ícones preset (ícones são serializáveis via string)
-const PRESET_ICONS: Record<string, React.ComponentType<{ size?: number; color?: string }>> = {
-  sparkles: Sparkles,
-  megaphone: Megaphone,
-};
 
 interface BannerCarouselProps {
   banners: PlatformBanner[];
@@ -41,7 +37,7 @@ function BannerModal({
     setTimeout(onClose, 2000);
   };
 
-  const IconComp = banner.iconName ? PRESET_ICONS[banner.iconName] : null;
+  const IconComp = banner.iconName ? BANNER_ICON_MAP[banner.iconName] : null;
 
   return (
     <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal="true">
@@ -110,7 +106,7 @@ export default function BannerCarousel({ banners, user }: BannerCarouselProps) {
       <section className={styles.section} aria-label="Banners e comunicados">
         <div className={styles.scroll}>
           {filtered.map((banner, idx) => {
-            const IconComp = banner.iconName ? PRESET_ICONS[banner.iconName] : null;
+            const IconComp = banner.iconName ? BANNER_ICON_MAP[banner.iconName] : null;
 
             return (
               <motion.div

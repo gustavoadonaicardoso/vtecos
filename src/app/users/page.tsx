@@ -34,6 +34,7 @@ export default function UsersPage() {
 
   const { config, refreshConfig } = useTheme();
   const { user } = useAuth();
+  const isPlatformAdmin = user?.role === 'ADMIN' && Boolean(user?.workspace?.is_platform);
 
   // Branding states
   const [primaryColor, setPrimaryColor] = useState(config.primary_color);
@@ -347,6 +348,8 @@ export default function UsersPage() {
     if (!error) {
        await refreshConfig();
        alert("Identidade Visual atualizada com sucesso!");
+    } else {
+       alert(`Não foi possível salvar a identidade visual: ${error.message}`);
     }
     setLoading(false);
   };
@@ -414,12 +417,15 @@ export default function UsersPage() {
                 >
                   Emitir Atualização
                 </button>
-                <button
-                  className={`${styles.tabBtn} ${activeTab === 'personalization' ? styles.tabActive : ''}`}
-                  onClick={() => setActiveTab('personalization')}
-                >
-                  Personalização
-                </button>
+                {/* Identidade visual é da plataforma inteira: só o admin da Vórtice altera. */}
+                {isPlatformAdmin && (
+                  <button
+                    className={`${styles.tabBtn} ${activeTab === 'personalization' ? styles.tabActive : ''}`}
+                    onClick={() => setActiveTab('personalization')}
+                  >
+                    Personalização
+                  </button>
+                )}
               </div>
 
               <div className={styles.editorScroller}>
@@ -456,7 +462,7 @@ export default function UsersPage() {
                     onSubmit={handleCreateUpdate}
                     onDeleteUpdate={handleDeleteUpdate}
                   />
-                ) : (
+                ) : isPlatformAdmin ? (
                   <UserPersonalizationTab
                     primaryColor={primaryColor}
                     secondaryColor={secondaryColor}
@@ -472,7 +478,7 @@ export default function UsersPage() {
                     onFileSelect={handleFileSelect}
                     onSaveBranding={saveBrandingConfig}
                   />
-                )}
+                ) : null}
               </div>
             </div>
           )}

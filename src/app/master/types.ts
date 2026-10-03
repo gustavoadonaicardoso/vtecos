@@ -2,8 +2,6 @@ export interface MasterSettings {
   siteName: string;
   primaryColor: string;
   accentColor: string;
-  bgColor: string;
-  logoText: string;
   logoUrl: string;
   faviconUrl: string;
   sidebarBg: string;

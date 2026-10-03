@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/session';
 import { fetchTenantUser, updateTenantUser } from '@/services/tenants.service';
-import { deleteTeamMember } from '@/services/users.service';
+import { adminResetPassword, deleteTeamMember } from '@/services/users.service';
+import { logAudit } from '@/lib/audit';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 type Params = { params: Promise<{ id: string; userId: string }> };
 
-// PATCH: muda perfil (ADMIN/MANAGER/SELLER) ou status de um login de cliente.
+// PATCH: muda perfil (ADMIN/MANAGER/SELLER), status ou senha de um login de cliente.
 export async function PATCH(request: Request, { params }: Params) {
   try {
     const auth = await requirePlatformAdmin();
@@ -17,6 +19,26 @@ export async function PATCH(request: Request, { params }: Params) {
     }
 
     const body = await request.json();
+
+    // Senha nova: a rota /api/users/[id]/password só alcança a equipe da
+    // própria empresa (Vórtice); aqui o Master redefine a de um cliente.
+    if ('password' in body) {
+      const password = typeof body.password === 'string' ? body.password : '';
+      if (password.length < 8) return NextResponse.json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' }, { status: 400 });
+      const result = await adminResetPassword(id, userId, password);
+      if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
+      await logAudit(
+        { id: auth.profile.id, name: auth.profile.name },
+        'SETTINGS_UPDATE',
+        `Painel Master: redefiniu a senha do usuário ${userId} da empresa ${id}.`,
+        'profile',
+        userId,
+        supabaseAdmin,
+        auth.tenantId
+      );
+      return NextResponse.json({ success: true });
+    }
+
     const updates: { role?: string; status?: string } = {};
     if (['ADMIN', 'MANAGER', 'SELLER'].includes(body.role)) updates.role = body.role;
     if (['ACTIVE', 'INACTIVE'].includes(body.status)) updates.status = body.status;

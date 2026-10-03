@@ -98,6 +98,8 @@ const Sidebar = () => {
   const sidebarStyle = config.sidebar_bg
     ? { background: config.sidebar_bg }
     : undefined;
+  const tone = sidebarTone(config.sidebar_bg);
+  const toneClass = tone === 'dark' ? styles.toneDark : tone === 'light' ? styles.toneLight : '';
 
   return (
     <>
@@ -105,7 +107,7 @@ const Sidebar = () => {
         className={`${styles.backdrop} ${isMobileOpen ? styles.backdropVisible : ''}`} 
         onClick={closeMobileMenu}
       />
-      <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''} ${isMobileOpen ? styles.mobileOpen : ''}`} style={sidebarStyle}>
+      <aside className={`${styles.sidebar} ${toneClass} ${isCollapsed ? styles.collapsed : ''} ${isMobileOpen ? styles.mobileOpen : ''}`} style={sidebarStyle}>
         <div className={styles.logoArea}>
           {!isCollapsed && (
             <div className={styles.logoContainer}>
@@ -210,5 +212,19 @@ const Sidebar = () => {
 };
 
 
+
+/**
+ * Fundo do menu escolhido no Painel Master: claro ou escuro? O texto do
+ * menu segue o fundo (e não o tema), senão some em "Azul Escuro" no tema claro.
+ */
+function sidebarTone(background?: string | null): 'dark' | 'light' | null {
+  const colors = background?.match(/#[0-9a-f]{6}\b/gi);
+  if (!colors) return null;
+  const brightness = colors.reduce((sum, hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    return sum + 0.299 * r + 0.587 * g + 0.114 * b;
+  }, 0) / colors.length;
+  return brightness < 140 ? 'dark' : 'light';
+}
 
 export default Sidebar;

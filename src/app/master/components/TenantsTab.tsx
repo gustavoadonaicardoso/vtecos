@@ -26,6 +26,7 @@ interface Tenant {
   plan_id: string | null;
   document?: string | null;
   contact_email?: string | null;
+  notes?: string | null;
   created_at: string;
   user_count?: number;
 }
@@ -71,6 +72,7 @@ export default function TenantsTab() {
   const [newTenant, setNewTenant] = useState(EMPTY_TENANT);
   const [creating, setCreating] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [tenantForm, setTenantForm] = useState<{ id: string; name: string; document: string; contact_email: string; notes: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,14 +149,23 @@ export default function TenantsTab() {
     }
   };
 
-  const patchTenant = async (tenant: Tenant, changes: Partial<Tenant>) => {
+  const patchTenant = async (tenant: Pick<Tenant, 'id'>, changes: Partial<Tenant>) => {
     try {
       const updated = await request<Tenant>(`/api/tenants/${tenant.id}`, { method: 'PATCH', body: JSON.stringify(changes) });
       setTenants((list) => list.map((item) => (item.id === tenant.id ? { ...item, ...updated } : item)));
       if ('plan_id' in changes) load();
+      return true;
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao atualizar empresa.');
+      return false;
     }
+  };
+
+  const saveTenantData = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!tenantForm) return;
+    const { id, ...changes } = tenantForm;
+    if (await patchTenant({ id }, changes)) setTenantForm(null);
   };
 
   const toggleModule = (key: string) => {
@@ -273,10 +284,30 @@ export default function TenantsTab() {
                     {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </label>
-                <button className={styles.secondary} onClick={() => setExpanded(expanded === tenant.id ? null : tenant.id)}>
-                  <KeyRound size={15} /> Acessos {expanded === tenant.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                </button>
+                <div className={styles.rowActions}>
+                  <button
+                    className={styles.icon}
+                    title="Editar dados da empresa"
+                    onClick={() => setTenantForm({
+                      id: tenant.id,
+                      name: tenant.name,
+                      document: tenant.document || '',
+                      contact_email: tenant.contact_email || '',
+                      notes: tenant.notes || '',
+                    })}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button className={styles.secondary} onClick={() => setExpanded(expanded === tenant.id ? null : tenant.id)}>
+                    <KeyRound size={15} /> Acessos {expanded === tenant.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+                </div>
               </div>
+              {(tenant.document || tenant.contact_email) && (
+                <p className={styles.muted} style={{ margin: 0 }}>
+                  {[tenant.document && `CNPJ/CPF ${tenant.document}`, tenant.contact_email].filter(Boolean).join(' · ')}
+                </p>
+              )}
               {!tenant.plan_id && !tenant.is_platform && <p className={styles.warn}>Sem plano: os usuários desta empresa só veem Início, Equipe e Ajuda.</p>}
               {tenant.plan_id && planName.get(tenant.plan_id) === undefined && <p className={styles.warn}>Plano não encontrado.</p>}
               {expanded === tenant.id && <TenantUsers tenant={tenant} onChanged={load} />}
@@ -285,6 +316,39 @@ export default function TenantsTab() {
           {!loading && tenants.length === 0 && <p className={styles.muted}>Nenhuma empresa cadastrada.</p>}
         </div>
       </section>
+
+      {tenantForm && (
+        <div className={styles.overlay} onClick={() => setTenantForm(null)}>
+          <form className={styles.modal} onClick={(event) => event.stopPropagation()} onSubmit={saveTenantData}>
+            <div className={styles.modalHead}>
+              <h3>Dados da empresa</h3>
+              <button type="button" className={styles.icon} onClick={() => setTenantForm(null)} aria-label="Fechar"><X size={16} /></button>
+            </div>
+            <label className={styles.field}>
+              <span>Nome</span>
+              <input className={styles.input} value={tenantForm.name} maxLength={120} onChange={(event) => setTenantForm({ ...tenantForm, name: event.target.value })} required autoFocus />
+            </label>
+            <div className={styles.formGrid}>
+              <label className={styles.field}>
+                <span>E-mail de contato</span>
+                <input className={styles.input} type="email" value={tenantForm.contact_email} onChange={(event) => setTenantForm({ ...tenantForm, contact_email: event.target.value })} placeholder="financeiro@empresa.com" />
+              </label>
+              <label className={styles.field}>
+                <span>CNPJ / CPF</span>
+                <input className={styles.input} value={tenantForm.document} maxLength={20} onChange={(event) => setTenantForm({ ...tenantForm, document: event.target.value })} placeholder="00.000.000/0001-00" />
+              </label>
+            </div>
+            <label className={styles.field}>
+              <span>Observações internas</span>
+              <textarea className={styles.input} rows={3} maxLength={500} value={tenantForm.notes} onChange={(event) => setTenantForm({ ...tenantForm, notes: event.target.value })} placeholder="Ex.: vencimento todo dia 10, contato com a Ana" />
+            </label>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.secondary} onClick={() => setTenantForm(null)}>Cancelar</button>
+              <button type="submit" className={styles.primary}>Salvar dados</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {planForm && (
         <div className={styles.overlay} onClick={() => setPlanForm(null)}>
@@ -377,7 +441,7 @@ function TenantUsers({ tenant, onChanged }: { tenant: Tenant; onChanged: () => v
     const newPassword = prompt(`Nova senha para ${user.name} (mínimo 8 caracteres):`);
     if (!newPassword) return;
     try {
-      await request(`/api/users/${user.id}/password`, { method: 'PATCH', body: JSON.stringify({ newPassword }) });
+      await request(`${base}/${user.id}`, { method: 'PATCH', body: JSON.stringify({ password: newPassword }) });
       alert('Senha redefinida.');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao redefinir senha.');

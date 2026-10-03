@@ -1,4 +1,4 @@
-import { CheckCircle2, Plus, RotateCcw, Save, ShieldCheck } from 'lucide-react';
+import { Building2, CheckCircle2, Layout, LayoutGrid, Loader2, Palette, Plus, RotateCcw, Save, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import styles from '../master.module.css';
 import type { TabId } from '../types';
 
@@ -6,74 +6,83 @@ interface MasterHeaderProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
   saved: boolean;
+  saving: boolean;
   bannerSaved: boolean;
   onSave: () => void;
   onReset: () => void;
   onAddBanner: () => void;
 }
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'modules', label: 'Módulo de Comando' },
-  { id: 'branding', label: 'Identidade Visual' },
-  { id: 'permissions', label: 'Gestão de Menu' },
-  { id: 'tenants', label: 'Empresas e Planos' },
-  { id: 'banners', label: 'Banners' },
+const TABS: { id: TabId; label: string; icon: typeof Layout }[] = [
+  { id: 'modules', label: 'Módulo de Comando', icon: LayoutGrid },
+  { id: 'tenants', label: 'Empresas e Planos', icon: Building2 },
+  { id: 'branding', label: 'Identidade Visual', icon: Palette },
+  { id: 'permissions', label: 'Menu por Função', icon: SlidersHorizontal },
+  { id: 'banners', label: 'Banners', icon: Layout },
 ];
 
-export default function MasterHeader({ activeTab, onTabChange, saved, bannerSaved, onSave, onReset, onAddBanner }: MasterHeaderProps) {
+export default function MasterHeader({ activeTab, onTabChange, saved, saving, bannerSaved, onSave, onReset, onAddBanner }: MasterHeaderProps) {
+  const savable = activeTab === 'branding' || activeTab === 'permissions';
+
   return (
     <header className={styles.header}>
-      <div className={styles.headerLeft}>
-        <div className={styles.headerIcon}>
-          <ShieldCheck size={28} />
+      <div className={styles.headerTop}>
+        <div className={styles.headerLeft}>
+          <div className={styles.headerIcon}>
+            <ShieldCheck size={26} />
+          </div>
+          <div>
+            <h1>Painel Master</h1>
+            <p>Empresas, planos e a identidade do sistema em um só lugar.</p>
+          </div>
         </div>
-        <div>
-          <h1>Painel Master</h1>
-          <p>Controle total sobre a infraestrutura e identidade do sistema.</p>
-        </div>
-      </div>
 
-      <div className={styles.tabNav}>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            className={`${styles.tabBtn} ${activeTab === tab.id ? styles.tabActive : ''}`}
-            onClick={() => onTabChange(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className={styles.headerActions}>
-        {(activeTab === 'branding' || activeTab === 'permissions') && (
+        {savable && (
           <div className={styles.actionButtons}>
             {activeTab === 'branding' && (
-              <button className={styles.resetBtn} onClick={onReset}>
-                <RotateCcw size={16} /> Padrões
+              <button className={styles.resetBtn} onClick={onReset} disabled={saving}>
+                <RotateCcw size={16} /> Restaurar padrão
               </button>
             )}
             <button
               className={`${styles.saveBtn} ${saved ? styles.saveBtnSuccess : ''}`}
               onClick={onSave}
+              disabled={saving}
             >
-              {saved ? <><CheckCircle2 size={16} /> Salvo!</> : <><Save size={16} /> {activeTab === 'permissions' ? 'Salvar e Aplicar' : 'Salvar'}</>}
+              {saving ? <Loader2 size={16} className={styles.spin} />
+                : saved ? <CheckCircle2 size={16} />
+                : <Save size={16} />}
+              {saved ? 'Salvo!' : activeTab === 'permissions' ? 'Aplicar à equipe' : 'Salvar'}
             </button>
           </div>
         )}
         {activeTab === 'banners' && (
           <div className={styles.actionButtons}>
             {bannerSaved && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10b981', fontWeight: 700, fontSize: '0.9rem' }}>
+              <span className={styles.savedTag}>
                 <CheckCircle2 size={16} /> Salvo!
               </span>
             )}
             <button className={styles.saveBtn} onClick={onAddBanner}>
-              <Plus size={16} /> Novo Banner
+              <Plus size={16} /> Novo banner
             </button>
           </div>
         )}
       </div>
+
+      <nav className={styles.tabNav} aria-label="Seções do Painel Master">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            className={`${styles.tabBtn} ${activeTab === id ? styles.tabActive : ''}`}
+            onClick={() => onTabChange(id)}
+            aria-current={activeTab === id ? 'page' : undefined}
+          >
+            <Icon size={16} />
+            {label}
+          </button>
+        ))}
+      </nav>
     </header>
   );
 }
