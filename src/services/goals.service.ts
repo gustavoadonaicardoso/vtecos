@@ -27,21 +27,11 @@ function mapRow(row: any): GoalPlan {
   };
 }
 
-export async function fetchRequesterProfile(requesterId: string): Promise<GoalRequester | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, role, status')
-    .eq('id', requesterId)
-    .maybeSingle();
-
-  if (error || !data || data.status !== 'ACTIVE') return null;
-  return data;
-}
-
-export async function fetchVisibleGoals(requester: GoalRequester): Promise<ServiceResult<GoalPlan[]>> {
+export async function fetchVisibleGoals(tenantId: string, requester: GoalRequester): Promise<ServiceResult<GoalPlan[]>> {
   const { data, error } = await supabase
     .from('goals')
     .select('*')
+    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
 
   if (error) return { success: false, error: error.message };
@@ -54,10 +44,11 @@ export async function fetchVisibleGoals(requester: GoalRequester): Promise<Servi
   return { success: true, data: goals };
 }
 
-export async function createGoal(goal: GoalPlan): Promise<ServiceResult<GoalPlan>> {
+export async function createGoal(tenantId: string, goal: GoalPlan): Promise<ServiceResult<GoalPlan>> {
   const { data, error } = await supabase
     .from('goals')
     .insert({
+      tenant_id: tenantId,
       id: goal.id,
       title: goal.title,
       description: goal.description,
@@ -78,7 +69,7 @@ export async function createGoal(goal: GoalPlan): Promise<ServiceResult<GoalPlan
   return { success: true, data: mapRow(data) };
 }
 
-export async function updateGoal(id: string, updates: Partial<GoalPlan>): Promise<ServiceResult<GoalPlan>> {
+export async function updateGoal(tenantId: string, id: string, updates: Partial<GoalPlan>): Promise<ServiceResult<GoalPlan>> {
   const patch: Record<string, any> = { updated_at: new Date().toISOString() };
   if (updates.title !== undefined) patch.title = updates.title;
   if (updates.description !== undefined) patch.description = updates.description;
@@ -94,6 +85,7 @@ export async function updateGoal(id: string, updates: Partial<GoalPlan>): Promis
   const { data, error } = await supabase
     .from('goals')
     .update(patch)
+    .eq('tenant_id', tenantId)
     .eq('id', id)
     .select()
     .single();
@@ -102,14 +94,14 @@ export async function updateGoal(id: string, updates: Partial<GoalPlan>): Promis
   return { success: true, data: mapRow(data) };
 }
 
-export async function deleteGoal(id: string): Promise<ServiceResult<null>> {
-  const { error } = await supabase.from('goals').delete().eq('id', id);
+export async function deleteGoal(tenantId: string, id: string): Promise<ServiceResult<null>> {
+  const { error } = await supabase.from('goals').delete().eq('tenant_id', tenantId).eq('id', id);
   if (error) return { success: false, error: error.message };
   return { success: true, data: null };
 }
 
-export async function fetchGoalOwner(id: string): Promise<string | null> {
-  const { data, error } = await supabase.from('goals').select('owner_id').eq('id', id).maybeSingle();
+export async function fetchGoalOwner(tenantId: string, id: string): Promise<string | null> {
+  const { data, error } = await supabase.from('goals').select('owner_id').eq('tenant_id', tenantId).eq('id', id).maybeSingle();
   if (error || !data) return null;
   return data.owner_id;
 }

@@ -35,8 +35,10 @@ export function usePermissions() {
     return (user.permissions as any)?.[category]?.[field] === true;
   };
 
-  // Admin de empresa cliente administra só a própria empresa, não o sistema.
-  const isAdmin = user?.role === 'ADMIN' && user?.account_type !== 'CLIENT';
+  // Admin da própria empresa (equipe, integrações, configurações).
+  const isAdmin = user?.role === 'ADMIN';
+  // Admin da empresa dona da plataforma: Painel Master (empresas, planos).
+  const isPlatformAdmin = isAdmin && Boolean(user?.workspace?.is_platform);
 
-  return { hasPermission, isAdmin, user };
+  return { hasPermission, isAdmin, isPlatformAdmin, user };
 }

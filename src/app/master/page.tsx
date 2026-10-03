@@ -171,8 +171,7 @@ export default function MasterPage() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('role, permissions')
-        .neq('account_type', 'CLIENT');
+        .select('role, permissions');
 
       if (data && !error) {
         const perms: any = { ...rolePermissions };
@@ -274,20 +273,17 @@ export default function MasterPage() {
   };
 
   const applyToAll = async () => {
-    if (!supabase) {
-      alert("Configuração do Supabase não encontrada.");
-      return;
-    }
-
     setLoading(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ permissions: rolePermissions[selectedRole] })
-      .eq('role', selectedRole)
-      .neq('account_type', 'CLIENT');
+    // Pelo servidor: só os usuários da própria empresa recebem as permissões.
+    const response = await fetch('/api/users/role-permissions', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: selectedRole, permissions: rolePermissions[selectedRole] }),
+    });
+    const result = await response.json().catch(() => ({}));
 
-    if (error) {
-      alert("Erro ao aplicar permissões: " + error.message);
+    if (!response.ok) {
+      alert("Erro ao aplicar permissões: " + (result.error || 'falha desconhecida'));
     } else {
       alert(`As permissões para ${selectedRole} foram salvas e aplicadas a todos os usuários deste nível com sucesso.`);
     }

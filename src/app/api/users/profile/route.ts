@@ -6,7 +6,7 @@ import { requireActiveProfile } from '@/lib/session';
 
 export async function PATCH(request: Request) {
   try {
-    const auth = await requireActiveProfile({ allowClient: true });
+    const auth = await requireActiveProfile();
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
@@ -20,7 +20,7 @@ export async function PATCH(request: Request) {
     // Sempre a partir da sessão verificada -- nunca de um id enviado pelo
     // cliente, senão qualquer um poderia editar o perfil de outra pessoa
     // chamando esta rota com um x-user-id forjado.
-    const result = await updateOwnProfile(auth.profile.id, { name, phone, avatar_url });
+    const result = await updateOwnProfile(auth.tenantId, auth.profile.id, { name, phone, avatar_url });
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
@@ -29,12 +29,13 @@ export async function PATCH(request: Request) {
     const updatedProfile = result.data!;
 
     await logAudit(
-      { id: updatedProfile.id, name: updatedProfile.name },
+      { id: auth.profile.id, name: String(updatedProfile.name) },
       'SETTINGS_UPDATE',
       `Informações de perfil atualizadas (Nome/Telefone/Foto).`,
       'profile',
-      updatedProfile.id,
-      supabaseAdmin
+      auth.profile.id,
+      supabaseAdmin,
+      auth.tenantId
     );
 
     return NextResponse.json({ success: true, data: updatedProfile }, { status: 200 });

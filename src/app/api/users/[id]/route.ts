@@ -46,7 +46,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const permissions = body.permissions && typeof body.permissions === 'object' ? body.permissions : {};
     const allowed_templates = Array.isArray(body.allowed_templates) ? body.allowed_templates : [];
 
-    const result = await updateTeamMember(id, { name, email, role, status, permissions, allowed_templates });
+    const result = await updateTeamMember(auth.tenantId, id, { name, email, role, status, permissions, allowed_templates });
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -57,7 +57,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       `Atualizou os dados do membro ${name} (${email}).`,
       'profile',
       id,
-      supabaseAdmin
+      supabaseAdmin,
+      auth.tenantId
     );
 
     return NextResponse.json({ data: result.data }, { status: 200 });
@@ -86,7 +87,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Você não pode remover sua própria conta.' }, { status: 400 });
     }
 
-    const result = await deleteTeamMember(id);
+    const result = await deleteTeamMember(auth.tenantId, id);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -97,7 +98,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       `Removeu o membro ${id} da equipe.`,
       'profile',
       id,
-      supabaseAdmin
+      supabaseAdmin,
+      auth.tenantId
     );
 
     return NextResponse.json({ success: true }, { status: 200 });

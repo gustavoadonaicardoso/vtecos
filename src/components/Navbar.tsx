@@ -60,7 +60,7 @@ const Navbar = () => {
           <HelpCircle size={22} />
         </Link>
 
-        {user?.account_type !== 'CLIENT' && (
+        {(!user?.workspace || user.workspace.modules.includes('crm')) && (
           <button
             className={styles.actionButton}
             onClick={toggleDialer}

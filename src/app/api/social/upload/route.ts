@@ -12,7 +12,7 @@ const MAX_INPUT_BYTES = 15 * 1024 * 1024;
 const MAX_WIDTH = 1440;
 
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'social' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     canvas.composite(source, 0, 0);
     const jpeg = await canvas.getBuffer(JimpMime.jpeg, { quality: 90 });
 
-    const storagePath = `${auth.profile.id}/${Date.now()}-${randomUUID()}.jpg`;
+    const storagePath = `${auth.tenantId}/${auth.profile.id}/${Date.now()}-${randomUUID()}.jpg`;
     const { error: uploadError } = await supabaseAdmin.storage
       .from('social-media')
       .upload(storagePath, jpeg, { contentType: 'image/jpeg', upsert: false });

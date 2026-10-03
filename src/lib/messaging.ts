@@ -95,31 +95,32 @@ export async function sendWhatsApp(
  * route_type configured. If so, assign the lead to the specified user or move to
  * the specified pipeline stage so the right person/team sees the conversation.
  *
- * Only the most recent active/completed campaign for this phone is used.
- * Routing is idempotent — re-applying to an already-routed lead is harmless.
+ * Só campanhas DA MESMA EMPRESA do lead são consideradas.
  */
 export async function applyBlastRouting(
-    supabase: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    db: any,
     cleanPhone: string,
     searchSuffix: string,
-    leadId: string
+    leadId: string,
+    tenantId: string
 ) {
     try {
-        // Find the blast_contact record for this phone across campaigns with routing set
-        const { data: contacts } = await supabase
+        const { data: contacts } = await db
             .from('blast_contacts')
             .select('campaign_id')
+            .eq('tenant_id', tenantId)
             .or(`phone.eq.${cleanPhone},phone.ilike.%${searchSuffix}`)
             .order('created_at', { ascending: false })
             .limit(5);
 
         if (!contacts?.length) return;
 
-        // Find the first campaign that has a non-null route_type
-        const campaignIds = contacts.map((c: any) => c.campaign_id);
-        const { data: campaigns } = await supabase
+        const campaignIds = contacts.map((c: { campaign_id: string }) => c.campaign_id);
+        const { data: campaigns } = await db
             .from('blast_campaigns')
             .select('id, route_type, route_to_id')
+            .eq('tenant_id', tenantId)
             .in('id', campaignIds)
             .neq('route_type', 'none')
             .not('route_to_id', 'is', null)
@@ -130,16 +131,16 @@ export async function applyBlastRouting(
         if (!campaign) return;
 
         if (campaign.route_type === 'user') {
-            // Assign lead to the specified user
-            await supabase
+            await db
                 .from('leads')
                 .update({ assigned_to: campaign.route_to_id })
+                .eq('tenant_id', tenantId)
                 .eq('id', leadId);
         } else if (campaign.route_type === 'stage') {
-            // Move lead to the specified pipeline stage
-            await supabase
+            await db
                 .from('leads')
                 .update({ stage_id: campaign.route_to_id })
+                .eq('tenant_id', tenantId)
                 .eq('id', leadId);
         }
     } catch (err) {
@@ -152,55 +153,48 @@ export async function applyBlastRouting(
  * mensagem, aplica roteamento de campanha). Usado pelo listener do WhatsApp
  * Web (src/lib/whatsapp-web.ts) sempre que chega uma mensagem nova.
  *
- * Quando chamado a partir de uma rota de servidor sem sessão de usuário
- * (ex.: um listener de webhook), passe o client administrativo em
- * `dbClient` para não ser bloqueado pelo RLS.
+ * Roda no servidor com o client administrativo, então TUDO filtra pela
+ * empresa dona do número que recebeu a mensagem (tenantId).
  */
-export async function processInboundWhatsAppMessage(payload: any, dbClient: any = supabase) {
-    if (!dbClient) return { success: false, error: 'Supabase não inicializado' };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function processInboundWhatsAppMessage(payload: any, db: any, tenantId: string) {
+    if (!db || !tenantId) return { success: false, error: 'Empresa não identificada.' };
 
     try {
-        let rawPhone = payload.phone || '';
-        let cleanPhone = rawPhone.replace(/\D/g, '');
+        const rawPhone = payload.phone || '';
+        const cleanPhone = rawPhone.replace(/\D/g, '');
 
-        // O provedor envia o telefone com DDI. Buscamos de forma robusta
-        // pelos últimos dígitos para não depender do formato exato salvo no lead.
-        const searchSuffix = cleanPhone.slice(-8); // Get last 8 digits
+        // Busca pelos últimos dígitos para não depender do formato salvo no lead.
+        const searchSuffix = cleanPhone.slice(-8);
 
         const isReceivedMessage = payload.isGroup === false;
         const media = payload.media as { url: string; kind: 'image' | 'audio' | 'document' } | undefined;
 
-        if (isReceivedMessage && (payload.text?.message || payload.audio?.audioUrl || media)) {
+        if (isReceivedMessage && (payload.text?.message || payload.audio?.audioUrl || media) && searchSuffix.length >= 8) {
             const senderName = payload.senderName || 'Cliente WhatsApp';
             const messageText = payload.text?.message || '';
-            // audio.audioUrl mantido por compatibilidade; media é o formato
-            // novo, usado pra imagem/áudio/documento/figurinha recebidos.
             const mediaUrl = media?.url || payload.audio?.audioUrl || null;
             const messageType = media?.kind || (mediaUrl ? 'audio' : 'text');
 
-            // 1. Find existing lead by normalized phone
-            // PostgreSQL trick to compare only digits
-            const { data: lead } = await dbClient
-                .rpc('find_lead_by_phone', { search_phone: cleanPhone }) // Recommended SQL function approach
-                .maybeSingle();
-
-            // Fallback if RPC not defined
-            let targetLead: any = lead;
-            if (!targetLead) {
-                const { data: leads } = await dbClient.from('leads').select('id, name, phone');
-                targetLead = leads?.find((l: any) => l.phone.replace(/\D/g, '').endsWith(searchSuffix));
-            }
+            // 1. Lead desta empresa com o mesmo telefone
+            const { data: candidates } = await db
+                .from('leads')
+                .select('id, name, phone')
+                .eq('tenant_id', tenantId)
+                .ilike('phone', `%${searchSuffix}`)
+                .limit(20);
+            const targetLead = (candidates || []).find((l: { phone?: string }) =>
+                (l.phone || '').replace(/\D/g, '').endsWith(searchSuffix));
 
             let leadId = targetLead?.id;
-            let isNewLead = false;
 
             if (!leadId) {
-                // 2. Create new lead — check if phone belongs to an active blast campaign
-                // to determine the initial stage for routing
-                const { data: stages } = await dbClient.from('pipeline_stages').select('id').order('position').limit(1);
+                // 2. Lead novo, na primeira etapa do funil DESTA empresa
+                const { data: stages } = await db.from('pipeline_stages').select('id').eq('tenant_id', tenantId).order('position').limit(1);
                 const firstStageId = stages && stages.length > 0 ? stages[0].id : null;
 
-                const { data: newLead } = await dbClient.from('leads').insert([{
+                const { data: newLead } = await db.from('leads').insert([{
+                    tenant_id: tenantId,
                     name: senderName,
                     phone: cleanPhone,
                     stage_id: firstStageId
@@ -208,14 +202,14 @@ export async function processInboundWhatsAppMessage(payload: any, dbClient: any 
 
                 if (newLead) {
                     leadId = newLead.id;
-                    isNewLead = true;
-                    await logAudit(null, 'LEAD_CREATE', `Lead ${senderName} criado via WhatsApp.`, 'lead', newLead.id, dbClient);
+                    await logAudit(null, 'LEAD_CREATE', `Lead ${senderName} criado via WhatsApp.`, 'lead', newLead.id, db, tenantId);
                 }
             }
 
             if (leadId) {
-                // 3. Save Message to Database
-                await dbClient.from('chat_messages').insert([{
+                // 3. Mensagem
+                await db.from('chat_messages').insert([{
+                    tenant_id: tenantId,
                     lead_id: leadId.toString(),
                     text: messageText,
                     audio_url: mediaUrl,
@@ -223,25 +217,24 @@ export async function processInboundWhatsAppMessage(payload: any, dbClient: any 
                     type: messageType
                 }]);
 
-                // 4. Update lead lastMsg
+                // 4. Última mensagem do lead
                 const lastMsgPreview = messageText
                     || (messageType === 'audio' ? '🎵 Áudio'
                         : messageType === 'image' ? '📷 Imagem'
                         : messageType === 'document' ? '📎 Arquivo'
                         : 'Nova mensagem');
-                await dbClient.from('leads').update({
+                await db.from('leads').update({
                     last_msg: lastMsgPreview
-                }).eq('id', leadId);
+                }).eq('tenant_id', tenantId).eq('id', leadId);
 
-                // 5. Apply blast routing: check if this phone was part of a blast campaign
-                //    with route_type configured. Only apply if lead wasn't already routed.
-                await applyBlastRouting(dbClient, cleanPhone, searchSuffix, leadId);
+                // 5. Roteamento de campanha (disparos) da mesma empresa
+                await applyBlastRouting(db, cleanPhone, searchSuffix, leadId, tenantId);
             }
         }
 
         return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Inbound WhatsApp message processing error:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: error instanceof Error ? error.message : 'Erro.' };
     }
 }

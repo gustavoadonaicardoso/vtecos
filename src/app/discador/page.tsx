@@ -41,13 +41,13 @@ export default function PowerDialerPage() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, name, status, role')
-        .neq('account_type', 'CLIENT')
+        
         .order('name');
       
       if (data) {
         // Map database status to UI status
         const mappedAgents = data.map(agent => ({
-          id: agent.name, // Using name as ID for Twilio Client identity
+          id: `u_${String(agent.id).replace(/-/g, '')}`, // identidade no Twilio Client = id do perfil
           name: agent.name,
           status: agent.status === 'ACTIVE' ? 'available' : 'offline',
           role: agent.role
@@ -66,7 +66,7 @@ export default function PowerDialerPage() {
         if (userExists) {
           return prev.map(a => a.name === user.name ? { ...a, status: 'available', name: `${user.name} (Você)` } : a);
         }
-        return [...prev, { id: user.name, name: `${user.name} (Você)`, status: 'available' }];
+        return [...prev, { id: `u_${user.id.replace(/-/g, '')}`, name: `${user.name} (Você)`, status: 'available' }];
       });
     }
   }, [user]);

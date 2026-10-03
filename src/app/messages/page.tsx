@@ -75,7 +75,7 @@ function MessagesContent() {
   // Carrega templates do banco filtrados pela permissão do usuário
   useEffect(() => {
     if (!user) return;
-    fetch(`/api/messages/templates?userId=${user.id}`)
+    fetch('/api/messages/templates')
       .then(r => r.json())
       .then(d => { if (d.templates) setQuickTemplates(d.templates); })
       .catch(() => {});

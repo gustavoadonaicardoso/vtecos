@@ -8,7 +8,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  const result = await updateDisplayMedia(id, {
+  const result = await updateDisplayMedia(auth.tenantId, id, {
     title: typeof body?.title === 'string' ? body.title : undefined,
     durationSeconds: body?.durationSeconds !== undefined ? Number(body.durationSeconds) : undefined,
     active: typeof body?.active === 'boolean' ? body.active : undefined,
@@ -22,7 +22,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;
-  const result = await deleteDisplayMedia(id);
+  const result = await deleteDisplayMedia(auth.tenantId, id);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true });
 }

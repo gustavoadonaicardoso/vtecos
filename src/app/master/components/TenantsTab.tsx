@@ -22,6 +22,7 @@ interface Tenant {
   id: string;
   name: string;
   status: string;
+  is_platform?: boolean;
   plan_id: string | null;
   document?: string | null;
   contact_email?: string | null;
@@ -40,14 +41,15 @@ interface ClientUser {
 const ROLE_LABEL: Record<ClientUser['role'], string> = {
   ADMIN: 'Dono / Administrador',
   MANAGER: 'Gerente',
-  SELLER: 'Operador (só registra vendas)',
+  SELLER: 'Vendedor / Atendente',
 };
 
 const STATUS_LABEL: Record<string, string> = { ACTIVE: 'Ativa', INACTIVE: 'Inativa', SUSPENDED: 'Suspensa' };
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const EMPTY_PLAN = { name: '', description: '', price: '', modules: ['financeiro'] as string[], active: true };
+const EMPTY_PLAN = { name: '', description: '', price: '', modules: ['crm'] as string[], active: true };
+const EMPTY_TENANT = { name: '', plan_id: '', adminName: '', adminEmail: '', adminPassword: '' };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -66,7 +68,8 @@ export default function TenantsTab() {
   const [error, setError] = useState('');
 
   const [planForm, setPlanForm] = useState<typeof EMPTY_PLAN & { id?: string } | null>(null);
-  const [newTenant, setNewTenant] = useState({ name: '', plan_id: '' });
+  const [newTenant, setNewTenant] = useState(EMPTY_TENANT);
+  const [creating, setCreating] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -120,17 +123,27 @@ export default function TenantsTab() {
   const createTenant = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!newTenant.name.trim()) return;
+    setCreating(true);
     try {
-      const created = await request<Tenant>('/api/tenants', {
+      const response = await fetch('/api/tenants', {
         method: 'POST',
-        body: JSON.stringify({ name: newTenant.name, plan_id: newTenant.plan_id || null }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newTenant.name,
+          plan_id: newTenant.plan_id || null,
+          admin: newTenant.adminEmail ? { name: newTenant.adminName, email: newTenant.adminEmail, password: newTenant.adminPassword } : null,
+        }),
       });
-      setTenants((list) => [created, ...list]);
-      setNewTenant({ name: '', plan_id: '' });
-      setExpanded(created.id);
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json.error || 'Erro ao criar empresa.');
+      if (json.warning) alert(json.warning);
+      setNewTenant(EMPTY_TENANT);
+      setExpanded(json.data.id);
       load();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao criar empresa.');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -160,7 +173,7 @@ export default function TenantsTab() {
         <div className={styles.cardHead}>
           <div>
             <h2><Layers size={18} /> Planos de assinatura</h2>
-            <p>Cada empresa cliente fica em um plano. Os módulos marcados como <strong>login do cliente</strong> aparecem para o próprio cliente; os demais são serviços operados pela equipe Vórtice.</p>
+            <p>O plano define quais módulos aparecem para a empresa. Cada empresa trabalha só com os próprios dados: leads, conversas, WhatsApp, equipe e configurações.</p>
           </div>
           <button className={styles.primary} onClick={() => setPlanForm({ ...EMPTY_PLAN })}><Plus size={16} /> Novo plano</button>
         </div>
@@ -188,7 +201,7 @@ export default function TenantsTab() {
                   {plan.modules.map((key) => {
                     const item = moduleByKey(key);
                     return item ? (
-                      <span key={key} className={`${styles.chip} ${item.clientLogin ? styles.chipClient : ''}`}>{item.label}</span>
+                      <span key={key} className={`${styles.chip} ${styles.chipClient}`}>{item.label}</span>
                     ) : null;
                   })}
                   {plan.modules.length === 0 && <span className={styles.muted}>Sem módulos</span>}
@@ -207,23 +220,31 @@ export default function TenantsTab() {
         <div className={styles.cardHead}>
           <div>
             <h2><Building2 size={18} /> Empresas clientes</h2>
-            <p>Crie a empresa, escolha o plano e cadastre o login do cliente em “Acessos”. Cada empresa só enxerga os próprios dados.</p>
+            <p>Crie a empresa já com o administrador dela: ele entra no sistema e cadastra a própria equipe em “Equipe”. Cada empresa enxerga só os próprios dados.</p>
           </div>
         </div>
 
-        <form onSubmit={createTenant} className={styles.inlineForm}>
-          <input
-            className={styles.input}
-            value={newTenant.name}
-            onChange={(event) => setNewTenant((form) => ({ ...form, name: event.target.value }))}
-            placeholder="Nome da empresa (ex.: Doces da Ana)"
-            required
-          />
-          <select className={styles.input} value={newTenant.plan_id} onChange={(event) => setNewTenant((form) => ({ ...form, plan_id: event.target.value }))}>
-            <option value="">Sem plano</option>
-            {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
-          </select>
-          <button type="submit" className={styles.primary}><Plus size={16} /> Criar empresa</button>
+        <form onSubmit={createTenant} className={styles.createForm}>
+          <div className={styles.inlineForm}>
+            <input
+              className={styles.input}
+              value={newTenant.name}
+              onChange={(event) => setNewTenant((form) => ({ ...form, name: event.target.value }))}
+              placeholder="Nome da empresa (ex.: Doces da Ana)"
+              required
+            />
+            <select className={styles.input} value={newTenant.plan_id} onChange={(event) => setNewTenant((form) => ({ ...form, plan_id: event.target.value }))}>
+              <option value="">Sem plano</option>
+              {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+            </select>
+          </div>
+          <div className={styles.adminRow}>
+            <span className={styles.muted}>Administrador da empresa (opcional, dá pra criar depois em “Acessos”)</span>
+            <input className={styles.input} placeholder="Nome" value={newTenant.adminName} onChange={(event) => setNewTenant((form) => ({ ...form, adminName: event.target.value }))} />
+            <input className={styles.input} type="email" placeholder="E-mail de login" value={newTenant.adminEmail} onChange={(event) => setNewTenant((form) => ({ ...form, adminEmail: event.target.value }))} />
+            <input className={styles.input} type="text" placeholder="Senha inicial (8+)" value={newTenant.adminPassword} onChange={(event) => setNewTenant((form) => ({ ...form, adminPassword: event.target.value }))} />
+            <button type="submit" className={styles.primary} disabled={creating}><Plus size={16} /> {creating ? 'Criando…' : 'Criar empresa'}</button>
+          </div>
         </form>
 
         <div className={styles.tenantList}>
@@ -231,13 +252,13 @@ export default function TenantsTab() {
             <div key={tenant.id} className={styles.tenant}>
               <div className={styles.tenantRow}>
                 <div className={styles.tenantName}>
-                  <strong>{tenant.name}</strong>
+                  <strong>{tenant.name} {tenant.is_platform && <span className={`${styles.chip} ${styles.chipClient}`}>plataforma</span>}</strong>
                   <span className={styles.muted}>{tenant.user_count || 0} acesso(s) · desde {new Date(tenant.created_at).toLocaleDateString('pt-BR')}</span>
                 </div>
                 <label className={styles.inlineField}>
                   <span>Plano</span>
-                  <select className={styles.input} value={tenant.plan_id || ''} onChange={(event) => patchTenant(tenant, { plan_id: event.target.value || null })}>
-                    <option value="">Sem plano</option>
+                  <select className={styles.input} value={tenant.is_platform ? '' : tenant.plan_id || ''} disabled={tenant.is_platform} onChange={(event) => patchTenant(tenant, { plan_id: event.target.value || null })}>
+                    <option value="">{tenant.is_platform ? 'Todos os módulos' : 'Sem plano'}</option>
                     {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
                   </select>
                 </label>
@@ -246,6 +267,7 @@ export default function TenantsTab() {
                   <select
                     className={`${styles.input} ${tenant.status === 'ACTIVE' ? styles.ok : styles.bad}`}
                     value={tenant.status}
+                    disabled={tenant.is_platform}
                     onChange={(event) => patchTenant(tenant, { status: event.target.value })}
                   >
                     {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -255,7 +277,7 @@ export default function TenantsTab() {
                   <KeyRound size={15} /> Acessos {expanded === tenant.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                 </button>
               </div>
-              {!tenant.plan_id && <p className={styles.warn}>Sem plano: o login desta empresa não abre nenhum módulo.</p>}
+              {!tenant.plan_id && !tenant.is_platform && <p className={styles.warn}>Sem plano: os usuários desta empresa só veem Início, Equipe e Ajuda.</p>}
               {tenant.plan_id && planName.get(tenant.plan_id) === undefined && <p className={styles.warn}>Plano não encontrado.</p>}
               {expanded === tenant.id && <TenantUsers tenant={tenant} onChanged={load} />}
             </div>
@@ -296,9 +318,6 @@ export default function TenantsTab() {
                       <span>
                         <strong>{item.label}</strong>
                         <small>{item.description}</small>
-                        <em className={item.clientLogin ? styles.tagClient : styles.tagStaff}>
-                          {item.clientLogin ? 'Login do cliente' : 'Operado pela equipe Vórtice'}
-                        </em>
                       </span>
                     </button>
                   );

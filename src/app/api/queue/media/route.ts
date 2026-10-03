@@ -7,7 +7,7 @@ export async function GET() {
   const auth = await requireQueueDisplayManager();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
-  const [media, config] = await Promise.all([listDisplayMedia(false), getDisplayConfig()]);
+  const [media, config] = await Promise.all([listDisplayMedia(auth.tenantId, false), getDisplayConfig(auth.tenantId)]);
   if (!media.success) return NextResponse.json({ error: media.error }, { status: 400 });
   return NextResponse.json({ success: true, data: { media: media.data, config } });
 }
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const type = body?.type === 'video' ? 'video' : body?.type === 'image' ? 'image' : null;
   if (!type || typeof body?.path !== 'string') return NextResponse.json({ error: 'Mídia inválida.' }, { status: 400 });
 
-  const result = await createDisplayMedia({
+  const result = await createDisplayMedia(auth.tenantId, {
     path: body.path,
     type,
     title: typeof body.title === 'string' ? body.title : '',

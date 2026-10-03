@@ -32,7 +32,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { WhatsAppService } from '@/lib/whatsapp';
-import { getService, processWebhookEntries } from '@/services/meta-webhook.service';
+import { phoneNumberIdsOf, processWebhookEntries, resolveMetaTenant } from '@/services/meta-webhook.service';
+import { isKnownVerifyToken } from '@/lib/whatsapp';
 import type { WhatsAppWebhookPayload } from '@/types';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
@@ -55,20 +56,18 @@ export async function GET(request: NextRequest) {
   const token     = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  // Responde somente quando modo = subscribe e token correto
-  if (mode === 'subscribe' && token) {
+  // Responde somente quando modo = subscribe e o token é de alguma empresa configurada
+  if (mode === 'subscribe' && token && challenge) {
     try {
-      const service = await getService(supabaseAdmin);
-      if (service.verifyWebhookToken(token) && challenge) {
+      if (await isKnownVerifyToken(supabaseAdmin, token)) {
         console.log('[Webhook Meta] ✅ Verificação do webhook aprovada.');
-        // Retorna o challenge como plain text (obrigatório)
         return new NextResponse(challenge, {
           status: 200,
           headers: { 'Content-Type': 'text/plain' },
         });
       }
-    } catch (err: any) {
-      console.error('[Webhook Meta] Erro ao verificar token:', err.message);
+    } catch (err: unknown) {
+      console.error('[Webhook Meta] Erro ao verificar token:', err instanceof Error ? err.message : err);
     }
   }
 
@@ -84,26 +83,6 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
   const signature = request.headers.get('x-hub-signature-256') ?? '';
 
-  let service: WhatsAppService | null = null;
-
-  // 2. Valida assinatura HMAC-SHA256 (segurança)
-  try {
-    service = await getService(supabaseAdmin);
-    if (!service.validateWebhookSignature(rawBody, signature)) {
-      console.warn('[Webhook Meta] ❌ Assinatura HMAC inválida. Requisição rejeitada.');
-      return NextResponse.json({ error: 'Assinatura inválida.' }, { status: 401 });
-    }
-  } catch (err: any) {
-    // Se as env vars não estiverem configuradas, loga mas não bloqueia
-    // em ambiente de desenvolvimento/testes
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[Webhook Meta] Erro na validação HMAC ou de configuração:', err.message);
-      return NextResponse.json({ error: 'Configuração incompleta.' }, { status: 500 });
-    }
-    console.warn('[Webhook Meta] ⚠️ Validação HMAC ignorada (modo desenvolvimento):', err.message);
-  }
-
-  // 3. Parse do payload
   let payload: WhatsAppWebhookPayload;
   try {
     payload = JSON.parse(rawBody);
@@ -111,25 +90,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
   }
 
-  // 4. Verifica que é um evento do WhatsApp Business
   if (payload.object !== 'whatsapp_business_account') {
     return NextResponse.json({ error: 'Objeto não reconhecido.' }, { status: 400 });
   }
 
-  // 5. Processa cada entry de forma assíncrona (não bloqueia a resposta)
-  // A Meta espera resposta HTTP 200 em até 20 segundos.
-  // Disparamos o processamento e retornamos 200 imediatamente.
-  const finalService = service || new WhatsAppService({
-    accessToken: '',
-    phoneNumberId: '',
-    businessAccountId: '',
-    webhookVerifyToken: 'vortice_verify_token_2024',
-    appSecret: ''
-  });
+  // 2. Para cada número que recebeu eventos: acha a empresa dona, valida a
+  //    assinatura com a chave DELA e processa só os eventos desse número.
+  //    Número sem empresa dona = evento ignorado (nunca cai em outra empresa).
+  for (const phoneNumberId of phoneNumberIdsOf(payload)) {
+    const owner = await resolveMetaTenant(supabaseAdmin, phoneNumberId);
+    if (!owner) {
+      console.warn('[Webhook Meta] Número sem empresa configurada, evento ignorado:', phoneNumberId);
+      continue;
+    }
 
-  processWebhookEntries(payload, finalService).catch(err =>
-    console.error('[Webhook Meta] Erro no processamento:', err)
-  );
+    const service = new WhatsAppService(owner.config);
+    if (!service.validateWebhookSignature(rawBody, signature)) {
+      console.warn('[Webhook Meta] ❌ Assinatura HMAC inválida para o número', phoneNumberId);
+      return NextResponse.json({ error: 'Assinatura inválida.' }, { status: 401 });
+    }
+
+    // A Meta espera 200 em até 20s: processa em segundo plano.
+    processWebhookEntries(payload, service, owner.tenantId, phoneNumberId).catch(err =>
+      console.error('[Webhook Meta] Erro no processamento:', err)
+    );
+  }
 
   return NextResponse.json({ success: true }, { status: 200 });
 }

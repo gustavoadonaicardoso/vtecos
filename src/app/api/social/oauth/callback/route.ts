@@ -17,7 +17,7 @@ function backToAccounts(request: Request, params: Record<string, string>) {
 }
 
 export async function GET(request: Request) {
-  const auth = await requireAdminProfile();
+  const auth = await requireAdminProfile({ module: 'social' });
   if ('error' in auth) return backToAccounts(request, { oauth_error: auth.error.message });
 
   const params = new URL(request.url).searchParams;
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const saved = await saveConnectedPages(pages, auth.profile.id);
+    const saved = await saveConnectedPages(auth.tenantId, pages, auth.profile.id);
     if (!saved.success) return backToAccounts(request, { oauth_error: saved.error || 'Falha ao salvar as contas.' });
 
     return backToAccounts(request, { connected: String(saved.data ?? 0) });

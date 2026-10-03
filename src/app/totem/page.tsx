@@ -3,7 +3,6 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { CheckCircle2, IdCard, Phone, ShieldCheck, Ticket, User } from 'lucide-react';
 import styles from './totem.module.css';
-import { logAudit } from '@/lib/audit';
 import {
   formatBrazilDocument,
   formatBrazilPhone,
@@ -27,6 +26,31 @@ export default function TotemPage() {
   const [error, setError] = useState('');
   const [now, setNow] = useState<Date | null>(null);
   const [countdown, setCountdown] = useState(AUTO_RESET_SECONDS);
+  // Chave da empresa na URL (/totem?k=...): a senha entra na fila dela.
+  const [totemKey, setTotemKey] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState('');
+  const [missingKey, setMissingKey] = useState(false);
+
+  useEffect(() => {
+    const key = new URLSearchParams(window.location.search).get('k');
+    queueMicrotask(() => {
+      if (!key) {
+        setMissingKey(true);
+        return;
+      }
+      setTotemKey(key);
+      fetch(`/api/queue/display/tickets?key=${encodeURIComponent(key)}`, { cache: 'no-store' })
+        .then(async (response) => {
+          if (!response.ok) {
+            setMissingKey(true);
+            return;
+          }
+          const data = await response.json();
+          setCompanyName(data?.settings?.app_name || data?.tenant?.name || '');
+        })
+        .catch(() => {});
+    });
+  }, []);
 
   useEffect(() => {
     setNow(new Date());
@@ -85,7 +109,7 @@ export default function TotemPage() {
       const response = await fetch('/api/queue/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, whatsapp: normalizedWhatsapp, document: normalizedDocument, origin: 'totem' }),
+        body: JSON.stringify({ key: totemKey, name, whatsapp: normalizedWhatsapp, document: normalizedDocument, origin: 'totem' }),
       });
       const result: { number?: number; error?: string } = await response.json();
 
@@ -99,13 +123,23 @@ export default function TotemPage() {
       // A confirmação no WhatsApp sai do servidor, junto com a senha.
       if (normalizedWhatsapp) setSentToWhatsapp(true);
 
-      logAudit(null, 'TICKET_CREATE', `Nova senha #${nextNumber} gerada via Totem para ${name.trim()}.`, 'ticket', nextNumber.toString());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro de conexão. Tente de novo.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (missingKey) {
+    return (
+      <div className={styles.container}>
+        <main className={styles.card}>
+          <h1 className={styles.title}>Totem sem empresa</h1>
+          <p className={styles.subtitle}>Abra o link do totem pela tela de Senhas do sistema.</p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
@@ -216,7 +250,7 @@ export default function TotemPage() {
         )}
       </main>
 
-      <footer className={styles.footer}>Vórtice Tecnologia · Atendimento</footer>
+      <footer className={styles.footer}>{companyName ? `${companyName} · ` : ''}Atendimento</footer>
     </div>
   );
 }

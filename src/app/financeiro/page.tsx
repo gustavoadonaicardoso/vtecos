@@ -33,7 +33,8 @@ const TENANT_KEY = 'vortice-financeiro-tenant';
 
 export default function FinanceiroPage() {
   const { user } = useAuth();
-  const isClient = user?.account_type === 'CLIENT';
+  // Só a equipe da plataforma escolhe a empresa; os demais veem a própria.
+  const isClient = !user?.workspace?.is_platform;
 
   const [tab, setTab] = useState<TabId>('overview');
   const [tenants, setTenants] = useState<{ id: string; name: string; status: string }[] | null>(null);

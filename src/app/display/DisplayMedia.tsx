@@ -19,7 +19,7 @@ import { normalizeDisplayConfig, type DisplayConfig, type DisplayMediaItem, type
 const POLL_MS = 60_000;
 const MAX_VIDEO_MS = 10 * 60_000;
 
-export function useDisplayMedia() {
+export function useDisplayMedia(displayKey: string | null) {
   const [config, setConfig] = useState<DisplayConfig | null>(null);
   const [media, setMedia] = useState<DisplayMediaItem[]>([]);
   const [mode, setMode] = useState<DisplayMediaMode>('hidden');
@@ -30,10 +30,11 @@ export function useDisplayMedia() {
   const lastTick = useRef(0);
 
   useEffect(() => {
+    if (!displayKey) return;
     let cancelled = false;
     const load = async () => {
       try {
-        const response = await fetch('/api/queue/display', { cache: 'no-store' });
+        const response = await fetch(`/api/queue/display?key=${encodeURIComponent(displayKey)}`, { cache: 'no-store' });
         const result = await response.json().catch(() => ({}));
         if (cancelled || !response.ok) return;
         setConfig(normalizeDisplayConfig(result.data?.config));
@@ -48,7 +49,7 @@ export function useDisplayMedia() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [displayKey]);
 
   const active = Boolean(config?.enabled && media.length > 0);
 

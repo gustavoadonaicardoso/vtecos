@@ -185,6 +185,20 @@
   margin-bottom: 18px;
 }
 
+.createForm { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.createForm .inlineForm { margin-bottom: 0; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+
+.adminRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--card-border);
+}
+
+.adminRow > span { grid-column: 1 / -1; font-size: 0.8rem; }
+
 .tenantList { display: flex; flex-direction: column; gap: 10px; }
 
 .tenant {
@@ -313,6 +327,8 @@
 
 @media (max-width: 900px) {
   .inlineForm,
+  .createForm .inlineForm,
+  .adminRow,
   .tenantRow,
   .userForm,
   .formGrid { grid-template-columns: 1fr; }

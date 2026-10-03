@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { requireAdminProfile } from '@/lib/session';
+import { requirePlatformAdmin } from '@/lib/session';
 import { deletePlan, parsePlanInput, updatePlan } from '@/services/plans.service';
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(request: Request, { params }: Params) {
   try {
-    const auth = await requireAdminProfile();
+    const auth = await requirePlatformAdmin();
     if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
     const { id } = await params;
@@ -22,7 +22,7 @@ export async function PUT(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const auth = await requireAdminProfile();
+  const auth = await requirePlatformAdmin();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;

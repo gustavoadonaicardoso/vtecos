@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { requireAdminProfile } from '@/lib/session';
+import { requirePlatformAdmin } from '@/lib/session';
 import { createPlan, listPlans, parsePlanInput } from '@/services/plans.service';
 
 // GET: planos de assinatura (só admin -- painel Master).
 export async function GET() {
-  const auth = await requireAdminProfile();
+  const auth = await requirePlatformAdmin();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const result = await listPlans();
@@ -14,7 +14,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAdminProfile();
+    const auth = await requirePlatformAdmin();
     if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
     const parsed = parsePlanInput(await request.json());

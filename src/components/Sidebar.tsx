@@ -37,7 +37,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { usePermissions } from '@/lib/permissions';
 // Hook centralizado de não lidos — não duplicamos lógica de Realtime aqui
 import { useUnreadCount } from '@/hooks/useUnreadCount';
-import { isClientRouteAllowed } from '@/lib/plans';
+import { isRouteAllowed } from '@/lib/plans';
 
 
 const Sidebar = () => {
@@ -45,7 +45,7 @@ const Sidebar = () => {
   const { isCollapsed, toggleSidebar, isMobileOpen, closeMobileMenu } = useSidebar();
   const { user, logout } = useAuth();
   const { config } = useTheme();
-  const { hasPermission, isAdmin } = usePermissions();
+  const { hasPermission, isPlatformAdmin } = usePermissions();
   const [mounted, setMounted] = React.useState(false);
   // Hook centralizado — toda lógica de Realtime fica em useUnreadCount
   const unreadChatCount = useUnreadCount();
@@ -81,15 +81,12 @@ const Sidebar = () => {
   ], []);
 
   // FIX #7: hasPermission vem do hook centralizado usePermissions()
-  // Login de cliente vê só o que o plano da empresa libera.
-  const isClient = user?.account_type === 'CLIENT';
-  const clientModules = user?.workspace?.modules;
+  // Cada empresa vê só os módulos do seu plano (e, dentro deles, o que o cargo permite).
+  const modules = user?.workspace?.modules;
   const visibleItems = React.useMemo(
-    () => navItems.filter((item) =>
-      isClient ? isClientRouteAllowed(item.path, clientModules || []) : hasPermission(item.permission)
-    ),
+    () => navItems.filter((item) => (!modules || isRouteAllowed(item.path, modules)) && hasPermission(item.permission)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [navItems, isClient, clientModules, user]
+    [navItems, modules, user]
   );
 
   const handleLinkClick = () => {
@@ -157,7 +154,7 @@ const Sidebar = () => {
           ))}
 
           {/* FIX #20: Seção Admin visível apenas para ADMIN */}
-          {mounted && isAdmin && (
+          {mounted && isPlatformAdmin && (
             <>
               <div className={styles.navSeparator}>{!isCollapsed && <span>Admin</span>}</div>
 

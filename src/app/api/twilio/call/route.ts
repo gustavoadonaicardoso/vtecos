@@ -5,7 +5,7 @@ import { requireActiveProfile } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ module: 'crm' });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     // um userId enviado pelo cliente (senão dava pra atribuir a ligação
     // a outra pessoa).
     await supabase.from('call_logs').insert([{
+      tenant_id: auth.tenantId,
       user_id: auth.profile.id,
       contact_number: to,
       direction: 'outbound',

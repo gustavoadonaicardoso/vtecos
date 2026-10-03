@@ -25,7 +25,8 @@ export async function POST(request: Request) {
       `Solicitou uma redefinição de senha para o Administrador.`,
       'profile',
       userProfile.id,
-      supabaseAdmin
+      supabaseAdmin,
+      userProfile.tenant_id
     );
 
     return NextResponse.json({ success: true, message: 'Solicitação encaminhada com sucesso ao administrador.' }, { status: 200 });

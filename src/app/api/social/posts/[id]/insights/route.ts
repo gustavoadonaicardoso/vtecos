@@ -9,17 +9,17 @@ export const runtime = 'nodejs';
 
 /** Resultados de um post já publicado, por conta de destino. */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'social' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
 
   const { id } = await params;
-  const post = await getPost(id);
+  const post = await getPost(auth.tenantId, id);
   if (!post) return NextResponse.json({ error: 'Post não encontrado.' }, { status: 404 });
 
   const published = post.targets.filter((target) => target.status === 'published' && target.external_id);
-  const accounts = await getAccountsWithTokens(published.map((target) => target.account_id));
+  const accounts = await getAccountsWithTokens(auth.tenantId, published.map((target) => target.account_id));
   const accountsById = new Map(accounts.map((account) => [account.id, account]));
 
   const data: SocialTargetInsights[] = await Promise.all(

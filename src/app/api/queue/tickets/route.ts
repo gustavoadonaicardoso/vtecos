@@ -6,6 +6,8 @@ import {
   validateBrazilPhone,
 } from '@/lib/brazilian-fields';
 import { createQueueTicket } from '@/services/queue.service';
+import { requireActiveProfile } from '@/lib/session';
+import { resolveTenantByDisplayKey } from '@/services/tenant-public.service';
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +17,18 @@ export async function POST(request: Request) {
     }
 
     const payload = body as Record<string, unknown>;
+
+    // Totem (público) identifica a empresa pela chave da URL; a recepção,
+    // pela sessão de quem está logado.
+    let tenant: { id: string; name: string } | null = null;
+    if (payload.key !== undefined) {
+      tenant = await resolveTenantByDisplayKey(payload.key);
+      if (!tenant) return NextResponse.json({ error: 'Totem não configurado. Peça o link correto à recepção.' }, { status: 404 });
+    } else {
+      const auth = await requireActiveProfile({ module: 'senhas' });
+      if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+      tenant = { id: auth.tenantId, name: auth.tenantName };
+    }
     const name = typeof payload.name === 'string' ? payload.name.trim() : '';
     const rawWhatsapp = typeof payload.whatsapp === 'string' ? payload.whatsapp : '';
     const rawDocument = typeof payload.document === 'string' ? payload.document : '';
@@ -31,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     const origin = payload.origin === 'recepcao' ? 'recepcao' : 'totem';
-    const ticket = await createQueueTicket({ name, whatsapp: whatsapp || null, document: document || null, origin });
+    const ticket = await createQueueTicket(tenant, { name, whatsapp: whatsapp || null, document: document || null, origin });
 
     return NextResponse.json({ number: ticket.number }, { status: 201 });
   } catch (error: unknown) {

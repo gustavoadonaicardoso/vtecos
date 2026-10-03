@@ -16,20 +16,22 @@ function renderMessage(template: string, data: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] ?? '');
 }
 
-export async function fetchCampaigns() {
+export async function fetchCampaigns(tenantId: string) {
   const { data, error } = await supabase
     .from('blast_campaigns')
     .select('*')
+    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false });
 
   if (error) return { success: false as const, error: error.message };
   return { success: true as const, data };
 }
 
-export async function fetchCampaignWithContacts(campaignId: string) {
+export async function fetchCampaignWithContacts(tenantId: string, campaignId: string) {
   const { data: campaign, error } = await supabase
     .from('blast_campaigns')
     .select('*')
+    .eq('tenant_id', tenantId)
     .eq('id', campaignId)
     .single();
 
@@ -38,13 +40,14 @@ export async function fetchCampaignWithContacts(campaignId: string) {
   const { data: contacts } = await supabase
     .from('blast_contacts')
     .select('*')
+    .eq('tenant_id', tenantId)
     .eq('campaign_id', campaignId)
     .order('created_at', { ascending: true });
 
   return { success: true as const, data: { campaign, contacts: contacts ?? [] } };
 }
 
-export async function createCampaign(body: {
+export async function createCampaign(tenantId: string, body: {
   name: string;
   template: string;
   columnsConfig: Array<{ key: string; isPhone?: boolean }>;
@@ -69,6 +72,7 @@ export async function createCampaign(body: {
   const { data: campaign, error: campaignError } = await supabase
     .from('blast_campaigns')
     .insert([{
+      tenant_id: tenantId,
       name,
       template,
       columns_config: columnsConfig,
@@ -91,6 +95,7 @@ export async function createCampaign(body: {
     const phone = row[phoneColumn] ?? '';
     const rendered = renderMessage(template, row);
     return {
+      tenant_id: tenantId,
       campaign_id: campaign.id,
       phone,
       data: row,
@@ -101,12 +106,13 @@ export async function createCampaign(body: {
 
   const BATCH = 500;
   for (let i = 0; i < contactRows.length; i += BATCH) {
+    // tenant-scope: ok (cada linha de contactRows leva tenant_id)
     const { error: insertError } = await supabase
       .from('blast_contacts')
       .insert(contactRows.slice(i, i + BATCH));
 
     if (insertError) {
-      await supabase.from('blast_campaigns').delete().eq('id', campaign.id);
+      await supabase.from('blast_campaigns').delete().eq('tenant_id', tenantId).eq('id', campaign.id);
       return { success: false, error: insertError.message };
     }
   }
@@ -114,26 +120,30 @@ export async function createCampaign(body: {
   return { success: true, data: campaign };
 }
 
-export async function updateCampaign(campaignId: string, updates: Record<string, unknown>): Promise<ServiceResult> {
+export async function updateCampaign(tenantId: string, campaignId: string, updates: Record<string, unknown>): Promise<ServiceResult> {
+  const { tenant_id: _ignored, ...safe } = updates;
+  void _ignored;
   const { error } = await supabase
     .from('blast_campaigns')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...safe, updated_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId)
     .eq('id', campaignId);
 
   if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
-export async function deleteCampaign(campaignId: string): Promise<ServiceResult> {
-  const { error } = await supabase.from('blast_campaigns').delete().eq('id', campaignId);
+export async function deleteCampaign(tenantId: string, campaignId: string): Promise<ServiceResult> {
+  const { error } = await supabase.from('blast_campaigns').delete().eq('tenant_id', tenantId).eq('id', campaignId);
   if (error) return { success: false, error: error.message };
   return { success: true };
 }
 
-async function incrementCampaignCount(campaignId: string, field: 'sent_count' | 'failed_count') {
+async function incrementCampaignCount(tenantId: string, campaignId: string, field: 'sent_count' | 'failed_count') {
   const { data } = await supabase
     .from('blast_campaigns')
     .select('sent_count, total_contacts, failed_count')
+    .eq('tenant_id', tenantId)
     .eq('id', campaignId)
     .single();
 
@@ -146,6 +156,7 @@ async function incrementCampaignCount(campaignId: string, field: 'sent_count' | 
   await supabase
     .from('blast_campaigns')
     .update({ [field]: newValue, status: done ? 'completed' : 'running', updated_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId)
     .eq('id', campaignId);
 }
 
@@ -153,10 +164,11 @@ async function incrementCampaignCount(campaignId: string, field: 'sent_count' | 
  * Envia a mensagem de um contato específico da campanha pelo WhatsApp
  * Web e atualiza os contadores da campanha conforme o resultado.
  */
-export async function sendCampaignContact(campaignId: string, contactId: string): Promise<ServiceResult> {
+export async function sendCampaignContact(tenantId: string, campaignId: string, contactId: string): Promise<ServiceResult> {
   const { data: contact, error: contactError } = await supabase
     .from('blast_contacts')
     .select('*')
+    .eq('tenant_id', tenantId)
     .eq('id', contactId)
     .eq('campaign_id', campaignId)
     .single();
@@ -165,15 +177,16 @@ export async function sendCampaignContact(campaignId: string, contactId: string)
     return { success: false, error: 'Contato não encontrado' };
   }
 
-  await supabase.from('blast_contacts').update({ status: 'sending' }).eq('id', contactId);
+  await supabase.from('blast_contacts').update({ status: 'sending' }).eq('tenant_id', tenantId).eq('id', contactId);
 
   let cleanPhone = (contact.phone ?? '').replace(/\D/g, '');
   if (cleanPhone.length < 10) {
     await supabase
       .from('blast_contacts')
       .update({ status: 'failed', error_msg: 'Telefone inválido' })
+      .eq('tenant_id', tenantId)
       .eq('id', contactId);
-    await incrementCampaignCount(campaignId, 'failed_count');
+    await incrementCampaignCount(tenantId, campaignId, 'failed_count');
     return { success: false, error: 'Telefone inválido' };
   }
   if (!cleanPhone.startsWith('55')) cleanPhone = '55' + cleanPhone;
@@ -181,20 +194,22 @@ export async function sendCampaignContact(campaignId: string, contactId: string)
   const message = contact.rendered_message ?? '';
 
   try {
-    await sendWhatsAppWebMessage(cleanPhone, message);
+    await sendWhatsAppWebMessage(tenantId, cleanPhone, message);
     await supabase
       .from('blast_contacts')
       .update({ status: 'sent', sent_at: new Date().toISOString(), error_msg: null })
+      .eq('tenant_id', tenantId)
       .eq('id', contactId);
-    await incrementCampaignCount(campaignId, 'sent_count');
+    await incrementCampaignCount(tenantId, campaignId, 'sent_count');
     return { success: true };
   } catch (sendError) {
     const errorMessage = sendError instanceof Error ? sendError.message : 'Falha no envio pelo WhatsApp Web';
     await supabase
       .from('blast_contacts')
       .update({ status: 'failed', error_msg: errorMessage.slice(0, 200) })
+      .eq('tenant_id', tenantId)
       .eq('id', contactId);
-    await incrementCampaignCount(campaignId, 'failed_count');
+    await incrementCampaignCount(tenantId, campaignId, 'failed_count');
     return { success: false, error: errorMessage };
   }
 }

@@ -112,12 +112,12 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user?.id, user?.role]);
 
-  // Login de cliente não usa o CRM da Vórtice: nada de leads/pipeline no navegador dele.
-  const isClient = user?.account_type === 'CLIENT';
+  // Empresa sem o módulo de CRM no plano: nada de leads/pipeline.
+  const hasCrm = !user?.workspace || user.workspace.modules.includes('crm');
 
   useEffect(() => {
-    // Sem usuário ainda (sessão carregando) ou login de cliente: não busca o CRM.
-    if (!user || isClient) return;
+    // Sem usuário ainda (sessão carregando) ou sem CRM no plano: não busca.
+    if (!user || !hasCrm) return;
     fetchDatabase();
     if (!supabase) return;
 
@@ -129,7 +129,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
       .subscribe();
 
     return () => { supabase?.removeChannel(channel); };
-  }, [fetchDatabase, isClient, user]);
+  }, [fetchDatabase, hasCrm, user]);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);

@@ -37,62 +37,118 @@ const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
 
 // ─── Helpers de configuração ──────────────────────────────────
 
-/**
- * Busca a configuração da Meta API das env vars ou do banco de dados (tabela integrations_config).
- */
-export async function getWhatsAppConfig(supabaseClient?: any): Promise<MetaWhatsAppConfig> {
-  const envToken = process.env.WHATSAPP_ACCESS_TOKEN;
-  const envPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const envWabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-  const envVerifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'vortice_verify_token_2024';
-  const envAppSecret = process.env.WHATSAPP_APP_SECRET || '';
+type ConfigRow = { tenant_id: string; config: Record<string, string> | null };
 
-  // Se todas as principais estiverem nas env vars, retorna elas
-  if (envToken && envPhoneId && envWabaId) {
-    return {
-      accessToken: envToken,
-      phoneNumberId: envPhoneId,
-      businessAccountId: envWabaId,
-      webhookVerifyToken: envVerifyToken,
-      appSecret: envAppSecret,
-      apiVersion: API_VERSION,
-    };
-  }
-
-  // Senão, tenta ler do Supabase
-  const client = supabaseClient || createClient(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function adminClient(supabaseClient?: any) {
+  return supabaseClient || createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+}
 
-  const { data: item, error } = await client
-    .from('integrations_config')
-    .select('config')
-    .eq('provider', 'whatsapp_meta')
-    .maybeSingle();
+function configFromEnv(): MetaWhatsAppConfig | null {
+  const envToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const envPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const envWabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+  if (!envToken || !envPhoneId || !envWabaId) return null;
+  return {
+    accessToken: envToken,
+    phoneNumberId: envPhoneId,
+    businessAccountId: envWabaId,
+    webhookVerifyToken: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'vortice_verify_token_2024',
+    appSecret: process.env.WHATSAPP_APP_SECRET || '',
+    apiVersion: API_VERSION,
+  };
+}
 
-  if (error || !item) {
-    throw new Error(
-      'Configuração WhatsApp (Meta) não encontrada nas variáveis de ambiente (.env.local) e nem no banco de dados.\n' +
-      'Acesse a tela de Integrações para configurar ou preencha as variáveis de ambiente.'
-    );
-  }
-
-  const dbConfig = item.config as any;
-  if (!dbConfig.token || !dbConfig.phoneId || !dbConfig.wabaId) {
-    throw new Error(
-      'Configuração WhatsApp (Meta) encontrada no banco de dados, mas com chaves incompletas (necessita de Token, ID do Telefone e ID WABA).'
-    );
-  }
-
+function configFromRow(row: ConfigRow | null): MetaWhatsAppConfig | null {
+  const dbConfig = row?.config;
+  if (!dbConfig?.token || !dbConfig.phoneId || !dbConfig.wabaId) return null;
   return {
     accessToken: dbConfig.token,
     phoneNumberId: dbConfig.phoneId,
     businessAccountId: dbConfig.wabaId,
-    webhookVerifyToken: dbConfig.webhookVerifyToken || envVerifyToken,
-    appSecret: dbConfig.appSecret || envAppSecret,
+    webhookVerifyToken: dbConfig.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'vortice_verify_token_2024',
+    appSecret: dbConfig.appSecret || process.env.WHATSAPP_APP_SECRET || '',
     apiVersion: API_VERSION,
   };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function platformTenantId(client: any): Promise<string | null> {
+  const { data } = await client.from('tenants').select('id').eq('is_platform', true).maybeSingle();
+  return data?.id ?? null;
+}
+
+/**
+ * Configuração da Meta (WhatsApp oficial) DE UMA EMPRESA: a que ela salvou
+ * em Integrações. As variáveis de ambiente valem só para a empresa da
+ * plataforma (Vórtice), como antes.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getWhatsAppConfig(supabaseClient: any, tenantId: string): Promise<MetaWhatsAppConfig> {
+  const client = adminClient(supabaseClient);
+
+  const { data: item } = await client
+    .from('integrations_config')
+    .select('tenant_id, config')
+    .eq('tenant_id', tenantId)
+    .eq('provider', 'whatsapp_meta')
+    .maybeSingle();
+
+  const fromDb = configFromRow(item as ConfigRow | null);
+  if (fromDb) return fromDb;
+
+  const fromEnv = configFromEnv();
+  if (fromEnv && tenantId === (await platformTenantId(client))) return fromEnv;
+
+  throw new Error(
+    'WhatsApp oficial (Meta) não configurado para esta empresa. Acesse Integrações para configurar.'
+  );
+}
+
+/**
+ * Webhook: descobre de qual empresa é o número (phone_number_id) que
+ * recebeu a mensagem. Sem empresa dona, o evento é ignorado.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function resolveMetaTenant(supabaseClient: any, phoneNumberId: string): Promise<{ tenantId: string; config: MetaWhatsAppConfig } | null> {
+  const client = adminClient(supabaseClient);
+  // tenant-scope: ok (procura a empresa dona do número; o resultado define o tenant)
+  const { data } = await client
+    .from('integrations_config')
+    .select('tenant_id, config')
+    .eq('provider', 'whatsapp_meta')
+    .eq('config->>phoneId', phoneNumberId);
+
+  for (const row of (data || []) as ConfigRow[]) {
+    const config = configFromRow(row);
+    if (config) return { tenantId: row.tenant_id, config };
+  }
+
+  const fromEnv = configFromEnv();
+  if (fromEnv && fromEnv.phoneNumberId === phoneNumberId) {
+    const tenantId = await platformTenantId(client);
+    if (tenantId) return { tenantId, config: fromEnv };
+  }
+  return null;
+}
+
+/** Handshake do webhook: aceita o verify token de qualquer empresa configurada. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function isKnownVerifyToken(supabaseClient: any, token: string): Promise<boolean> {
+  const fromEnv = configFromEnv();
+  if ((fromEnv?.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) === token) return true;
+  const client = adminClient(supabaseClient);
+  // tenant-scope: ok (só confere se o token existe em alguma configuração)
+  const { data } = await client
+    .from('integrations_config')
+    .select('tenant_id')
+    .eq('provider', 'whatsapp_meta')
+    .eq('config->>webhookVerifyToken', token)
+    .limit(1);
+  return Boolean(data && data.length > 0);
 }
 
 /**

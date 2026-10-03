@@ -17,7 +17,8 @@
 
 import { cookies } from 'next/headers';
 import { supabaseAuth } from '@/lib/supabase-auth';
-import { fetchProfileById, fetchProfileByEmail } from '@/services/auth.service';
+import { fetchProfileById, fetchProfileByEmail } from '@/services/profile-lookup.server';
+import { loadWorkspace } from '@/services/workspace.service';
 import type { UserProfile } from '@/types';
 
 const ACCESS_COOKIE = 'vortice_at';
@@ -51,12 +52,28 @@ async function resolveProfileFromAuthUser(authUser: { id: string; email?: string
   );
 }
 
+/** Data de expiração (segundos) lida do próprio JWT já verificado. */
+function tokenExpiry(token: string) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    return typeof payload.exp === 'number' ? payload.exp : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export interface AuthSession {
+  profile: UserProfile;
+  accessToken: string;
+  expiresAt: number;
+}
+
 /**
  * Verifica a sessão do cookie contra o Supabase Auth (assinatura real,
- * não pode ser forjada pelo cliente) e devolve o perfil correspondente.
+ * não pode ser forjada pelo cliente) e devolve perfil + token de acesso.
  * Tenta renovar via refresh_token se o access_token expirou.
  */
-export async function getAuthenticatedProfile(): Promise<UserProfile | null> {
+export async function getAuthSession(): Promise<AuthSession | null> {
   const store = await cookies();
   const accessToken = store.get(ACCESS_COOKIE)?.value;
   const refreshToken = store.get(REFRESH_COOKIE)?.value;
@@ -64,7 +81,8 @@ export async function getAuthenticatedProfile(): Promise<UserProfile | null> {
   if (accessToken) {
     const { data, error } = await supabaseAuth.auth.getUser(accessToken);
     if (!error && data.user) {
-      return resolveProfileFromAuthUser(data.user);
+      const profile = await resolveProfileFromAuthUser(data.user);
+      return profile ? { profile, accessToken, expiresAt: tokenExpiry(accessToken) } : null;
     }
   }
 
@@ -84,20 +102,42 @@ export async function getAuthenticatedProfile(): Promise<UserProfile | null> {
     refreshed.session.expires_in
   );
 
-  return resolveProfileFromAuthUser(refreshed.user);
+  const profile = await resolveProfileFromAuthUser(refreshed.user);
+  return profile
+    ? { profile, accessToken: refreshed.session.access_token, expiresAt: tokenExpiry(refreshed.session.access_token) }
+    : null;
+}
+
+export async function getAuthenticatedProfile(): Promise<UserProfile | null> {
+  return (await getAuthSession())?.profile ?? null;
+}
+
+type AuthError = { error: { message: string; status: number } };
+
+/** Sessão válida de um usuário ativo, já com a empresa dele resolvida. */
+export interface TenantAuth {
+  profile: UserProfile;
+  /** Empresa da sessão: TODA consulta de servidor filtra por ela. */
+  tenantId: string;
+  tenantName: string;
+  /** Empresa dona da plataforma (Vórtice). */
+  isPlatform: boolean;
+  modules: string[];
 }
 
 /**
  * Helper para rotas que exigem qualquer usuário ativo logado.
  *
- * Logins de cliente (account_type CLIENT) são barrados por padrão: as
- * rotas da equipe trabalham com dados da Vórtice que não são separados
- * por empresa. Só as rotas preparadas para isso (módulos por empresa,
- * notificações e o próprio perfil) passam `{ allowClient: true }` e
- * filtram pelo tenant_id da sessão.
+ * Devolve também a empresa da sessão (tenantId). Rotas e serviços do
+ * servidor usam o service role, que ignora o RLS -- por isso TODA
+ * leitura/gravação deve filtrar por esse tenantId. A empresa nunca vem
+ * do corpo, da URL ou de cabeçalhos da requisição.
+ *
+ * `module`: exige que o plano da empresa inclua o módulo (a empresa da
+ * plataforma tem todos).
  */
-export async function requireActiveProfile(options: { allowClient?: boolean } = {}): Promise<
-  { profile: UserProfile } | { error: { message: string; status: number } }
+export async function requireActiveProfile(options: { module?: string } = {}): Promise<
+  TenantAuth | AuthError
 > {
   const profile = await getAuthenticatedProfile();
 
@@ -107,20 +147,32 @@ export async function requireActiveProfile(options: { allowClient?: boolean } = 
   if (profile.status !== 'ACTIVE') {
     return { error: { message: 'Conta desativada. Contate o administrador.', status: 403 } };
   }
-  if (profile.account_type === 'CLIENT' && !options.allowClient) {
-    return { error: { message: 'Este recurso não está disponível para a sua conta.', status: 403 } };
+
+  const workspace = await loadWorkspace(profile);
+  if (!workspace) {
+    return { error: { message: 'Sua conta não está vinculada a uma empresa.', status: 403 } };
+  }
+  if (!workspace.is_platform && workspace.tenant_status !== 'ACTIVE') {
+    return { error: { message: 'O acesso da sua empresa está suspenso. Fale com a Vórtice.', status: 403 } };
+  }
+  if (options.module && !workspace.modules.includes(options.module)) {
+    return { error: { message: 'Este módulo não faz parte do plano da sua empresa.', status: 403 } };
   }
 
-  return { profile };
+  return {
+    profile: { ...profile, workspace },
+    tenantId: workspace.tenant_id,
+    tenantName: workspace.tenant_name,
+    isPlatform: workspace.is_platform,
+    modules: workspace.modules,
+  };
 }
 
 /**
- * Helper para rotas que exigem administrador ativo.
+ * Helper para rotas que exigem administrador ativo (da própria empresa).
  */
-export async function requireAdminProfile(): Promise<
-  { profile: UserProfile } | { error: { message: string; status: number } }
-> {
-  const result = await requireActiveProfile();
+export async function requireAdminProfile(options: { module?: string } = {}): Promise<TenantAuth | AuthError> {
+  const result = await requireActiveProfile(options);
   if ('error' in result) return result;
 
   if (result.profile.role !== 'ADMIN') {
@@ -133,15 +185,26 @@ export async function requireAdminProfile(): Promise<
 /**
  * Helper para rotas que exigem administrador ou gerente ativo.
  */
-export async function requireAdminOrManagerProfile(): Promise<
-  { profile: UserProfile } | { error: { message: string; status: number } }
-> {
-  const result = await requireActiveProfile();
+export async function requireAdminOrManagerProfile(options: { module?: string } = {}): Promise<TenantAuth | AuthError> {
+  const result = await requireActiveProfile(options);
   if ('error' in result) return result;
 
   if (!['ADMIN', 'MANAGER'].includes(result.profile.role)) {
-    return { error: { message: 'Usuário sem permissão para listar estes perfis.', status: 403 } };
+    return { error: { message: 'Usuário sem permissão para esta ação.', status: 403 } };
   }
 
+  return result;
+}
+
+/**
+ * Painel Master: só administradores da empresa dona da plataforma
+ * (criar empresas, planos, identidade visual, avisos).
+ */
+export async function requirePlatformAdmin(): Promise<TenantAuth | AuthError> {
+  const result = await requireAdminProfile();
+  if ('error' in result) return result;
+  if (!result.isPlatform) {
+    return { error: { message: 'Apenas a equipe da Vórtice pode fazer isso.', status: 403 } };
+  }
   return result;
 }

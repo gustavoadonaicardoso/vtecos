@@ -9,7 +9,7 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Configuração inválida.' }, { status: 400 });
 
-  const result = await saveDisplayConfig(body);
+  const result = await saveDisplayConfig(auth.tenantId, body);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true, data: result.data });
 }

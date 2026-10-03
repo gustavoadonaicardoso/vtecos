@@ -14,13 +14,11 @@ const fail = (message: string, status = 400) => NextResponse.json({ error: messa
 export async function GET(request: Request, { params }: Params) {
   const { resource } = await params;
 
-  // Seletor de empresa da equipe Vórtice (login de cliente nunca lista outras).
+  // Seletor de empresa: só a equipe da plataforma (Vórtice) lista outras empresas.
   if (resource === 'tenants') {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ module: 'financeiro' });
     if ('error' in auth) return fail(auth.error.message, auth.error.status);
-    const permissions = auth.profile.permissions as Record<string, Record<string, boolean>> | undefined;
-    const allowed = auth.profile.role === 'ADMIN' || !permissions || Object.keys(permissions).length === 0 || permissions.financeiro?.view === true;
-    if (!allowed) return fail('Sem permissão para Custos e Precificação.', 403);
+    if (!auth.isPlatform) return NextResponse.json({ data: [{ id: auth.tenantId, name: auth.tenantName, status: 'ACTIVE' }] });
     try {
       return NextResponse.json({ data: await listTenantsForStaff() });
     } catch (err: unknown) {

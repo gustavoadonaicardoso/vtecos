@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
 import styles from './display.module.css';
 import { DisplayMediaLayer, useDisplayMedia } from './DisplayMedia';
 
@@ -32,7 +31,10 @@ export default function DisplayPage() {
   // time is populated after hydration, when the browser has mounted the page.
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const { mode: mediaMode, media, active: mediaActive, notifyCall } = useDisplayMedia();
+  // Chave da empresa na URL (/display?k=...): o painel mostra só a fila dela.
+  const [displayKey, setDisplayKey] = useState<string | null>(null);
+  const [missingKey, setMissingKey] = useState(false);
+  const { mode: mediaMode, media, active: mediaActive, notifyCall } = useDisplayMedia(displayKey);
   const [mediaSlot, setMediaSlot] = useState<HTMLDivElement | null>(null);
   // fetchTickets roda dentro do efeito de montagem; o ref sempre aponta pra versão atual.
   const notifyCallRef = useRef(notifyCall);
@@ -42,79 +44,69 @@ export default function DisplayPage() {
   const [highlightCall, setHighlightCall] = useState(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchTickets = async () => {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from('attendance_queue_tickets')
-      .select('*')
-      .or('status.eq.calling,status.eq.completed')
-      .order('updated_at', { ascending: false })
-      .limit(6);
-
-    if (data && data.length > 0) {
-      // Find the most recent 'calling' ticket for the main display
-      const calling = data.find(t => t.status === 'calling') || data[0];
-      setCurrentTicket(calling);
-
-      // Senha nova chamada (ou rechamada): tira a mídia da frente por alguns segundos.
-      const callKey = calling.status === 'calling' ? `${calling.id}-${calling.updated_at}` : null;
-      if (callKey && lastCallKey.current !== null && callKey !== lastCallKey.current) {
-        notifyCallRef.current();
-        setHighlightCall(true);
-        if (highlightTimer.current) clearTimeout(highlightTimer.current);
-        highlightTimer.current = setTimeout(() => setHighlightCall(false), 8000);
+  const fetchTickets = async (key: string) => {
+    try {
+      const response = await fetch(`/api/queue/display/tickets?key=${encodeURIComponent(key)}`, { cache: 'no-store' });
+      if (!response.ok) {
+        if (response.status === 404) setMissingKey(true);
+        return;
       }
-      lastCallKey.current = callKey ?? lastCallKey.current ?? '';
-      
-      // The rest is history, excluding the current one if it's there
-      setHistory(data.filter(t => t.id !== calling.id));
-    } else {
-      setCurrentTicket(null);
-      setHistory([]);
+      const payload: { settings: QueueSettings | null; tickets: Ticket[] } = await response.json();
+      if (payload.settings) setSettings(payload.settings);
+      const data = payload.tickets;
+
+      if (data && data.length > 0) {
+        const calling = data.find(t => t.status === 'calling') || data[0];
+        setCurrentTicket(calling);
+
+        // Senha nova chamada (ou rechamada): toca o aviso e tira a mídia da frente.
+        const callKey = calling.status === 'calling' ? `${calling.id}-${calling.updated_at}` : null;
+        if (callKey && lastCallKey.current !== null && callKey !== lastCallKey.current) {
+          audioRef.current?.play().catch(() => {});
+          notifyCallRef.current();
+          setHighlightCall(true);
+          if (highlightTimer.current) clearTimeout(highlightTimer.current);
+          highlightTimer.current = setTimeout(() => setHighlightCall(false), 8000);
+        }
+        lastCallKey.current = callKey ?? lastCallKey.current ?? '';
+
+        setHistory(data.filter(t => t.id !== calling.id));
+      } else {
+        setCurrentTicket(null);
+        setHistory([]);
+        if (lastCallKey.current === null) lastCallKey.current = '';
+      }
+    } catch {
+      // Sem rede: mantém o que está na tela e tenta de novo no próximo ciclo.
     }
   };
 
-  const fetchSettings = async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from('queue_settings').select('*').eq('id', 'default').single();
-    if (data) setSettings(data);
-  };
-
   useEffect(() => {
-    // Current time clock
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-
-    // Defer the initial async loads so state updates do not run synchronously
-    // inside the effect body.
+    const key = new URLSearchParams(window.location.search).get('k');
     queueMicrotask(() => {
-      void fetchTickets();
-      void fetchSettings();
+      if (!key) setMissingKey(true);
+      else setDisplayKey(key);
     });
-
-    // Subscribe to changes
-    const channel = supabase
-      ?.channel('queue_changes')
-      .on(
-        'postgres_changes',
-        { event: '*', table: 'attendance_queue_tickets', schema: 'public' },
-        (payload) => {
-          console.log('Realtime update:', payload);
-          // Refresh data on any change
-          fetchTickets();
-          
-          // Play sound if a new ticket is called
-          if (payload.eventType === 'UPDATE' && payload.new.status === 'calling') {
-            audioRef.current?.play().catch(e => console.log('Audio error:', e));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(timer);
-      supabase?.removeChannel(channel!);
-    };
+    return () => clearInterval(timer);
   }, []);
+
+  // A fila é consultada pelo servidor a cada 3s (não há mais leitura anônima no banco).
+  useEffect(() => {
+    if (!displayKey) return;
+    queueMicrotask(() => void fetchTickets(displayKey));
+    const poll = setInterval(() => void fetchTickets(displayKey), 3000);
+    return () => clearInterval(poll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayKey]);
+
+  if (missingKey) {
+    return (
+      <div className={styles.container} style={{ placeItems: 'center', display: 'grid' }}>
+        <p className={styles.footerText}>Painel sem empresa. Abra o link do painel pela tela de Senhas do sistema.</p>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>

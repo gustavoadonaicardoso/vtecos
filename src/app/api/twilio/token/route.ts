@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { twilioService } from '@/services/twilio.service';
+import { twilioIdentity, twilioService } from '@/services/twilio.service';
 import { requireActiveProfile } from '@/lib/session';
 
 /**
@@ -15,12 +15,12 @@ import { requireActiveProfile } from '@/lib/session';
  */
 export async function GET() {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ module: 'crm' });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
-    const identity = auth.profile.name;
+    const identity = twilioIdentity(auth.profile.id);
     const token = twilioService.generateToken(identity);
 
     return NextResponse.json({ token, identity });

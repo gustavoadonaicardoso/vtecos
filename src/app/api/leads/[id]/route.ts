@@ -8,12 +8,12 @@ import { requireActiveProfile } from '@/lib/session';
  * não é ADMIN/MANAGER, confere que o lead é mesmo do usuário.
  */
 async function authorizeLeadAccess(leadId: string) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'crm' });
   if ('error' in auth) return auth;
 
   if (auth.profile.role === 'ADMIN' || auth.profile.role === 'MANAGER') return auth;
 
-  const ownerId = await fetchLeadOwner(leadId);
+  const ownerId = await fetchLeadOwner(auth.tenantId, leadId);
   if (ownerId !== auth.profile.id) {
     return { error: { message: 'Você não tem permissão para alterar este lead.', status: 403 } };
   }
@@ -34,12 +34,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { action, ...updates } = body;
 
     if (action === 'move_stage' && updates.stageId) {
-      const result = await moveLeadToStage(leadId, updates.stageId);
+      const result = await moveLeadToStage(auth.tenantId, leadId, updates.stageId);
       if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
-    const result = await updateLeadInDb(leadId, updates);
+    const result = await updateLeadInDb(auth.tenantId, leadId, updates);
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
 
     return NextResponse.json({ success: true }, { status: 200 });
@@ -57,7 +57,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
-    const result = await deleteLeadFromDb(leadId);
+    const result = await deleteLeadFromDb(auth.tenantId, leadId);
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
 
     return NextResponse.json({ success: true }, { status: 200 });

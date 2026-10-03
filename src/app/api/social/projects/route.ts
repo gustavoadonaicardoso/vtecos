@@ -8,12 +8,12 @@ import { listProjectOptions } from '@/services/social.service';
  * aqui qualquer usuário do módulo precisa poder escolher o projeto do post.
  */
 export async function GET() {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'social' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
 
-  const result = await listProjectOptions();
+  const result = await listProjectOptions(auth.tenantId);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true, data: result.data });
 }

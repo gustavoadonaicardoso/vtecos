@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAdminProfile } from '@/lib/session';
+import { requirePlatformAdmin } from '@/lib/session';
 import { fetchTenantById, fetchTenantUsers } from '@/services/tenants.service';
 import { createUserWithProfile } from '@/services/users.service';
 
@@ -7,7 +7,7 @@ const CLIENT_ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
 
 // GET: logins de cliente desta empresa (só admin da Vórtice).
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminProfile();
+  const auth = await requirePlatformAdmin();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;
@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 // POST: cria um login de cliente preso a esta empresa.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const auth = await requireAdminProfile();
+    const auth = await requirePlatformAdmin();
     if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
     const { id } = await params;
@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     if (!CLIENT_ROLES.has(role)) return NextResponse.json({ error: 'Perfil inválido.' }, { status: 400 });
 
-    const result = await createUserWithProfile({ name, email, password, role, permissions: {}, clientTenantId: id });
+    const result = await createUserWithProfile({ tenantId: id, name, email, password, role, permissions: {} });
     if (!result.success) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (err: unknown) {

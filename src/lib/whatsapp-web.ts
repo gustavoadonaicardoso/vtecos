@@ -31,34 +31,59 @@ type WhatsAppWebRuntime = {
   starting: Promise<void> | null;
 };
 
+/**
+ * Uma sessão de WhatsApp Web POR EMPRESA (cada uma com seu número e sua
+ * pasta de credenciais). Mensagens recebidas viram leads só da empresa
+ * dona daquele número.
+ */
 const globalRuntime = globalThis as typeof globalThis & {
-  __vtecWhatsAppWeb?: WhatsAppWebRuntime;
+  __vtecWhatsAppWebByTenant?: Map<string, WhatsAppWebRuntime>;
+  __vtecPlatformTenantId?: string | null;
 };
 
-const runtime = globalRuntime.__vtecWhatsAppWeb ?? {
-  socket: null,
-  status: 'disconnected' as const,
-  qrCode: null,
-  phone: null,
-  starting: null,
-};
+const runtimes = globalRuntime.__vtecWhatsAppWebByTenant ?? new Map<string, WhatsAppWebRuntime>();
+globalRuntime.__vtecWhatsAppWebByTenant = runtimes;
 
-globalRuntime.__vtecWhatsAppWeb = runtime;
+function runtimeFor(tenantId: string): WhatsAppWebRuntime {
+  let runtime = runtimes.get(tenantId);
+  if (!runtime) {
+    runtime = { socket: null, status: 'disconnected', qrCode: null, phone: null, starting: null };
+    runtimes.set(tenantId, runtime);
+  }
+  return runtime;
+}
 
-const SESSION_PATH = process.env.WHATSAPP_WEB_SESSION_PATH
+const BASE_SESSION_PATH = process.env.WHATSAPP_WEB_SESSION_PATH
   || path.join(process.cwd(), '.whatsapp-session');
+const TENANT_SESSIONS_DIR = `${BASE_SESSION_PATH}-tenants`;
+
+async function platformTenantId() {
+  if (globalRuntime.__vtecPlatformTenantId !== undefined) return globalRuntime.__vtecPlatformTenantId;
+  const { supabaseAdmin } = await import('@/lib/supabase-admin');
+  const { data } = await supabaseAdmin.from('tenants').select('id').eq('is_platform', true).maybeSingle();
+  globalRuntime.__vtecPlatformTenantId = data?.id ?? null;
+  return globalRuntime.__vtecPlatformTenantId;
+}
+
+/** A Vórtice mantém a pasta antiga (não precisa escanear o QR de novo). */
+async function sessionPathFor(tenantId: string) {
+  if (tenantId === (await platformTenantId())) return BASE_SESSION_PATH;
+  if (!/^[0-9a-f-]{36}$/i.test(tenantId)) throw new Error('Empresa inválida.');
+  return path.join(TENANT_SESSIONS_DIR, tenantId);
+}
 
 function shouldReconnect(error: unknown) {
   const statusCode = (error as { output?: { statusCode?: number } })?.output?.statusCode;
   return statusCode !== DisconnectReason.loggedOut;
 }
 
-export async function startWhatsAppWeb() {
+export async function startWhatsAppWeb(tenantId: string) {
+  const runtime = runtimeFor(tenantId);
   if (runtime.socket || runtime.starting) return runtime.starting;
 
   runtime.status = 'connecting';
   runtime.starting = (async () => {
-    const { state, saveCreds } = await useMultiFileAuthState(SESSION_PATH);
+    const { state, saveCreds } = await useMultiFileAuthState(await sessionPathFor(tenantId));
     const socket = makeWASocket({
       auth: state,
       browser: Browsers.ubuntu('VTEC OS'),
@@ -114,7 +139,7 @@ export async function startWhatsAppWeb() {
 
             const mimetype = mediaContent.mimetype || 'application/octet-stream';
             const ext = content.stickerMessage ? 'webp' : (mimetype.split('/')[1]?.split(';')[0] || 'bin');
-            const storagePath = `inbound/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+            const storagePath = `${tenantId}/inbound/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
             const { supabaseAdmin: admin } = await import('@/lib/supabase-admin');
             const { error: uploadError } = await admin.storage
@@ -150,13 +175,14 @@ export async function startWhatsAppWeb() {
         // padrão -- como leads/chat_messages sempre exigiram um papel
         // autenticado, a busca/criação do lead falhava silenciosamente
         // (erros descartados) e a mensagem recebida nunca era salva.
+        // O lead e a mensagem entram na empresa dona DESTE número.
         await processInboundWhatsAppMessage({
           phone: phoneJid.replace(/@.*$/, ''),
           isGroup: false,
           senderName: item.pushName || 'Cliente WhatsApp',
           text: { message: text || mediaCaption || '' },
           media,
-        }, supabaseAdmin);
+        }, supabaseAdmin, tenantId);
       }
     });
     socket.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
@@ -178,7 +204,7 @@ export async function startWhatsAppWeb() {
         runtime.phone = null;
 
         if (shouldReconnect(lastDisconnect?.error)) {
-          setTimeout(() => void startWhatsAppWeb(), 2_000);
+          setTimeout(() => void startWhatsAppWeb(tenantId), 2_000);
         }
       }
     });
@@ -189,7 +215,8 @@ export async function startWhatsAppWeb() {
   return runtime.starting;
 }
 
-export function getWhatsAppWebStatus() {
+export function getWhatsAppWebStatus(tenantId: string) {
+  const runtime = runtimeFor(tenantId);
   return {
     status: runtime.status,
     connected: runtime.status === 'connected',
@@ -198,9 +225,10 @@ export function getWhatsAppWebStatus() {
   };
 }
 
-async function ensureConnectedSocket(): Promise<WASocket> {
+async function ensureConnectedSocket(tenantId: string): Promise<WASocket> {
+  const runtime = runtimeFor(tenantId);
   if (!runtime.socket || runtime.status !== 'connected') {
-    await startWhatsAppWeb();
+    await startWhatsAppWeb(tenantId);
   }
 
   for (let attempt = 0; attempt < 20 && runtime.status === 'connecting'; attempt += 1) {
@@ -220,8 +248,9 @@ function toWhatsAppJid(phone: string) {
   return `${normalized}@s.whatsapp.net`;
 }
 
-export async function sendWhatsAppWebMessage(phone: string, message: string) {
-  const socket = await ensureConnectedSocket();
+/** Envia pelo WhatsApp da empresa informada (nunca pelo de outra). */
+export async function sendWhatsAppWebMessage(tenantId: string, phone: string, message: string) {
+  const socket = await ensureConnectedSocket(tenantId);
   return socket.sendMessage(toWhatsAppJid(phone), { text: message });
 }
 
@@ -232,12 +261,13 @@ export async function sendWhatsAppWebMessage(phone: string, message: string) {
  * o arquivo já estar propagado/acessível no CDN no exato instante do envio.
  */
 export async function sendWhatsAppWebMedia(
+  tenantId: string,
   phone: string,
   buffer: Buffer,
   kind: 'image' | 'document' | 'audio',
   options: { caption?: string; fileName?: string; mimetype: string }
 ) {
-  const socket = await ensureConnectedSocket();
+  const socket = await ensureConnectedSocket(tenantId);
   const jid = toWhatsAppJid(phone);
 
   if (kind === 'image') {
@@ -256,10 +286,36 @@ export async function sendWhatsAppWebMedia(
   });
 }
 
-export async function disconnectWhatsAppWeb() {
+export async function disconnectWhatsAppWeb(tenantId: string) {
+  const runtime = runtimeFor(tenantId);
   if (runtime.socket) await runtime.socket.logout();
   runtime.socket = null;
   runtime.status = 'disconnected';
   runtime.qrCode = null;
   runtime.phone = null;
+}
+
+/**
+ * Ao subir o servidor, religa as sessões que já foram pareadas (pasta de
+ * credenciais existente), para as mensagens recebidas continuarem
+ * entrando sem ninguém precisar abrir a tela de Integrações.
+ */
+export async function resumeSavedWhatsAppSessions() {
+  const fs = await import('node:fs/promises');
+  const tenantIds: string[] = [];
+
+  const platform = await platformTenantId();
+  if (platform && (await fs.stat(path.join(BASE_SESSION_PATH, 'creds.json')).catch(() => null))) {
+    tenantIds.push(platform);
+  }
+  const entries = await fs.readdir(TENANT_SESSIONS_DIR).catch(() => [] as string[]);
+  for (const entry of entries) {
+    if (/^[0-9a-f-]{36}$/i.test(entry) && (await fs.stat(path.join(TENANT_SESSIONS_DIR, entry, 'creds.json')).catch(() => null))) {
+      tenantIds.push(entry);
+    }
+  }
+
+  for (const tenantId of tenantIds) {
+    await startWhatsAppWeb(tenantId)?.catch((error) => console.error('[whatsapp-web] Falha ao religar sessão', tenantId, error));
+  }
 }

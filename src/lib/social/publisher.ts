@@ -15,6 +15,7 @@ import {
   claimPostForPublishing,
   getAccountsWithTokens,
   getPost,
+  getPostTenant,
   markAccountError,
   notifyUser,
   setPostStatus,
@@ -30,21 +31,25 @@ export async function claimAndPublishPost(
   fromStatuses: SocialPostStatus[],
   options: { detectLate?: boolean } = {}
 ): Promise<{ claimed: boolean; status?: SocialPostStatus }> {
-  const claimed = await claimPostForPublishing(postId, fromStatuses);
+  // Publica sempre com as contas da empresa dona do post.
+  const tenantId = await getPostTenant(postId);
+  if (!tenantId) return { claimed: false };
+
+  const claimed = await claimPostForPublishing(tenantId, postId, fromStatuses);
   if (!claimed) return { claimed: false };
 
-  const post = await getPost(postId);
+  const post = await getPost(tenantId, postId);
   if (!post) return { claimed: true, status: 'failed' };
 
   const pendingTargets = post.targets.filter((target) => target.status !== 'published');
-  const accounts = await getAccountsWithTokens(pendingTargets.map((target) => target.account_id));
+  const accounts = await getAccountsWithTokens(tenantId, pendingTargets.map((target) => target.account_id));
   const accountsById = new Map(accounts.map((account) => [account.id, account]));
   const imageUrls = post.media.map((item) => item.url);
 
   for (const target of pendingTargets) {
     const account = accountsById.get(target.account_id);
     if (!account || account.status === 'disconnected' || !account.access_token) {
-      await updateTarget(target.id, { status: 'failed', error: 'Conta desconectada. Reconecte em Redes Sociais → Contas.' });
+      await updateTarget(tenantId, target.id, { status: 'failed', error: 'Conta desconectada. Reconecte em Redes Sociais → Contas.' });
       continue;
     }
 
@@ -64,7 +69,7 @@ export async function claimAndPublishPost(
               imageUrls,
             });
 
-      await updateTarget(target.id, {
+      await updateTarget(tenantId, target.id, {
         status: 'published',
         external_id: result.externalId,
         permalink: result.permalink,
@@ -72,25 +77,26 @@ export async function claimAndPublishPost(
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro desconhecido ao publicar.';
-      await updateTarget(target.id, { status: 'failed', error: message });
+      await updateTarget(tenantId, target.id, { status: 'failed', error: message });
       if (err instanceof MetaGraphError && err.tokenInvalid) {
-        await markAccountError(account.id, message);
+        await markAccountError(tenantId, account.id, message);
       }
     }
   }
 
   const late = Boolean(options.detectLate && claimed.scheduled_at) &&
     Date.now() - new Date(claimed.scheduled_at as string).getTime() > LATE_THRESHOLD_MS;
-  const status = await consolidatePostStatus(postId, late);
+  const status = await consolidatePostStatus(tenantId, postId, late);
   await notifyAuthor(claimed.created_by, status, post.caption);
   return { claimed: true, status };
 }
 
 /** Recalcula o status do post a partir dos destinos e grava. */
-export async function consolidatePostStatus(postId: string, late = false): Promise<SocialPostStatus> {
+export async function consolidatePostStatus(tenantId: string, postId: string, late = false): Promise<SocialPostStatus> {
   const { data: targets } = await supabaseAdmin
     .from('social_post_targets')
     .select('status')
+    .eq('tenant_id', tenantId)
     .eq('post_id', postId);
 
   const all = targets || [];
@@ -101,7 +107,7 @@ export async function consolidatePostStatus(postId: string, late = false): Promi
   else if (publishedCount > 0) status = 'partial';
   else status = 'failed';
 
-  await setPostStatus(postId, status, {
+  await setPostStatus(tenantId, postId, status, {
     publishing_started_at: null,
     ...(publishedCount > 0 ? { published_at: new Date().toISOString() } : {}),
   });

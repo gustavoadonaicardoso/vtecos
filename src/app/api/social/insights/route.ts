@@ -11,7 +11,7 @@ const ALLOWED_DAYS = [7, 30];
 const TOP_POSTS_SAMPLE = 12;
 
 export async function GET(request: Request) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'social' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const accountId = params.get('accountId') || '';
   const days = ALLOWED_DAYS.includes(Number(params.get('days'))) ? Number(params.get('days')) : 7;
 
-  const [account] = await getAccountsWithTokens([accountId]);
+  const [account] = await getAccountsWithTokens(auth.tenantId, [accountId]);
   if (!account || account.status === 'disconnected' || !account.access_token) {
     return NextResponse.json({ error: 'Conta não encontrada ou desconectada.' }, { status: 404 });
   }
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
       const since = new Date(Date.now() - days * 86_400_000).toISOString();
       const [overview, targets] = await Promise.all([
         fetchAccountInsights(account, days),
-        listPublishedTargets(account.id, since, TOP_POSTS_SAMPLE),
+        listPublishedTargets(auth.tenantId, account.id, since, TOP_POSTS_SAMPLE),
       ]);
 
       const topPosts: SocialTopPost[] = await Promise.all(
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data });
   } catch (error) {
     if (error instanceof MetaGraphError && error.tokenInvalid) {
-      await markAccountError(account.id, error.message);
+      await markAccountError(auth.tenantId, account.id, error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     console.error('[social] falha ao buscar insights:', error);

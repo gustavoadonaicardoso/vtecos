@@ -20,7 +20,7 @@ function sanitizeHashtag(raw: unknown) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'social' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

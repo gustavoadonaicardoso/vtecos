@@ -14,9 +14,11 @@ export async function POST(request: Request) {
     const { action, details, entityType, entityId } = body;
 
     const profile = await getAuthenticatedProfile();
-    const user = profile ? { id: profile.id, name: profile.name } : null;
+    // Sem sessão não há empresa: o registro é descartado.
+    if (!profile?.tenant_id) return NextResponse.json({ success: true });
+    const user = { id: profile.id, name: profile.name };
 
-    await logAudit(user, action, details, entityType, entityId, supabaseAdmin);
+    await logAudit(user, action, details, entityType, entityId, supabaseAdmin, profile.tenant_id);
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erro ao registrar auditoria.';

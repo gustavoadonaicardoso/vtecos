@@ -33,7 +33,7 @@ const NewLeadModal = () => {
   useEffect(() => {
     const fetchProfiles = async () => {
       if (!supabase) return;
-      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').neq('account_type', 'CLIENT').order('name');
+      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').order('name');
       if (data) setProfiles(data);
     };
 

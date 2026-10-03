@@ -8,5 +8,5 @@ export async function GET() {
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
-  return NextResponse.json({ success: true, data: await buildDashboardSummary(auth.profile) });
+  return NextResponse.json({ success: true, data: await buildDashboardSummary(auth.profile, auth.tenantId, auth.modules) });
 }

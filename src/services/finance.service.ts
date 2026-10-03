@@ -557,6 +557,7 @@ export async function createSales(
 
   let inserted: FinSale[] = [];
   for (let start = 0; start < rows.length; start += 500) {
+    // tenant-scope: ok (cada linha montada acima leva tenant_id)
     const { data, error } = await db.from('fin_sales').insert(rows.slice(start, start + 500)).select();
     if (error) throw new Error(error.message);
     inserted = inserted.concat((data || []).map(toSale));
@@ -595,11 +596,13 @@ export async function importRows(tenantId: string, kind: 'ingredients' | 'fixed_
       }
     }
     if (toInsert.length > 0) {
+      // tenant-scope: ok (cada linha de valid/toInsert leva tenant_id)
       const { error } = await db.from('fin_ingredients').insert(toInsert);
       if (error) throw new Error(error.message);
       inserted = toInsert.length;
     }
   } else if (valid.length > 0) {
+    // tenant-scope: ok (cada linha de valid leva tenant_id)
     const { error } = await db.from('fin_fixed_costs').insert(valid);
     if (error) throw new Error(error.message);
     inserted = valid.length;

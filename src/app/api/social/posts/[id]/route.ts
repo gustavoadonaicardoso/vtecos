@@ -10,13 +10,13 @@ const LOCKED_STATUSES: SocialPostStatus[] = ['publishing', 'published', 'publish
 const REAPPROVAL_STATUSES: SocialPostStatus[] = ['scheduled', 'failed'];
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ module: 'social' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
 
   const { id } = await params;
-  const post = await getPost(id);
+  const post = await getPost(auth.tenantId, id);
   if (!post) return NextResponse.json({ error: 'Post não encontrado.' }, { status: 404 });
   return NextResponse.json({ success: true, data: post });
 }
@@ -40,16 +40,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   // que falhou e seria reenviado pelo "Tentar de novo": volta pra rascunho.
   // Volta ANTES de gravar o conteúdo novo, senão o agendador poderia pegar o
   // post editado entre as duas operações e publicar algo não aprovado.
-  const settings = await getSocialSettings();
+  const settings = await getSocialSettings(access.tenantId);
   const revertToDraft = needsApproval(access.profile, settings) && REAPPROVAL_STATUSES.includes(access.post.status);
   if (revertToDraft) {
-    const moved = await transitionPostStatus(id, [access.post.status], 'draft', { approved_by: null, approved_at: null });
+    const moved = await transitionPostStatus(access.tenantId, id, [access.post.status], 'draft', { approved_by: null, approved_at: null });
     if (!moved) {
       return NextResponse.json({ error: 'O post mudou de status enquanto você editava. Atualize a página.' }, { status: 409 });
     }
   }
 
-  const result = await updatePost(id, parsed.input);
+  const result = await updatePost(access.tenantId, id, parsed.input);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true, revertedToDraft: revertToDraft, data: result.data });
 }
@@ -65,7 +65,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'Aguarde a publicação terminar antes de excluir.' }, { status: 409 });
   }
 
-  const result = await deletePost(id);
+  const result = await deletePost(access.tenantId, id);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true });
 }

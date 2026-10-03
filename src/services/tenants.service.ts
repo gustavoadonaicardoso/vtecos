@@ -2,8 +2,8 @@
  * ============================================================
  * VÓRTICE CRM — Tenants Service
  * ============================================================
- * Empresas clientes (painel Master): plano contratado e logins de
- * cliente (profiles com account_type CLIENT presos à empresa).
+ * Empresas (painel Master): plano contratado e usuários de cada empresa.
+ * Cada empresa só enxerga os próprios dados (ver migration 202610050001).
  * ============================================================
  */
 
@@ -41,8 +41,8 @@ export function parseTenantInput(body: Record<string, unknown>, partial: boolean
 
 export async function fetchTenants(): Promise<ServiceResult<Record<string, unknown>[]>> {
   const [{ data, error }, { data: users }] = await Promise.all([
-    supabase.from('tenants').select('*').order('created_at', { ascending: false }),
-    supabase.from('profiles').select('tenant_id').eq('account_type', 'CLIENT'),
+    supabase.from('tenants').select('*').order('is_platform', { ascending: false }).order('created_at', { ascending: false }),
+    supabase.from('profiles').select('tenant_id'),
   ]);
 
   if (error) return { success: false, error: error.message };
@@ -61,12 +61,21 @@ export async function fetchTenantById(id: string) {
 export async function createTenant(input: TenantInput): Promise<ServiceResult<Record<string, unknown>>> {
   const { data, error } = await supabase
     .from('tenants')
-    .insert({ status: 'ACTIVE', ...input })
+    .insert({ status: 'ACTIVE', ...input, is_platform: false })
     .select()
     .single();
 
   if (error) return { success: false, error: error.message };
+  // Empresa nova já nasce com o funil padrão (o CRM precisa de etapas).
+  const { seedDefaultStages } = await import('@/services/pipeline.service');
+  await seedDefaultStages(data.id as string);
   return { success: true, data: { ...data, user_count: 0 } };
+}
+
+/** A empresa da plataforma (Vórtice) não pode ser suspensa nem trocar de plano. */
+export async function isPlatformTenant(id: string) {
+  const { data } = await supabase.from('tenants').select('is_platform').eq('id', id).maybeSingle();
+  return Boolean(data?.is_platform);
 }
 
 export async function updateTenant(id: string, input: TenantInput): Promise<ServiceResult<Record<string, unknown>>> {
@@ -80,7 +89,6 @@ export async function fetchTenantUsers(tenantId: string): Promise<ServiceResult<
   const { data, error } = await supabase
     .from('profiles')
     .select('id, name, email, role, status, created_at')
-    .eq('account_type', 'CLIENT')
     .eq('tenant_id', tenantId)
     .order('name');
   if (error) return { success: false, error: error.message };
@@ -93,14 +101,13 @@ export async function fetchTenantUser(tenantId: string, userId: string) {
     .from('profiles')
     .select('id, name, email, role, status')
     .eq('id', userId)
-    .eq('account_type', 'CLIENT')
     .eq('tenant_id', tenantId)
     .maybeSingle();
   return data;
 }
 
-export async function updateTenantUser(userId: string, updates: { role?: string; status?: string; name?: string }) {
-  const { data, error } = await supabase.from('profiles').update(updates).eq('id', userId).select('id, name, email, role, status, created_at').single();
+export async function updateTenantUser(tenantId: string, userId: string, updates: { role?: string; status?: string; name?: string }) {
+  const { data, error } = await supabase.from('profiles').update(updates).eq('tenant_id', tenantId).eq('id', userId).select('id, name, email, role, status, created_at').single();
   if (error) return { success: false as const, error: error.message };
   return { success: true as const, data };
 }

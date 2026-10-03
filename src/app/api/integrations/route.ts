@@ -4,10 +4,8 @@ import { requireAdminProfile } from '@/lib/session';
 
 /**
  * integrations_config guarda credenciais sensíveis (tokens, secrets).
- * A tabela é restrita a `authenticated` no Postgres, mas o navegador
- * nunca tem sessão real do Supabase Auth (é sempre `anon`) -- então
- * salvar/ler direto do cliente sempre falhava silenciosamente. Esta
- * rota roda com supabaseAdmin no servidor, gated por sessão de admin.
+ * Cada empresa tem as SUAS integrações (uma por provedor): o admin só lê
+ * e grava as da própria empresa.
  */
 export async function GET() {
   const auth = await requireAdminProfile();
@@ -15,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
 
-  const { data, error } = await supabaseAdmin.from('integrations_config').select('*');
+  const { data, error } = await supabaseAdmin.from('integrations_config').select('*').eq('tenant_id', auth.tenantId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data }, { status: 200 });
 }
@@ -33,8 +31,8 @@ export async function POST(request: Request) {
     }
 
     const { error } = await supabaseAdmin.from('integrations_config').upsert(
-      { provider, config: config ?? {}, updated_at: new Date().toISOString() },
-      { onConflict: 'provider' }
+      { tenant_id: auth.tenantId, provider, config: config ?? {}, updated_at: new Date().toISOString() },
+      { onConflict: 'tenant_id,provider' }
     );
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -55,7 +53,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'provider é obrigatório.' }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin.from('integrations_config').delete().eq('provider', provider);
+  const { error } = await supabaseAdmin.from('integrations_config').delete().eq('tenant_id', auth.tenantId).eq('provider', provider);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true }, { status: 200 });
 }
