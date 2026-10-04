@@ -1,7 +1,7 @@
 /**
  * Executado uma vez quando o servidor Next.js sobe.
  *
- * O agendador de posts das Redes Sociais só liga em produção E com a
+ * Os agendadores (posts das Redes Sociais e esperas das Automações) só ligam em produção E com a
  * flag explícita -- assim ele roda na VPS (que recebe o .env.local pelo
  * deploy.sh), mas nunca no `npm run dev` local nem nos previews da
  * Vercel, que publicariam posts de verdade.
@@ -20,4 +20,8 @@ export async function register() {
 
   const { startSocialScheduler } = await import('./lib/social/scheduler');
   startSocialScheduler();
+
+  // Automações: retoma as esperas (bloco Aguardar e perguntas sem resposta).
+  const { startAutomationScheduler } = await import('./lib/automations/engine');
+  startAutomationScheduler();
 }

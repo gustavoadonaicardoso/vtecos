@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { updateLeadInDb, deleteLeadFromDb, moveLeadToStage, fetchLeadOwner } from '@/services/leads.service';
+import { updateLeadInDb, deleteLeadFromDb, moveLeadToStage, fetchLeadOwner, fetchLeadStage } from '@/services/leads.service';
 import { requireActiveProfile } from '@/lib/session';
+import { fireAutomation, onStageChanged } from '@/lib/automations/engine';
 
 /**
  * Antes: qualquer requisição podia editar/apagar qualquer lead, sem
@@ -33,14 +34,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = await request.json();
     const { action, ...updates } = body;
 
+    // Etapa antes da mudança: lead que entra numa etapa dispara as automações dela.
+    const nextStage: string | undefined = action === 'move_stage' ? updates.stageId : updates.pipelineStage;
+    const previousStage = nextStage ? await fetchLeadStage(auth.tenantId, leadId) : null;
+    const notifyStage = () => {
+      if (nextStage && nextStage !== previousStage) fireAutomation(onStageChanged, auth.tenantId, leadId, String(nextStage));
+    };
+
     if (action === 'move_stage' && updates.stageId) {
       const result = await moveLeadToStage(auth.tenantId, leadId, updates.stageId);
       if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
+      notifyStage();
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
     const result = await updateLeadInDb(auth.tenantId, leadId, updates);
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
+    notifyStage();
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: unknown) {

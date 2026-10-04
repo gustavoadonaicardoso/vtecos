@@ -241,7 +241,7 @@ export async function integrationsOverview(tenantId: string, options: { isPlatfo
         envStatus('twilio', 'Twilio (Discador)', 'Ligações pelo navegador no Discador e no card do lead.', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_API_KEY', 'TWILIO_API_SECRET', 'TWILIO_TWIML_APP_SID', 'TWILIO_PHONE_NUMBER']),
         envStatus('gemini', 'Google Gemini (IA)', 'Legendas com IA nas Redes Sociais e geração de notas fiscais.', ['GEMINI_API_KEY']),
         envStatus('meta-app', 'App da Meta (Redes Sociais)', 'Conectar Instagram/Facebook e publicar posts.', ['META_APP_ID', 'META_APP_SECRET']),
-        envStatus('scheduler', 'Agendador de posts', 'Publica sozinho os posts agendados.', [], () => (process.env.CONTENT_SCHEDULER_ENABLED === 'true' ? null : 'CONTENT_SCHEDULER_ENABLED=true')),
+        envStatus('scheduler', 'Agendador do servidor', 'Publica os posts agendados e continua as esperas das automações.', [], () => (process.env.CONTENT_SCHEDULER_ENABLED === 'true' ? null : 'CONTENT_SCHEDULER_ENABLED=true')),
       ]
     : null;
 

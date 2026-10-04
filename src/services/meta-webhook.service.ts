@@ -16,6 +16,7 @@ import { applyBlastRouting } from '@/lib/messaging';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WhatsAppWebhookPayload, WhatsAppInboundMessage, WhatsAppMessageStatus } from '@/types';
 import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
+import { fireAutomation, onInboundMessage, onLeadCreated } from '@/lib/automations/engine';
 
 /** phone_number_id de todos os eventos do payload (para achar a empresa). */
 export function phoneNumberIdsOf(payload: WhatsAppWebhookPayload): string[] {
@@ -129,6 +130,7 @@ async function handleInboundMessage(
         leadId = newLead.id;
         isNewLead = true;
         emitIntegrationEvent(tenantId, 'lead.created', leadEventData(newLead, 'whatsapp'));
+        fireAutomation(onLeadCreated, tenantId, String(newLead.id), 'whatsapp');
         await logAudit(
           null,
           'LEAD_CREATE',
@@ -185,6 +187,9 @@ async function handleInboundMessage(
       })
       .eq('tenant_id', tenantId)
       .eq('id', leadId);
+
+    // Automações depois do last_msg, para a resposta do robô não ser sobrescrita.
+    if (!msgError) fireAutomation(onInboundMessage, tenantId, String(leadId), messageText || '', { isNewContact: isNewLead });
 
     // 5. Marca mensagem como lida (envia duplo-check azul)
     try {
