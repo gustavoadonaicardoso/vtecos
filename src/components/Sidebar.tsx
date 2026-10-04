@@ -28,7 +28,8 @@ import {
   Bell,
   Workflow,
   Share2,
-  Calculator
+  Calculator,
+  LogOut
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import { useSidebar } from '@/components/SidebarProvider';
@@ -77,7 +78,7 @@ const Sidebar = () => {
     { name: 'Integrações', icon: Blocks, path: '/integrations', permission: 'integrations.view' },
     { name: 'Notificações', icon: Bell, path: '/notificacoes' }, // Sempre visível — histórico é por usuário
     { name: 'Central de Ajuda', icon: LifeBuoy, path: '/help' }, // Public or always visible
-    { name: 'Configurações', icon: Settings, path: '/settings', permission: 'admin.settings' },
+    { name: 'Configurações', icon: Settings, path: '/settings' },
   ], []);
 
   // FIX #7: hasPermission vem do hook centralizado usePermissions()
@@ -179,32 +180,32 @@ const Sidebar = () => {
         </nav>
 
         <div className={styles.sidebarFooter}>
-          <button 
-            className={styles.profileCard} 
-            onClick={(e) => {
-              e.preventDefault();
-              logout();
-            }} 
-            title="Clique para sair"
-          >
-             <div className={styles.avatar}>
-               {user?.avatar_url ? (
-                 // eslint-disable-next-line @next/next/no-img-element
-                 <img src={user.avatar_url} alt="" className={styles.avatarImage} />
-               ) : (
-                 <>
-                   {user?.name?.charAt(0) || 'U'}
-                   {user?.name?.split(' ')[1]?.charAt(0) || ''}
-                 </>
-               )}
-             </div>
-            {!isCollapsed && (
-              <div className={styles.profileInfo}>
-                <p>{user?.name || 'Carregando...'}</p>
-                <span>{user?.role || 'Acessando...'}</span>
+          <div className={styles.footerRow}>
+            {/* O cartão abre Meu perfil; sair fica num botão separado
+                (antes o cartão inteiro era "sair", fácil de clicar sem querer). */}
+            <Link href="/settings" className={styles.profileCard} title="Meu perfil e configurações" onClick={closeMobileMenu}>
+              <div className={styles.avatar}>
+                {user?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.avatar_url} alt="" className={styles.avatarImage} />
+                ) : (
+                  <>
+                    {user?.name?.charAt(0) || 'U'}
+                    {user?.name?.split(' ')[1]?.charAt(0) || ''}
+                  </>
+                )}
               </div>
-            )}
-          </button>
+              {!isCollapsed && (
+                <div className={styles.profileInfo}>
+                  <p>{user?.name || 'Carregando...'}</p>
+                  <span>{ROLE_LABEL[user?.role || ''] || user?.role || 'Acessando...'}</span>
+                </div>
+              )}
+            </Link>
+            <button type="button" className={styles.logoutBtn} onClick={() => logout()} title="Sair do sistema" aria-label="Sair do sistema">
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
       </aside>
     </>
@@ -212,6 +213,8 @@ const Sidebar = () => {
 };
 
 
+
+const ROLE_LABEL: Record<string, string> = { ADMIN: 'Administrador', MANAGER: 'Gerente', SELLER: 'Vendedor' };
 
 /**
  * Fundo do menu escolhido no Painel Master: claro ou escuro? O texto do

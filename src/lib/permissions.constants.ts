@@ -26,6 +26,5 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/users': 'team.view',
   '/automations': 'automations.view',
   '/integrations': 'integrations.view',
-  '/settings': 'admin.settings',
   '/master': 'admin.root',
 };

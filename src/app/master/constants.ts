@@ -5,7 +5,6 @@ import {
   Building2,
   ClipboardList,
   Layout,
-  Lock,
   MessageCircle,
   MessageSquare,
   Palette,
@@ -165,7 +164,6 @@ export const MENU_PERMISSION_ITEMS = [
   { id: 'integrations.view', label: 'Integrações, Agendamento, Senhas e Notas Fiscais', icon: Blocks, cat: 'integrations', field: 'view' },
   { id: 'team.view', label: 'Equipe', icon: Settings, cat: 'team', field: 'view' },
   { id: 'automations.view', label: 'Automações', icon: Zap, cat: 'automations', field: 'view' },
-  { id: 'admin.settings', label: 'Configurações', icon: Lock, cat: 'admin', field: 'settings' },
 ];
 
 export const ROLE_TABS: { value: 'ADMIN' | 'MANAGER' | 'SELLER'; icon: typeof ShieldCheck }[] = [

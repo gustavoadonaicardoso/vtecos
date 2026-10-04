@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { showBrowserNotification } from '@/hooks/useBrowserNotifications';
 import { fetchUserNotifications } from '@/services/notifications.service';
+import { getNotificationPrefs } from '@/lib/notificationPrefs';
 
 const POLL_INTERVAL_MS = 15_000;
 
@@ -42,6 +43,7 @@ export default function BrowserNotificationListener() {
 
       if (newest.length > 0) {
         lastSeenRef.current = notifications[0].created_at;
+        if (!getNotificationPrefs().systemPopup) return;
         // Mais antiga primeiro, pra manter a ordem cronológica dos toasts
         for (const notification of newest.slice().reverse()) {
           showBrowserNotification(notification);

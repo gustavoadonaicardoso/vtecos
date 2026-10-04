@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLeads } from '@/context/LeadContext';
 import { showBrowserNotification } from '@/hooks/useBrowserNotifications';
 import { playNotificationSound } from '@/lib/notificationSound';
+import { getNotificationPrefs } from '@/lib/notificationPrefs';
 
 /**
  * Toca som + mostra pop-up sempre que chega uma mensagem nova de
@@ -37,7 +38,10 @@ export default function WhatsAppNotificationListener() {
 
           if (message.sent_by_me) return;
 
-          playNotificationSound();
+          // Configurações > Notificações (vale por aparelho).
+          const prefs = getNotificationPrefs();
+          if (prefs.whatsappSound) playNotificationSound();
+          if (!prefs.whatsappPopup) return;
 
           const lead = leadsRef.current.find((l) => l.id === message.lead_id);
           const preview =
