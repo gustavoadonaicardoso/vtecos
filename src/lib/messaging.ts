@@ -149,6 +149,16 @@ export async function applyBlastRouting(
 }
 
 /**
+ * Avisos para as integrações de saída (webhooks, Google Sheets). Quem chama
+ * (servidor) passa o emissor -- este arquivo também é importado pela tela
+ * de Mensagens, então não pode importar nada exclusivo do servidor.
+ */
+export interface InboundEventSink {
+    leadCreated?: (lead: Record<string, unknown>) => void;
+    messageReceived?: (data: Record<string, unknown>) => void;
+}
+
+/**
  * Processa uma mensagem de WhatsApp recebida (cria/atualiza lead, salva a
  * mensagem, aplica roteamento de campanha). Usado pelo listener do WhatsApp
  * Web (src/lib/whatsapp-web.ts) sempre que chega uma mensagem nova.
@@ -157,7 +167,7 @@ export async function applyBlastRouting(
  * empresa dona do número que recebeu a mensagem (tenantId).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function processInboundWhatsAppMessage(payload: any, db: any, tenantId: string) {
+export async function processInboundWhatsAppMessage(payload: any, db: any, tenantId: string, events: InboundEventSink = {}) {
     if (!db || !tenantId) return { success: false, error: 'Empresa não identificada.' };
 
     try {
@@ -203,6 +213,7 @@ export async function processInboundWhatsAppMessage(payload: any, db: any, tenan
                 if (newLead) {
                     leadId = newLead.id;
                     await logAudit(null, 'LEAD_CREATE', `Lead ${senderName} criado via WhatsApp.`, 'lead', newLead.id, db, tenantId);
+                    events.leadCreated?.(newLead);
                 }
             }
 
@@ -229,6 +240,17 @@ export async function processInboundWhatsAppMessage(payload: any, db: any, tenan
 
                 // 5. Roteamento de campanha (disparos) da mesma empresa
                 await applyBlastRouting(db, cleanPhone, searchSuffix, leadId, tenantId);
+
+                // 6. Webhooks da empresa (Integrações)
+                events.messageReceived?.({
+                    lead_id: String(leadId),
+                    lead_name: targetLead?.name || senderName,
+                    phone: cleanPhone,
+                    text: messageText || null,
+                    type: messageType,
+                    media_url: mediaUrl || null,
+                    received_at: new Date().toISOString(),
+                });
             }
         }
 

@@ -15,6 +15,7 @@ import { logAudit } from '@/lib/audit';
 import { applyBlastRouting } from '@/lib/messaging';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WhatsAppWebhookPayload, WhatsAppInboundMessage, WhatsAppMessageStatus } from '@/types';
+import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
 
 /** phone_number_id de todos os eventos do payload (para achar a empresa). */
 export function phoneNumberIdsOf(payload: WhatsAppWebhookPayload): string[] {
@@ -127,6 +128,7 @@ async function handleInboundMessage(
       } else if (newLead) {
         leadId = newLead.id;
         isNewLead = true;
+        emitIntegrationEvent(tenantId, 'lead.created', leadEventData(newLead, 'whatsapp'));
         await logAudit(
           null,
           'LEAD_CREATE',
@@ -162,6 +164,16 @@ async function handleInboundMessage(
 
     if (msgError) {
       console.error('[Webhook Meta] Erro ao salvar mensagem:', msgError);
+    } else {
+      emitIntegrationEvent(tenantId, 'message.received', {
+        lead_id: leadId,
+        lead_name: targetLead?.name || senderName,
+        phone: cleanPhone,
+        text: messageText || null,
+        type: messageType,
+        media_url: null,
+        received_at: new Date().toISOString(),
+      });
     }
 
     // 4. Atualiza last_msg do lead

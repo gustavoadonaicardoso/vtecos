@@ -1,0 +1,53 @@
+.rich { display: flex; flex-direction: column; gap: 10px; line-height: 1.65; font-size: 0.93rem; }
+.rich p { margin: 0; }
+.rich ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.rich a { color: var(--accent); word-break: break-all; }
+.rich strong { font-weight: 700; }
+
+.inlineCode {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.16);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  word-break: break-all;
+}
+
+.codeBlock {
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: #0f172a;
+  color: #e2e8f0;
+  overflow: hidden;
+}
+
+.codeBlock pre {
+  margin: 0;
+  padding: 16px;
+  padding-top: 40px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.copyBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copyBtn:hover { background: rgba(255, 255, 255, 0.16); }

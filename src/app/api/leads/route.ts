@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { fetchLeadsAndStages, createLead } from '@/services/leads.service';
 import { requireActiveProfile } from '@/lib/session';
+import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
 
 /**
  * Antes: userId/role vinham direto de headers enviados pelo próprio
@@ -36,6 +37,17 @@ export async function POST(request: Request) {
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+
+    const lead = result.data!;
+    emitIntegrationEvent(auth.tenantId, 'lead.created', leadEventData({
+      id: lead.id,
+      name: lead.name,
+      phone: lead.phone,
+      email: lead.email,
+      value: parseFloat(String(lead.value || '0').replace(/[^0-9,-]+/g, '').replace(',', '.')) || 0,
+      stage_id: lead.pipelineStage,
+      created_at: lead.createdAt,
+    }, 'manual'));
 
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (error: unknown) {

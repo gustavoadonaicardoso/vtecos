@@ -1,385 +1,195 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { AlertTriangle, ArrowUpRight, BookOpen, CheckCircle2, Circle, Loader2, Lock, Search, Server } from 'lucide-react';
 import styles from './integrations.module.css';
-import { WhatsAppService } from '@/lib/whatsapp';
+import { useAuth } from '@/context/AuthContext';
+import { CATALOG, CATEGORIES, type CardStatus, type CatalogItem, type DeliveryInfo, type Overview } from './constants';
+import IntegrationModal from './components/IntegrationModal';
 
-import {
-  INTEGRATIONS,
-  type WaConfig,
-  type MetaConfig,
-  type WebConfig,
-  type WebhookConfig,
-  type SaveStatus,
-  type WhatsAppWebConnectionState,
-} from './constants';
-import IntegrationsHeader from './components/IntegrationsHeader';
-import IntegrationsGrid from './components/IntegrationsGrid';
-import WhatsAppModal from './components/modals/WhatsAppModal';
-import MetaAdsModal from './components/modals/MetaAdsModal';
-import WhatsAppWebModal from './components/modals/WhatsAppWebModal';
-import WebhookModal from './components/modals/WebhookModal';
-import GoogleSheetsModal from './components/modals/GoogleSheetsModal';
-import GenericModal from './components/modals/GenericModal';
+const STATUS_LABEL: Record<CardStatus, string> = { connected: 'Conectado', attention: 'Atenção', off: 'Não configurado' };
 
-export default function Integrations() {
-  const [filter, setFilter] = useState('Todos'); // Changed to localized "Todos"
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [originUrl, setOriginUrl] = useState('https://vtec.vorticetecnologia.com.br');
+function statusOf(item: CatalogItem, overview: Overview): { status: CardStatus; detail: string } {
+  if (item.id === 'whatsapp-web') {
+    const web = overview.whatsappWeb;
+    if (web?.connected) return { status: 'connected', detail: web.phone ? `Número ${web.phone}` : 'Sessão ativa' };
+    return { status: 'off', detail: 'Leia o QR Code para conectar' };
+  }
+  if (item.id === 'social') {
+    const count = overview.socialAccounts ?? 0;
+    return count > 0 ? { status: 'connected', detail: `${count} conta(s) conectada(s)` } : { status: 'off', detail: 'Conecte em Redes Sociais > Contas' };
+  }
+  const integration = overview.integrations.find((row) => row.provider === item.provider);
+  if (!integration) return { status: 'off', detail: 'Ainda não configurado' };
+  if (integration.config.enabled === false) return { status: 'attention', detail: 'Desativado' };
+  const delivery = integration.config.last_delivery as DeliveryInfo | undefined;
+  if (delivery && !delivery.ok) return { status: 'attention', detail: `Último envio falhou: ${delivery.error || 'erro'}` };
+  if (item.id === 'whatsapp-api' && !integration.secrets.appSecret) return { status: 'attention', detail: 'Falta a chave secreta do app' };
+  return { status: 'connected', detail: delivery ? `Último envio ${new Date(delivery.at).toLocaleString('pt-BR')}` : 'Configurado' };
+}
 
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOriginUrl(window.location.origin);
-    }
+async function fetchOverview(): Promise<{ data?: Overview; error?: string }> {
+  try {
+    const response = await fetch('/api/integrations', { cache: 'no-store' });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: json.error || 'Não foi possível carregar as integrações.' };
+    return { data: json.data };
+  } catch {
+    return { error: 'Não foi possível carregar as integrações.' };
+  }
+}
+
+export default function IntegrationsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const modules = user?.workspace?.modules;
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [error, setError] = useState('');
+  const [filter, setFilter] = useState<(typeof CATEGORIES)[number]>('Todos');
+  const [search, setSearch] = useState('');
+  const [openId, setOpenId] = useState<CatalogItem['id'] | null>(null);
+
+  const apply = useCallback((result: { data?: Overview; error?: string }) => {
+    setError(result.error || '');
+    if (result.data) setOverview(result.data);
   }, []);
 
-  // WhatsApp Config State
-  const [waConfig, setWaConfig] = useState<WaConfig>({
-    token: '',
-    phoneId: '',
-    wabaId: ''
-  });
+  const load = useCallback(async () => apply(await fetchOverview()), [apply]);
 
-  // Meta Config State
-  const [metaConfig, setMetaConfig] = useState<MetaConfig>({
-    pageToken: '',
-    pageId: '',
-    instagramId: ''
-  });
+  useEffect(() => {
+    if (isAdmin) fetchOverview().then(apply);
+  }, [isAdmin, apply]);
 
-  const [webConfig, setWebConfig] = useState<WebConfig>({ name: 'WhatsApp principal' });
+  // Só o que o plano da empresa libera.
+  const available = useMemo(() => CATALOG.filter((item) => !modules || modules.includes(item.module)), [modules]);
 
-  // Webhook Config State
-  const [webhookConfig, setWebhookConfig] = useState<WebhookConfig>({
-    url: '',
-    secret: ''
-  });
+  const cards = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return available
+      .filter((item) => filter === 'Todos' || item.category === filter)
+      .filter((item) => !term || `${item.name} ${item.description} ${item.category}`.toLowerCase().includes(term))
+      .map((item) => ({ item, ...(overview ? statusOf(item, overview) : { status: 'off' as CardStatus, detail: '' }) }));
+  }, [available, filter, search, overview]);
 
-  const [isTesting, setIsTesting] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  const [whatsappWebQr, setWhatsAppWebQr] = useState<string | null>(null);
-  const [isFetchingQr, setIsFetchingQr] = useState(false);
-  const [whatsappWebConnection, setWhatsAppWebConnection] = useState<WhatsAppWebConnectionState>('idle');
-  const [whatsappWebConnectionMessage, setWhatsAppWebConnectionMessage] = useState('');
-  const qrRefreshCount = React.useRef(0);
+  const connectedCount = overview ? available.filter((item) => statusOf(item, overview).status === 'connected').length : 0;
+  const openItem = available.find((item) => item.id === openId) || null;
 
-  const requestWhatsAppWeb = React.useCallback(async () => {
-    const response = await fetch('/api/whatsapp/web/connection', { cache: 'no-store' });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Erro ao conectar com o WhatsApp Web.');
-    return data;
-  }, []);
-
-  const fetchWhatsAppWebQrCode = React.useCallback(async (isRefresh = false) => {
-    setIsFetchingQr(true);
-    if (!isRefresh) {
-      setWhatsAppWebQr(null);
-      qrRefreshCount.current = 0;
-    }
-    setWhatsAppWebConnection('waiting');
-    setWhatsAppWebConnectionMessage('Aguardando leitura do QR Code...');
-
-    try {
-      const status = await requestWhatsAppWeb();
-      if (status.connected) {
-        setWhatsAppWebQr(null);
-        setWhatsAppWebConnection('connected');
-        setWhatsAppWebConnectionMessage('WhatsApp conectado com sucesso.');
-        return;
-      }
-
-      setWhatsAppWebQr(status.qrCode || null);
-    } catch (err) {
-      console.error(err);
-      setWhatsAppWebConnection('error');
-      setWhatsAppWebConnectionMessage(err instanceof Error ? err.message : 'Erro ao conectar com WhatsApp Web.');
-    } finally {
-      setIsFetchingQr(false);
-    }
-  }, [requestWhatsAppWeb]);
-
-  React.useEffect(() => {
-    if (activeModal !== 'whatsapp-web' || whatsappWebConnection !== 'waiting') return;
-
-    const timer = window.setInterval(async () => {
-      try {
-        const status = await requestWhatsAppWeb();
-        if (status.connected) {
-          setWhatsAppWebQr(null);
-          setWhatsAppWebConnection('connected');
-          setWhatsAppWebConnectionMessage('WhatsApp conectado com sucesso. Salve a integração para ativá-la no CRM.');
-          window.clearInterval(timer);
-          return;
-        }
-
-        if (status.qrCode) setWhatsAppWebQr(status.qrCode);
-
-        if (qrRefreshCount.current >= 30) {
-          setWhatsAppWebQr(null);
-          setWhatsAppWebConnection('idle');
-          setWhatsAppWebConnectionMessage('QR Code expirado. Gere um novo código para tentar novamente.');
-          window.clearInterval(timer);
-          return;
-        }
-
-        qrRefreshCount.current += 1;
-      } catch (error) {
-        setWhatsAppWebConnection('error');
-        setWhatsAppWebConnectionMessage(error instanceof Error ? error.message : 'Falha ao verificar a conexão.');
-        window.clearInterval(timer);
-      }
-    }, 2_000);
-
-    return () => window.clearInterval(timer);
-  }, [activeModal, requestWhatsAppWeb, whatsappWebConnection]);
-
-  const handleTestConnection = async () => {
-    if (!waConfig.token || !waConfig.phoneId) {
-       alert("Preencha o Token e o Phone ID primeiro!");
-       return;
-    }
-
-    setIsTesting(true);
-    const success = await WhatsAppService.validateConnection({
-      token: waConfig.token,
-      phoneId: waConfig.phoneId
-    });
-
-    setIsTesting(false);
-    if (success) {
-      alert("✅ Conexão validada com sucesso via Meta Graph API!");
-    } else {
-      alert("❌ Falha na conexão. Verifique o Token e o ID do Telefone.");
-    }
-  };
-
-  const [connectedProviders, setConnectedProviders] = useState<string[]>([]);
-
-  const fetchConfigs = async () => {
-    const response = await fetch('/api/integrations');
-    if (!response.ok) return;
-    const { data } = await response.json() as { data?: Array<{ provider: string; config: Record<string, string> }> };
-    if (data) {
-      const providers = data.map((item) => item.provider);
-      setConnectedProviders(providers);
-
-      data.forEach((item) => {
-        if (item.provider === 'whatsapp_web') {
-          setWebConfig({ name: item.config.name || 'WhatsApp principal' });
-        } else if (item.provider === 'whatsapp_meta') {
-          setWaConfig({ token: item.config.token, phoneId: item.config.phoneId, wabaId: item.config.wabaId });
-        } else if (item.provider === 'meta_ads') {
-          setMetaConfig({ pageToken: item.config.pageToken, pageId: item.config.pageId, instagramId: item.config.instagramId });
-        } else if (item.provider === 'webhook_custom') {
-          setWebhookConfig({ url: item.config.url, secret: item.config.secret });
-        }
-      });
-    }
-  };
-
-  React.useEffect(() => {
-    fetchConfigs();
-  }, []);
-
-  const handleSaveConfig = async (type: 'whatsapp' | 'meta' | 'whatsapp-web' | 'webhook' = 'whatsapp') => {
-     setSaveStatus('saving');
-
-     try {
-       let configToSave = {};
-       let provider = '';
-
-       if (type === 'whatsapp-web') {
-         configToSave = webConfig;
-         provider = 'whatsapp_web';
-       } else if (type === 'whatsapp') {
-         configToSave = waConfig;
-         provider = 'whatsapp_meta';
-       } else if (type === 'webhook') {
-         configToSave = webhookConfig;
-         provider = 'webhook_custom';
-       } else {
-         configToSave = metaConfig;
-         provider = 'meta_ads';
-       }
-
-       const response = await fetch('/api/integrations', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ provider, config: configToSave }),
-       });
-       const result = await response.json();
-       if (!response.ok) throw new Error(result.error || 'Erro ao salvar configuração.');
-
-       setConnectedProviders(prev => prev.includes(provider) ? prev : [...prev, provider]);
-       setSaveStatus('success');
-       setTimeout(() => {
-         setActiveModal(null);
-         setSaveStatus('idle');
-         // O status visual será atualizado no próximo reload ou via estado global se implementado
-       }, 1500);
-     } catch (err) {
-       console.error(err);
-       setSaveStatus('error');
-       alert("Erro ao salvar configuração.");
-       setTimeout(() => setSaveStatus('idle'), 3000);
-     }
-  };
-
-  const handleDisconnect = async (provider: string) => {
-    const confirmed = confirm(
-      `Tem certeza que deseja remover a integração com ${provider === 'whatsapp_web' ? 'WhatsApp Web' : provider}?`
+  if (!isAdmin) {
+    return (
+      <div className={styles.container}>
+        <header className={styles.header}>
+          <div>
+            <h1>Integrações</h1>
+            <p>Conexões do sistema com WhatsApp, site, planilhas e outros serviços.</p>
+          </div>
+        </header>
+        <div className={styles.notice}>
+          <Lock size={18} />
+          <div>
+            <strong>Só administradores configuram as integrações.</strong>
+            <span>Peça a um administrador da sua empresa. Os tutoriais estão na Central de Ajuda.</span>
+          </div>
+          <Link href="/help" className={styles.secondaryBtn}><BookOpen size={16} /> Central de Ajuda</Link>
+        </div>
+      </div>
     );
-    if (!confirmed) return;
-
-    try {
-      if (provider === 'whatsapp_web') {
-        const response = await fetch('/api/whatsapp/web/connection', {
-          method: 'DELETE',
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Não foi possível desconectar o WhatsApp.');
-      }
-
-      const response = await fetch(`/api/integrations?provider=${encodeURIComponent(provider)}`, {
-        method: 'DELETE',
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Erro ao remover integração.');
-
-      setConnectedProviders(prev => prev.filter(p => p !== provider));
-
-      if (provider === 'whatsapp_web') {
-        setWebConfig({ name: 'WhatsApp principal' });
-        setWhatsAppWebQr(null);
-        setWhatsAppWebConnection('idle');
-        setWhatsAppWebConnectionMessage('');
-      }
-
-      setActiveModal(null);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao remover integração.');
-    }
-  };
-
-  const filteredIntegrations = INTEGRATIONS.map(item => {
-    let currentStatus = item.status;
-    if (item.id === 'whatsapp-web' && connectedProviders.includes('whatsapp_web')) currentStatus = 'connected';
-    if (item.id === 'whatsapp' && connectedProviders.includes('whatsapp_meta')) currentStatus = 'connected';
-    if (item.id === 'meta-ads' && connectedProviders.includes('meta_ads')) currentStatus = 'connected';
-    if (item.id === 'webhook' && connectedProviders.includes('webhook_custom')) currentStatus = 'connected';
-
-    return { ...item, status: currentStatus };
-  }).filter(item => {
-    const matchesFilter = filter === 'Todos' || item.category === filter;
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
-
-  const openAppModal = (id: string) => {
-    setActiveModal(id);
-  };
-
-  const closeModal = () => setActiveModal(null);
-
-  const renderModalContent = () => {
-    if (activeModal === 'whatsapp') {
-      return (
-        <WhatsAppModal
-          waConfig={waConfig}
-          onWaConfigChange={setWaConfig}
-          isTesting={isTesting}
-          saveStatus={saveStatus}
-          originUrl={originUrl}
-          onTestConnection={handleTestConnection}
-          onSave={() => handleSaveConfig('whatsapp')}
-          onClose={closeModal}
-        />
-      );
-    }
-
-    if (activeModal === 'meta-ads') {
-      return (
-        <MetaAdsModal
-          metaConfig={metaConfig}
-          onMetaConfigChange={setMetaConfig}
-          saveStatus={saveStatus}
-          originUrl={originUrl}
-          onSave={() => handleSaveConfig('meta')}
-          onClose={closeModal}
-        />
-      );
-    }
-
-    if (activeModal === 'whatsapp-web') {
-      return (
-        <WhatsAppWebModal
-          webConfig={webConfig}
-          onWebConfigChange={setWebConfig}
-          whatsappWebQr={whatsappWebQr}
-          whatsappWebConnection={whatsappWebConnection}
-          whatsappWebConnectionMessage={whatsappWebConnectionMessage}
-          isFetchingQr={isFetchingQr}
-          saveStatus={saveStatus}
-          isConnected={connectedProviders.includes('whatsapp_web')}
-          onFetchQr={() => fetchWhatsAppWebQrCode()}
-          onSave={() => handleSaveConfig('whatsapp-web')}
-          onDisconnect={() => handleDisconnect('whatsapp_web')}
-          onClose={closeModal}
-        />
-      );
-    }
-
-    if (activeModal === 'webhook') {
-      return (
-        <WebhookModal
-          webhookConfig={webhookConfig}
-          onWebhookConfigChange={setWebhookConfig}
-          saveStatus={saveStatus}
-          onSave={() => handleSaveConfig('webhook')}
-          onClose={closeModal}
-        />
-      );
-    }
-
-    if (activeModal === 'google-sheets') {
-      return <GoogleSheetsModal onClose={closeModal} />;
-    }
-
-    // Default Custom Integration
-    return <GenericModal onClose={closeModal} />;
-  };
+  }
 
   return (
     <div className={styles.container}>
-      <IntegrationsHeader
-        connectedCount={connectedProviders.length}
-        searchQuery={searchQuery}
-        filter={filter}
-        onSearchChange={setSearchQuery}
-        onFilterChange={setFilter}
-      />
-
-      <IntegrationsGrid items={filteredIntegrations} onOpenModal={openAppModal} />
-
-      <div className={styles.customRequest}>
-        <div className={styles.requestContent}>
-          <h3>Precisa de uma integração personalizada via API?</h3>
-          <p>Fale com nossa equipe técnica engenharia para desenhar endpoints dedicados.</p>
+      <header className={styles.header}>
+        <div>
+          <h1>Integrações</h1>
+          <p>Conecte o WhatsApp, receba leads do site e envie dados para outros sistemas. Cada integração tem o passo a passo dentro dela.</p>
         </div>
-        <button className={styles.requestBtn}>
-          Falar com Suporte Técnico
-        </button>
+        <div className={styles.stats}>
+          <div><strong>{overview ? connectedCount : '–'}</strong><span>conectada(s)</span></div>
+          <div><strong>{available.length}</strong><span>disponíveis no seu plano</span></div>
+        </div>
+      </header>
+
+      <div className={styles.toolbar}>
+        <label className={styles.search}>
+          <Search size={17} />
+          <input type="search" placeholder="Buscar integração..." value={search} onChange={(event) => setSearch(event.target.value)} />
+        </label>
+        <div className={styles.filters}>
+          {CATEGORIES.map((category) => (
+            <button key={category} type="button" className={filter === category ? styles.filterActive : ''} onClick={() => setFilter(category)}>
+              {category}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {activeModal && (
-        <div className={styles.modalOverlay} onClick={closeModal}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            {renderModalContent()}
-          </div>
+      {error && <div className={styles.error}><AlertTriangle size={16} /> <span>{error}</span></div>}
+      {!overview && !error && <div className={styles.loading}><Loader2 size={18} className={styles.spin} /> Carregando integrações...</div>}
+
+      {overview && (
+        <div className={styles.grid}>
+          {cards.map(({ item, status, detail }) => (
+            <article key={item.id} className={styles.card}>
+              <div className={styles.cardTop}>
+                <span className={styles.iconBox} style={{ color: item.color, background: `${item.color}1f` }}><item.icon size={22} /></span>
+                <span className={`${styles.pill} ${styles[`pill_${status}`]}`}>
+                  {status === 'connected' ? <CheckCircle2 size={12} /> : status === 'attention' ? <AlertTriangle size={12} /> : <Circle size={10} />}
+                  {STATUS_LABEL[status]}
+                </span>
+              </div>
+              <div className={styles.cardBody}>
+                <h3>{item.name}</h3>
+                <p>{item.description}</p>
+                <span className={styles.detail}>{detail}</span>
+              </div>
+              <div className={styles.cardFoot}>
+                <span className={styles.category}>{item.category}</span>
+                <button type="button" className={status === 'off' ? styles.primaryBtn : styles.secondaryBtn} onClick={() => setOpenId(item.id)}>
+                  {status === 'off' ? 'Conectar' : 'Gerenciar'} <ArrowUpRight size={15} />
+                </button>
+              </div>
+            </article>
+          ))}
+          {cards.length === 0 && <div className={styles.empty}>Nenhuma integração encontrada.</div>}
         </div>
+      )}
+
+      {overview?.platform && (
+        <section className={styles.platform}>
+          <div className={styles.platformHead}>
+            <Server size={18} />
+            <div>
+              <h2>Serviços da plataforma</h2>
+              <p>Configurados no servidor (arquivo <code>.env.local</code> da VPS) e válidos para todas as empresas. Só a Vórtice vê este quadro.</p>
+            </div>
+          </div>
+          <div className={styles.platformGrid}>
+            {overview.platform.map((service) => (
+              <div key={service.key} className={styles.platformItem}>
+                <span className={`${styles.pill} ${service.configured ? styles.pill_connected : styles.pill_attention}`}>
+                  {service.configured ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+                  {service.configured ? 'Configurado' : 'Faltando'}
+                </span>
+                <strong>{service.label}</strong>
+                <span>{service.description}</span>
+                {!service.configured && <code className={styles.missing}>{service.missing.join(', ')}</code>}
+              </div>
+            ))}
+          </div>
+          <p className={styles.hint}>Depois de alterar o <code>.env.local</code>, rode o deploy (ou <code>pm2 restart vtec-os</code>) para valer.</p>
+        </section>
+      )}
+
+      {openItem && overview && (
+        <IntegrationModal
+          key={openItem.id}
+          item={openItem}
+          status={statusOf(openItem, overview).status}
+          integration={overview.integrations.find((row) => row.provider === openItem.provider) || null}
+          overview={overview}
+          onChanged={load}
+          onClose={() => setOpenId(null)}
+        />
       )}
     </div>
   );

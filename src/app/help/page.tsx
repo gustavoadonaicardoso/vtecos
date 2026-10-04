@@ -1,170 +1,260 @@
 "use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { 
-  Search, 
-  Book, 
-  MessageCircle, 
-  Zap, 
-  Shield, 
+import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import {
+  AlertTriangle,
+  ChevronDown,
   ChevronRight,
-  ExternalLink,
   LifeBuoy,
-  LayoutGrid,
-  Share2
+  Loader2,
+  Mail,
+  MessageCircle,
+  Search,
+  Send,
+  X,
 } from 'lucide-react';
 import styles from './help.module.css';
-
-const CATEGORIES = [
-  { title: 'Primeiros Passos', icon: Zap, desc: 'Aprenda o básico para configurar seu CRM em minutos.', slug: 'primeiros-passos' },
-  { title: 'Gestão de Leads', icon: Book, desc: 'Como capturar, organizar e converter leads no funil SSD.', slug: 'gestao-de-leads' },
-  { title: 'Automações', icon: MessageCircle, desc: 'Configure fluxos de WhatsApp e e-mail automático.', slug: 'automacoes' },
-  { title: 'Segurança & Conta', icon: Shield, desc: 'Gerencie permissões, usuários e dados da empresa.', slug: 'seguranca-e-conta' },
-  { title: 'Instagram & Facebook', icon: Share2, desc: 'Crie o app da Meta e conecte as contas para agendar posts.', slug: 'conectar-redes-sociais' }
-];
-
-const FAQS = [
-  { q: 'Como conectar meu WhatsApp Business?', a: 'Vá em Integrações > WhatsApp e escaneie o QR Code com seu celular.' },
-  { q: 'O que é o método SSD?', a: 'É nossa metodologia proprietária: Estruturar, Escalar e Dominar seu mercado.' },
-  { q: 'Posso exportar meus dados?', a: 'Sim, você pode exportar para CSV ou Google Sheets a qualquer momento.' }
-];
+import { HELP_ICONS, type HelpIconKey } from '@/lib/help/icons';
+import { articleText, loadHelp, normalize, type HelpData } from '@/lib/help/client';
+import RichText from '@/components/help/RichText';
 
 export default function HelpCenter() {
+  const [data, setData] = useState<HelpData | null>(null);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const router = useRouter();
+  const [openFaq, setOpenFaq] = useState<string | null>(null);
+  const [ticketOpen, setTicketOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    loadHelp()
+      .then((content) => { if (alive) setData(content); })
+      .catch((err) => { if (alive) setError(err instanceof Error ? err.message : 'Erro ao carregar.'); });
+    return () => { alive = false; };
+  }, []);
+
+  const term = normalize(search.trim());
+  const results = useMemo(() => {
+    if (!data || term.length < 2) return null;
+    return {
+      articles: data.articles.filter((article) => normalize(articleText(article)).includes(term)),
+      faqs: data.faqs.filter((faq) => normalize(`${faq.question} ${faq.answer}`).includes(term)),
+    };
+  }, [data, term]);
+
+  const whatsappLink = data?.contact?.whatsapp
+    ? `https://wa.me/${data.contact.whatsapp}?text=${encodeURIComponent('Olá! Preciso de ajuda com o vtec os.')}`
+    : null;
 
   return (
     <div className={styles.container}>
-      <header className={styles.helpHeader}>
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className={styles.badge}>
-            <LifeBuoy size={14} /> Suporte Vórtice
-          </div>
-          <h1>Como podemos ajudar hoje?</h1>
-          <div className={styles.searchBox}>
-            <Search size={20} className={styles.searchIcon} />
-            <input 
-              type="text" 
-              placeholder="Pesquisar artigos, tutoriais e soluções..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-        </motion.div>
+      <header className={styles.hero}>
+        <span className={styles.badge}><LifeBuoy size={14} /> Central de Ajuda</span>
+        <h1>Como podemos ajudar?</h1>
+        <p>Tutoriais passo a passo de cada módulo e de todas as integrações.</p>
+        <div className={styles.searchBox}>
+          <Search size={20} />
+          <input
+            type="search"
+            placeholder="Pesquise: WhatsApp, senha, planilha, webhook..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            aria-label="Pesquisar na Central de Ajuda"
+          />
+          {search && (
+            <button type="button" onClick={() => setSearch('')} aria-label="Limpar pesquisa"><X size={16} /></button>
+          )}
+        </div>
       </header>
 
-      <section className={styles.categories}>
-        {CATEGORIES.map((cat, i) => (
-          <motion.div 
-            key={cat.title}
-            className={styles.catCard}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            onClick={() => router.push(`/help/${cat.slug}`)}
-            style={{ cursor: 'pointer' }}
-          >
-            <div className={styles.catIcon}>
-              <cat.icon size={24} />
-            </div>
-            <h3>{cat.title}</h3>
-            <p>{cat.desc}</p>
-            <button className={styles.learnMore}>
-              Ver artigos <ChevronRight size={16} />
-            </button>
-          </motion.div>
-        ))}
-      </section>
+      {error && <div className={styles.errorBox}><AlertTriangle size={16} /> {error}</div>}
+      {!data && !error && <div className={styles.loading}><Loader2 size={20} className={styles.spin} /> Carregando artigos...</div>}
 
-      <section className={styles.tutorialsSection}>
-        <h2 className={styles.sectionTitle}>Tutoriais de Integração</h2>
-        <div className={styles.tutorialGrid}>
-          {/* Tutorial Meta */}
-          <motion.div 
-            className={styles.tutorialCard}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-          >
-            <div className={styles.tutorialHeader}>
-              <div className={styles.metaIcon}>
-                <LayoutGrid size={24} />
-              </div>
-              <div>
-                <h4>WhatsApp Oficial (Meta)</h4>
-                <span>Escalabilidade e Segurança</span>
-              </div>
+      {data && results && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>
+            {results.articles.length + results.faqs.length} resultado(s) para &quot;{search.trim()}&quot;
+          </h2>
+          {results.articles.length === 0 && results.faqs.length === 0 && (
+            <div className={styles.empty}>
+              Nada encontrado. Tente outra palavra ou abra um chamado no fim da página.
             </div>
-            <div className={styles.tutorialSteps}>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>1</span>
-                <p>Crie um aplicativo no portal <strong>Meta for Developers</strong> e adicione o produto WhatsApp.</p>
-              </div>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>2</span>
-                <p>Gere um <strong>Token de Acesso Permanente</strong> através de um Usuário do Sistema na sua BM.</p>
-              </div>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>3</span>
-                <p>Copie o <strong>ID do Número de Telefone</strong> e o <strong>ID da Conta Business</strong> no painel da Meta.</p>
-              </div>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>4</span>
-                <p>Vá em <strong>Integrações</strong> no Vórtice e clique em "Conectar" no card da Meta.</p>
-              </div>
-              <div className={styles.step}>
-                <span className={styles.stepNum}>5</span>
-                <p>Cole as chaves, clique em <strong>Testar Conexão</strong> e pronto!</p>
-              </div>
-            </div>
-            <button className={styles.tutorialBtn}>Abrir Documentação Meta <ExternalLink size={14} /></button>
-          </motion.div>
-        </div>
-      </section>
-
-      <div className={styles.mainGrid}>
-        <section className={styles.faqSection}>
-          <h2 className={styles.sectionTitle}>Perguntas Frequentes</h2>
-          <div className={styles.faqList}>
-            {FAQS.map((faq, i) => (
-              <div key={i} className={styles.faqItem}>
-                <h4>{faq.q}</h4>
-                <p>{faq.a}</p>
+          )}
+          <div className={styles.resultList}>
+            {results.articles.map((article) => (
+              <Link key={article.id} href={`/help/${article.slug}`} className={styles.resultItem}>
+                <div>
+                  <strong>{article.title}</strong>
+                  <span>{article.summary}</span>
+                </div>
+                <ChevronRight size={18} />
+              </Link>
+            ))}
+            {results.faqs.map((faq) => (
+              <div key={faq.id} className={styles.resultFaq}>
+                <strong>{faq.question}</strong>
+                <RichText text={faq.answer} />
               </div>
             ))}
           </div>
         </section>
+      )}
 
-        <section className={styles.contactSupport}>
-          <div className={styles.supportCard}>
+      {data && !results && (
+        <>
+          <section className={styles.categoryGrid}>
+            {data.categories.map((category) => {
+              const Icon = HELP_ICONS[category.icon as HelpIconKey] || HELP_ICONS.book;
+              const articles = data.articles.filter((article) => article.category_id === category.id);
+              if (articles.length === 0) return null;
+              return (
+                <article key={category.id} className={styles.categoryCard}>
+                  <div className={styles.categoryHead}>
+                    <span className={styles.categoryIcon} style={{ color: category.color, background: `${category.color}1f` }}>
+                      <Icon size={22} />
+                    </span>
+                    <div>
+                      <h3>{category.title}</h3>
+                      <p>{category.description}</p>
+                    </div>
+                  </div>
+                  <ul className={styles.articleLinks}>
+                    {articles.map((article) => (
+                      <li key={article.id}>
+                        <Link href={`/help/${article.slug}`}>
+                          {article.title} <ChevronRight size={15} />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              );
+            })}
+          </section>
+
+          {data.faqs.length > 0 && (
+            <section className={styles.section}>
+              <h2 className={styles.sectionTitle}>Perguntas frequentes</h2>
+              <div className={styles.faqList}>
+                {data.faqs.map((faq) => {
+                  const open = openFaq === faq.id;
+                  return (
+                    <div key={faq.id} className={`${styles.faqItem} ${open ? styles.faqOpen : ''}`}>
+                      <button type="button" onClick={() => setOpenFaq(open ? null : faq.id)} aria-expanded={open}>
+                        {faq.question}
+                        <ChevronDown size={18} />
+                      </button>
+                      {open && <div className={styles.faqAnswer}><RichText text={faq.answer} /></div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {data && (
+        <section className={styles.supportCard}>
+          <div>
             <h3>Ainda precisa de ajuda?</h3>
-            <p>Nossa equipe de especialistas está pronta para ajudar você a escalar sua operação.</p>
-            <div className={styles.contactButtons}>
-              <button className={styles.primaryBtn}>
-                <MessageCircle size={18} /> Abrir Ticket
-              </button>
-              <button className={styles.secondaryBtn}>
-                Falar no WhatsApp <ExternalLink size={14} />
-              </button>
-            </div>
+            <p>Fale com a equipe da Vórtice. Pelo chamado, sua mensagem chega direto para quem pode resolver.</p>
+          </div>
+          <div className={styles.supportActions}>
+            <button type="button" className={styles.primaryBtn} onClick={() => setTicketOpen(true)}>
+              <Send size={16} /> Abrir chamado
+            </button>
+            {whatsappLink && (
+              <a className={styles.secondaryBtn} href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                <MessageCircle size={16} /> WhatsApp
+              </a>
+            )}
+            {data.contact?.email && (
+              <a className={styles.secondaryBtn} href={`mailto:${data.contact.email}?subject=${encodeURIComponent('Ajuda com o vtec os')}`}>
+                <Mail size={16} /> E-mail
+              </a>
+            )}
           </div>
         </section>
-      </div>
+      )}
 
-      <div style={{ textAlign: 'center', marginTop: '40px', paddingBottom: '20px' }}>
-        <a 
-          href="/politica-de-privacidade" 
-          style={{ color: '#888', fontSize: '13px', textDecoration: 'none', transition: 'color 0.2s' }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#555'}
-          onMouseOut={(e) => e.currentTarget.style.color = '#888'}
-        >
-          Política de Privacidade
-        </a>
-      </div>
+      <footer className={styles.footer}>
+        <Link href="/politica-de-privacidade">Política de Privacidade</Link>
+      </footer>
+
+      {ticketOpen && <TicketModal onClose={() => setTicketOpen(false)} />}
+    </div>
+  );
+}
+
+function TicketModal({ onClose }: { onClose: () => void }) {
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/help/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, message }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json.error || 'Não foi possível abrir o chamado.');
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível abrir o chamado.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={styles.overlay} onClick={onClose}>
+      <form className={styles.modal} onClick={(event) => event.stopPropagation()} onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="ticket-title">
+        <div className={styles.modalHead}>
+          <h3 id="ticket-title">Abrir chamado</h3>
+          <button type="button" className={styles.iconBtn} onClick={onClose} aria-label="Fechar"><X size={18} /></button>
+        </div>
+        {sent ? (
+          <>
+            <div className={styles.successBox}>Chamado enviado. A equipe da Vórtice recebeu o aviso e vai retornar pelo seu e-mail ou WhatsApp.</div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.primaryBtn} onClick={onClose}>Fechar</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label className={styles.field}>
+              <span>Assunto</span>
+              <input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={120} placeholder="Ex.: WhatsApp desconectou" required autoFocus />
+            </label>
+            <label className={styles.field}>
+              <span>Descreva o que aconteceu</span>
+              <textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} rows={6} placeholder="O que você estava fazendo, o que esperava e o que apareceu na tela." required />
+            </label>
+            {error && <div className={styles.errorBox}><AlertTriangle size={16} /> {error}</div>}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.secondaryBtn} onClick={onClose}>Cancelar</button>
+              <button type="submit" className={styles.primaryBtn} disabled={busy}>
+                {busy ? <Loader2 size={16} className={styles.spin} /> : <Send size={16} />} Enviar chamado
+              </button>
+            </div>
+          </>
+        )}
+      </form>
     </div>
   );
 }

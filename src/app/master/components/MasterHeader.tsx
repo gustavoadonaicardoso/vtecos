@@ -1,4 +1,5 @@
-import { Building2, CheckCircle2, Layout, LayoutGrid, Loader2, Palette, Plus, RotateCcw, Save, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Building2, CheckCircle2, Layout, LayoutGrid, LifeBuoy, Loader2, Palette, Plus, RotateCcw, Save, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import styles from '../master.module.css';
 import type { TabId } from '../types';
 
@@ -19,10 +20,18 @@ const TABS: { id: TabId; label: string; icon: typeof Layout }[] = [
   { id: 'branding', label: 'Identidade Visual', icon: Palette },
   { id: 'permissions', label: 'Menu por Função', icon: SlidersHorizontal },
   { id: 'banners', label: 'Banners', icon: Layout },
+  { id: 'help', label: 'Ajuda', icon: LifeBuoy },
 ];
 
 export default function MasterHeader({ activeTab, onTabChange, saved, saving, bannerSaved, onSave, onReset, onAddBanner }: MasterHeaderProps) {
   const savable = activeTab === 'branding' || activeTab === 'permissions';
+  const navRef = useRef<HTMLElement>(null);
+
+  // Em telas estreitas as abas rolam: mantém a aba ativa à vista.
+  useEffect(() => {
+    const active = navRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    active?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [activeTab]);
 
   return (
     <header className={styles.header}>
@@ -70,7 +79,7 @@ export default function MasterHeader({ activeTab, onTabChange, saved, saving, ba
         )}
       </div>
 
-      <nav className={styles.tabNav} aria-label="Seções do Painel Master">
+      <nav ref={navRef} className={styles.tabNav} aria-label="Seções do Painel Master">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}

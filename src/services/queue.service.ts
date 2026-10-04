@@ -8,6 +8,7 @@
 
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { sendWhatsAppWebMessage } from '@/lib/whatsapp-web';
+import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
 
 export type TicketOrigin = 'totem' | 'recepcao';
 
@@ -70,7 +71,7 @@ export async function syncLeadFromTicket(tenantId: string, params: {
     }
 
     const { data: firstStage } = await supabase.from('pipeline_stages').select('id').eq('tenant_id', tenantId).order('position').limit(1).maybeSingle();
-    const { error } = await supabase.from('leads').insert([{
+    const { data: created, error } = await supabase.from('leads').insert([{
       tenant_id: tenantId,
       name: name || 'Visitante',
       phone: params.whatsapp,
@@ -80,8 +81,9 @@ export async function syncLeadFromTicket(tenantId: string, params: {
       tags: ['Senha', originLabel, 'Presencial'],
       last_activity_at: now,
       last_msg: `Retirou senha (${originLabel})`,
-    }]);
+    }]).select().maybeSingle();
     if (error) console.error('[QueueService] Falha ao criar lead da senha:', error.message);
+    else if (created) emitIntegrationEvent(tenantId, 'lead.created', leadEventData(created, 'totem'));
   } catch (error) {
     console.error('[QueueService] Falha ao sincronizar lead da senha:', error);
   }

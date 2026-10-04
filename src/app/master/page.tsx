@@ -14,6 +14,7 @@ import PermissionsTab from './components/PermissionsTab';
 import BannersTab from './components/BannersTab';
 import BannerEditModal from './components/BannerEditModal';
 import TenantsTab from './components/TenantsTab';
+import HelpTab from './components/HelpTab';
 import BrandingTab from './components/BrandingTab';
 
 const IMAGE_LIMITS = { logoUrl: 300 * 1024, faviconUrl: 100 * 1024 };
@@ -57,7 +58,14 @@ export default function MasterPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<TabId>('modules');
+  // ?tab=help&article=slug abre direto o editor (botão "Editar" da Ajuda).
+  // A página só monta no navegador (depois do login), então ler a URL aqui é seguro.
+  const [deepLink] = useState(() => {
+    if (typeof window === 'undefined') return { tab: null as string | null, article: null as string | null };
+    const params = new URLSearchParams(window.location.search);
+    return { tab: params.get('tab'), article: params.get('article') };
+  });
+  const [activeTab, setActiveTab] = useState<TabId>(() => (deepLink.tab === 'help' ? 'help' : 'modules'));
   const [selectedRole, setSelectedRole] = useState<Role>('SELLER');
   const { refreshConfig, config: themeConfig } = useTheme();
   // Enquanto não há edição, a aba mostra o que está salvo.
@@ -319,6 +327,8 @@ export default function MasterPage() {
           />
         ) : activeTab === 'tenants' ? (
           <TenantsTab key="tenants" />
+        ) : activeTab === 'help' ? (
+          <HelpTab key="help" initialArticle={deepLink.article} />
         ) : (
           <BrandingTab
             key="branding"
