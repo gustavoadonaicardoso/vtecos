@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
+import { fireAutomation, onLeadCreated } from '@/lib/automations/engine';
 
 /**
  * Captura de leads (Integrações > Captura de leads): formulário do site,
@@ -102,6 +103,7 @@ export async function POST(request: Request) {
 
   await logAudit(null, 'LEAD_CREATE', `Lead ${name} criado pelo formulário/API de captura.`, 'lead', lead.id, supabaseAdmin, tenantId).catch(() => {});
   emitIntegrationEvent(tenantId, 'lead.created', leadEventData(lead, 'form'));
+  fireAutomation(onLeadCreated, tenantId, String(lead.id), 'form');
 
   if (isForm) {
     const redirect = field(body.redirect, 500);

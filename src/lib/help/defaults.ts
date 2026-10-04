@@ -122,12 +122,16 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     slug: 'automacoes',
     category: 'atendimento',
     title: 'Automações',
-    summary: 'Montar fluxos de mensagens, condições, esperas e ações do CRM.',
+    summary: 'Fluxos que rodam sozinhos: respondem no WhatsApp, fazem perguntas, movem leads e avisam a equipe.',
     sections: [
-      { title: 'O editor', text: 'Em **Automações**, crie um projeto e monte o fluxo arrastando blocos no canvas. Clique em um bloco para configurar no painel lateral.' },
-      { title: 'Blocos', text: '- **Mensagem**: texto que será enviado.\n- **Condição**: segue por caminhos diferentes conforme a resposta ou um dado do lead.\n- **Espera**: aguarda um tempo antes do próximo passo.\n- **Ação do CRM**: move o lead de etapa, aplica etiqueta etc.' },
-      { title: 'Variáveis', text: 'Use variáveis nas mensagens e condições para personalizar com os dados do lead (o painel lateral mostra as disponíveis).' },
+      { title: 'Como funciona', text: 'Cada fluxo começa com um **gatilho** e segue os blocos ligados a ele. Os fluxos rodam no servidor, mesmo com ninguém logado. Um fluxo novo nasce como **Rascunho** e só roda depois de **Ativar**.' },
+      { title: 'Gatilhos', text: '- **Mensagem recebida**: o contato manda mensagem no WhatsApp (qualquer uma ou com palavras-chave; dá para limitar a contatos novos).\n- **Lead novo**: entra um lead (WhatsApp, formulário do site, cadastro manual ou totem).\n- **Mudança de etapa**: o lead é movido para uma etapa do funil.\n\nO campo **Não repetir por** evita que o mesmo contato entre no fluxo de novo antes desse tempo.' },
+      { title: 'Blocos', text: '- **Enviar mensagem** e **Enviar mídia**: saem pelo WhatsApp conectado (WhatsApp Web ou API oficial) e aparecem na conversa em **Mensagens**.\n- **Pergunta**: envia a pergunta e espera a resposta. Segue por **Respondeu** ou **Sem resposta** (depois do tempo limite) e guarda a resposta numa variável.\n- **Condição**: segue por **Sim** ou **Não** conforme a mensagem, um dado do lead ou uma resposta. Separe várias opções com vírgula; maiúsculas e acentos não importam.\n- **Aguardar**: espera minutos, horas ou dias.\n- **Atualizar lead**, **Etiqueta**, **Avisar equipe** e **Webhook**: mexem no CRM, avisam no sino ou mandam os dados para outro sistema.' },
+      { title: 'Variáveis', text: 'Use `{{lead.first_name}}`, `{{lead.name}}`, `{{lead.phone}}`, `{{message}}`, `{{empresa}}` e o nome das respostas das perguntas (ex.: `{{interesse}}`). Clique nas etiquetas do painel do bloco para inserir.' },
+      { title: 'Montar no editor', text: 'Clique em **+ Bloco** para adicionar (ele já se liga ao bloco selecionado). Para ligar à mão, clique na bolinha da direita de um bloco e depois no bloco de destino. Clique numa ligação para removê-la. Tudo é salvo automaticamente.' },
+      { title: 'Testar e ativar', text: 'Use **Simular** para ver o caminho e as mensagens sem enviar nada. O botão de problemas mostra o que falta corrigir; só dá para **Ativar** um fluxo sem problemas. Em **Execuções** você vê cada contato que passou pelo fluxo, passo a passo, e pode cancelar uma execução que está esperando.' },
     ],
+    tip: 'Esperas e tempo limite de pergunta dependem do agendador do servidor (CONTENT_SCHEDULER_ENABLED=true). Somente administradores e gerentes criam e editam fluxos.',
   },
 
   // ── Integrações (os mesmos textos aparecem dentro de Integrações) ──

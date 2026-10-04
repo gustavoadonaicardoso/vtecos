@@ -172,6 +172,12 @@ export async function updateLeadInDb(
   }
 }
 
+/** Etapa atual do lead (para saber se a mudança é de verdade). */
+export async function fetchLeadStage(tenantId: string, leadId: string): Promise<string | null> {
+  const { data } = await supabase.from('leads').select('stage_id').eq('tenant_id', tenantId).eq('id', leadId).maybeSingle();
+  return (data?.stage_id as string) ?? null;
+}
+
 /**
  * Move um lead para outra stage no banco.
  */

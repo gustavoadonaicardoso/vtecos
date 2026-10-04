@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { fetchLeadsAndStages, createLead } from '@/services/leads.service';
 import { requireActiveProfile } from '@/lib/session';
 import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
+import { fireAutomation, onLeadCreated } from '@/lib/automations/engine';
 
 /**
  * Antes: userId/role vinham direto de headers enviados pelo próprio
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
       stage_id: lead.pipelineStage,
       created_at: lead.createdAt,
     }, 'manual'));
+    fireAutomation(onLeadCreated, auth.tenantId, lead.id, 'manual');
 
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (error: unknown) {

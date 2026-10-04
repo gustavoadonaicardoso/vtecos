@@ -183,10 +183,7 @@ export async function startWhatsAppWeb(tenantId: string) {
           senderName: item.pushName || 'Cliente WhatsApp',
           text: { message: text || mediaCaption || '' },
           media,
-        }, supabaseAdmin, tenantId, {
-          leadCreated: (lead) => emitIntegrationEvent(tenantId, 'lead.created', leadEventData(lead, 'whatsapp')),
-          messageReceived: (data) => emitIntegrationEvent(tenantId, 'message.received', data),
-        });
+        }, supabaseAdmin, tenantId, automationSink(tenantId));
       }
     });
     socket.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
@@ -250,6 +247,26 @@ function toWhatsAppJid(phone: string) {
   const digits = phone.replace(/\D/g, '');
   const normalized = digits.startsWith('55') ? digits : `55${digits}`;
   return `${normalized}@s.whatsapp.net`;
+}
+
+/**
+ * Avisos de lead novo / mensagem recebida: integrações de saída e
+ * automações. O motor é importado sob demanda (ele também usa este arquivo).
+ */
+function automationSink(tenantId: string) {
+  let isNewContact = false;
+  return {
+    leadCreated: (lead: Record<string, unknown>) => {
+      isNewContact = true;
+      emitIntegrationEvent(tenantId, 'lead.created', leadEventData(lead, 'whatsapp'));
+      import('@/lib/automations/engine').then(({ fireAutomation, onLeadCreated }) => fireAutomation(onLeadCreated, tenantId, String(lead.id), 'whatsapp'));
+    },
+    messageReceived: (data: Record<string, unknown>) => {
+      emitIntegrationEvent(tenantId, 'message.received', data);
+      import('@/lib/automations/engine').then(({ fireAutomation, onInboundMessage }) =>
+        fireAutomation(onInboundMessage, tenantId, String(data.lead_id), String(data.text || ''), { isNewContact }));
+    },
+  };
 }
 
 /** Envia pelo WhatsApp da empresa informada (nunca pelo de outra). */

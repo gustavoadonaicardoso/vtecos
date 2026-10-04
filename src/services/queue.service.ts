@@ -9,6 +9,7 @@
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { sendWhatsAppWebMessage } from '@/lib/whatsapp-web';
 import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
+import { fireAutomation, onLeadCreated } from '@/lib/automations/engine';
 
 export type TicketOrigin = 'totem' | 'recepcao';
 
@@ -83,7 +84,10 @@ export async function syncLeadFromTicket(tenantId: string, params: {
       last_msg: `Retirou senha (${originLabel})`,
     }]).select().maybeSingle();
     if (error) console.error('[QueueService] Falha ao criar lead da senha:', error.message);
-    else if (created) emitIntegrationEvent(tenantId, 'lead.created', leadEventData(created, 'totem'));
+    else if (created) {
+      emitIntegrationEvent(tenantId, 'lead.created', leadEventData(created, 'totem'));
+      fireAutomation(onLeadCreated, tenantId, String(created.id), 'totem');
+    }
   } catch (error) {
     console.error('[QueueService] Falha ao sincronizar lead da senha:', error);
   }
