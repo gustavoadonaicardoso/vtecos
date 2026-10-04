@@ -8,6 +8,7 @@ import makeWASocket, {
   type WASocket,
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
+import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
 
 // downloadMediaMessage exige um logger no formato do pino -- não
 // precisamos de log de verdade aqui, só satisfazer o formato esperado.
@@ -182,7 +183,10 @@ export async function startWhatsAppWeb(tenantId: string) {
           senderName: item.pushName || 'Cliente WhatsApp',
           text: { message: text || mediaCaption || '' },
           media,
-        }, supabaseAdmin, tenantId);
+        }, supabaseAdmin, tenantId, {
+          leadCreated: (lead) => emitIntegrationEvent(tenantId, 'lead.created', leadEventData(lead, 'whatsapp')),
+          messageReceived: (data) => emitIntegrationEvent(tenantId, 'message.received', data),
+        });
       }
     });
     socket.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {

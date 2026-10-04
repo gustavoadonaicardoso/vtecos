@@ -1,75 +1,120 @@
-import {
-  MessageCircle,
-  FileSpreadsheet,
-  LayoutGrid,
-  Mail,
-  Globe,
-  Zap,
-} from 'lucide-react';
+import { FileSpreadsheet, Globe, MessageCircle, QrCode, Share2, UserPlus } from 'lucide-react';
 
-export const INTEGRATIONS = [
-  {
-    id: 'whatsapp',
-    name: 'WhatsApp Business API',
-    description: 'Integração oficial via Meta para envio de mensagens escaláveis e automação profissional.',
-    icon: MessageCircle,
-    category: 'Comunicação',
-    status: 'pending', // Mudando para pendente para incentivar a configuração
-    color: '#25D366'
-  },
+export type Provider = 'whatsapp_meta' | 'webhook_custom' | 'google_sheets' | 'lead_capture';
+
+export interface CatalogItem {
+  id: 'whatsapp-web' | 'whatsapp-api' | 'lead-capture' | 'webhooks' | 'google-sheets' | 'social';
+  provider: Provider | null;
+  name: string;
+  description: string;
+  icon: typeof MessageCircle;
+  color: string;
+  category: 'WhatsApp' | 'Leads' | 'Automação' | 'Marketing';
+  /** Módulo do plano que precisa estar liberado. */
+  module: string;
+  /** Artigo da Central de Ajuda com o passo a passo (editável no Painel Master). */
+  helpSlug: string;
+}
+
+export const CATALOG: CatalogItem[] = [
   {
     id: 'whatsapp-web',
-    name: 'WhatsApp Web (Gratuito)',
-    description: 'Conecte seu WhatsApp diretamente por QR Code, sem contratar gateways ou pagar mensalidade.',
-    icon: Zap,
-    category: 'Comunicação',
-    status: 'not_connected',
-    color: '#11c1d9'
+    provider: null,
+    name: 'WhatsApp Web',
+    description: 'Conecte o WhatsApp da empresa lendo um QR Code. Sem custo de API.',
+    icon: QrCode,
+    color: '#25D366',
+    category: 'WhatsApp',
+    module: 'crm',
+    helpSlug: 'integracao-whatsapp-web',
+  },
+  {
+    id: 'whatsapp-api',
+    provider: 'whatsapp_meta',
+    name: 'WhatsApp Business API',
+    description: 'Conexão oficial da Meta: templates aprovados e mais estabilidade.',
+    icon: MessageCircle,
+    color: '#128C7E',
+    category: 'WhatsApp',
+    module: 'crm',
+    helpSlug: 'integracao-whatsapp-api',
+  },
+  {
+    id: 'lead-capture',
+    provider: 'lead_capture',
+    name: 'Captura de leads',
+    description: 'Formulário do site, landing page ou outro sistema criando leads no funil.',
+    icon: UserPlus,
+    color: '#3b82f6',
+    category: 'Leads',
+    module: 'crm',
+    helpSlug: 'integracao-captura-leads',
+  },
+  {
+    id: 'webhooks',
+    provider: 'webhook_custom',
+    name: 'Webhooks',
+    description: 'Avise Make, Zapier, n8n ou seu sistema a cada lead novo ou mensagem recebida.',
+    icon: Globe,
+    color: '#8b5cf6',
+    category: 'Automação',
+    module: 'crm',
+    helpSlug: 'integracao-webhooks',
   },
   {
     id: 'google-sheets',
+    provider: 'google_sheets',
     name: 'Google Sheets',
-    description: 'Exporte leads e dados de desempenho automaticamente para suas planilhas compartilhadas.',
+    description: 'Cada lead novo vira uma linha na sua planilha do Google.',
     icon: FileSpreadsheet,
-    category: 'Produtividade',
-    status: 'not_connected',
-    color: '#0F9D58'
+    color: '#0F9D58',
+    category: 'Automação',
+    module: 'crm',
+    helpSlug: 'integracao-google-sheets',
   },
   {
-    id: 'meta-ads',
-    name: 'Meta (IG Direct & Messenger)',
-    description: 'Centralize mensagens do Direct e Messenger. Sincronize leads do Facebook Ads automaticamente.',
-    icon: LayoutGrid,
+    id: 'social',
+    provider: null,
+    name: 'Instagram e Facebook',
+    description: 'Agende e publique posts. A conexão é feita em Redes Sociais.',
+    icon: Share2,
+    color: '#E4405F',
     category: 'Marketing',
-    status: 'not_connected',
-    color: '#1877F2'
+    module: 'social',
+    helpSlug: 'conectar-redes-sociais',
   },
-  {
-    id: 'email',
-    name: 'Email Marketing',
-    description: 'Conecte seu e-mail comercial para rastrear taxas de abertura e histórico de respostas automaticamente.',
-    icon: Mail,
-    category: 'Comunicação',
-    status: 'not_connected',
-    color: '#EA4335'
-  },
-  {
-    id: 'webhook',
-    name: 'Webhooks Customizados',
-    description: 'Crie integrações personalizadas com qualquer serviço externo usando nossa robusta API.',
-    icon: Globe,
-    category: 'Desenvolvimento',
-    status: 'not_connected',
-    color: '#3b82f6'
-  }
 ];
 
-export const CATEGORIES = ['Todos', 'Marketing', 'Comunicação', 'Produtividade', 'Desenvolvimento'];
+export const CATEGORIES = ['Todos', 'WhatsApp', 'Leads', 'Automação', 'Marketing'] as const;
 
-export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
-export type WhatsAppWebConnectionState = 'idle' | 'waiting' | 'connected' | 'error';
+export interface DeliveryInfo {
+  ok: boolean;
+  status: number | null;
+  at: string;
+  event: string;
+  error?: string;
+}
 
-export interface WaConfig { token: string; phoneId: string; wabaId: string; appSecret?: string }
-export interface MetaConfig { pageToken: string; pageId: string; instagramId: string }
-export interface WebConfig { name: string }
-export interface WebhookConfig { url: string; secret: string }
+export interface IntegrationView {
+  provider: Provider;
+  config: Record<string, unknown>;
+  secrets: Record<string, boolean>;
+  updated_at: string | null;
+}
+
+export interface PlatformService {
+  key: string;
+  label: string;
+  description: string;
+  configured: boolean;
+  missing: string[];
+}
+
+export interface Overview {
+  integrations: IntegrationView[];
+  whatsappWeb: { status: string; connected: boolean; qrCode: string | null; phone?: string | null } | null;
+  socialAccounts: number | null;
+  platform: PlatformService[] | null;
+}
+
+export type CardStatus = 'connected' | 'attention' | 'off';

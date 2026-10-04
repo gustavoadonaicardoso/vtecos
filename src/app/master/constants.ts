@@ -5,6 +5,7 @@ import {
   Building2,
   ClipboardList,
   Layout,
+  LifeBuoy,
   MessageCircle,
   MessageSquare,
   Palette,
@@ -106,6 +107,14 @@ export const MASTER_MODULES: { id: string; title: string; desc: string; icon: ty
     icon: Layout,
     color: '#06b6d4',
     tab: 'banners',
+  },
+  {
+    id: 'help',
+    title: 'Central de Ajuda',
+    desc: 'Edite categorias, artigos, tutoriais de integração e perguntas frequentes.',
+    icon: LifeBuoy,
+    color: '#14b8a6',
+    tab: 'help',
   },
   {
     id: 'team',

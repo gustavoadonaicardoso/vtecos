@@ -1,42 +1,48 @@
 import { NextResponse } from 'next/server';
+import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdminProfile } from '@/lib/session';
+import { integrationsOverview, PROVIDERS, removeIntegration, saveIntegration, type Provider } from '@/services/integrations.service';
 
 /**
- * integrations_config guarda credenciais sensíveis (tokens, secrets).
- * Cada empresa tem as SUAS integrações (uma por provedor): o admin só lê
- * e grava as da própria empresa.
+ * Integrações da empresa logada (só administradores). Os segredos da
+ * Meta nunca voltam para o navegador; ao salvar, campo de segredo em
+ * branco mantém o valor já salvo.
  */
 export async function GET() {
   const auth = await requireAdminProfile();
-  if ('error' in auth) {
-    return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
-  }
+  if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
-  const { data, error } = await supabaseAdmin.from('integrations_config').select('*').eq('tenant_id', auth.tenantId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data }, { status: 200 });
+  try {
+    const data = await integrationsOverview(auth.tenantId, { isPlatform: auth.isPlatform, modules: auth.modules });
+    return NextResponse.json({ data });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro ao carregar integrações.' }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
   const auth = await requireAdminProfile();
-  if ('error' in auth) {
-    return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
-  }
+  if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   try {
-    const { provider, config } = await request.json();
-    if (!provider || typeof provider !== 'string') {
-      return NextResponse.json({ error: 'provider é obrigatório.' }, { status: 400 });
-    }
+    const body = await request.json();
+    const provider = String(body.provider || '') as Provider;
+    if (!PROVIDERS.includes(provider)) return NextResponse.json({ error: 'Integração desconhecida.' }, { status: 400 });
 
-    const { error } = await supabaseAdmin.from('integrations_config').upsert(
-      { tenant_id: auth.tenantId, provider, config: config ?? {}, updated_at: new Date().toISOString() },
-      { onConflict: 'tenant_id,provider' }
+    const result = await saveIntegration(auth.tenantId, provider, (body.config || {}) as Record<string, unknown>);
+    if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
+
+    await logAudit(
+      { id: auth.profile.id, name: auth.profile.name },
+      'SETTINGS_UPDATE',
+      `Salvou a integração ${provider}.`,
+      'integration',
+      provider,
+      supabaseAdmin,
+      auth.tenantId
     );
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({ data: result.data });
   } catch (error: unknown) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro interno.' }, { status: 500 });
   }
@@ -44,16 +50,22 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   const auth = await requireAdminProfile();
-  if ('error' in auth) {
-    return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
-  }
+  if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const provider = new URL(request.url).searchParams.get('provider');
-  if (!provider) {
-    return NextResponse.json({ error: 'provider é obrigatório.' }, { status: 400 });
-  }
+  if (!provider) return NextResponse.json({ error: 'provider é obrigatório.' }, { status: 400 });
 
-  const { error } = await supabaseAdmin.from('integrations_config').delete().eq('tenant_id', auth.tenantId).eq('provider', provider);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true }, { status: 200 });
+  const result = await removeIntegration(auth.tenantId, provider);
+  if (!result.success) return NextResponse.json({ error: result.error }, { status: 500 });
+
+  await logAudit(
+    { id: auth.profile.id, name: auth.profile.name },
+    'SETTINGS_UPDATE',
+    `Removeu a integração ${provider}.`,
+    'integration',
+    provider,
+    supabaseAdmin,
+    auth.tenantId
+  );
+  return NextResponse.json({ success: true });
 }
