@@ -14,6 +14,7 @@ import { TwilioProvider, useTwilio } from "@/context/TwilioContext";
 import Dialer from "@/components/Dialer";
 import BrowserNotificationListener from "@/components/BrowserNotificationListener";
 import WhatsAppNotificationListener from "@/components/WhatsAppNotificationListener";
+import InAppToasts from "@/components/InAppToasts";
 // FIX #7: hook centralizado de permissões — sem duplicação
 import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
 import { isRouteAllowed } from "@/lib/plans";
@@ -138,6 +139,7 @@ export default function RootLayoutContent({ children }: { children: React.ReactN
               <PresenceProvider>
                 <BrowserNotificationListener />
                 <WhatsAppNotificationListener />
+                <InAppToasts />
                 <AppGuard>
                   {children}
                 </AppGuard>

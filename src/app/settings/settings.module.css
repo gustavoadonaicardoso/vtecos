@@ -254,6 +254,21 @@
 .permissionCard p { margin: 0; }
 .permissionOk > svg { color: #10b981; }
 
+.testResult {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+}
+
+.testResultHead { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.testResultHead .ghostBtn { padding: 2px 6px; }
+.testResult p { margin: 0; font-size: 0.88rem; line-height: 1.5; }
+.testResult ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; line-height: 1.5; }
+
 .loading { display: flex; align-items: center; gap: 8px; color: var(--muted); padding: 12px 0; }
 
 /* ── Perfil ── */

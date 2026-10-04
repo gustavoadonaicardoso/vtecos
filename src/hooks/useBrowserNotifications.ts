@@ -25,24 +25,70 @@ export async function requestBrowserNotificationPermission(): Promise<BrowserNot
   }
 }
 
-export function showBrowserNotification(notification: Pick<SystemNotification, 'id' | 'title' | 'content' | 'link'>) {
-  if (getBrowserNotificationPermission() !== 'granted') return;
+type NotificationPayload = Pick<SystemNotification, 'id' | 'title' | 'content' | 'link'>;
 
-  try {
-    const browserNotification = new Notification(notification.title, {
-      body: notification.content,
-      icon: '/icon-192.png',
-      tag: `system-notification-${notification.id}`,
-    });
+/** Resultado de uma notificação do sistema operacional. */
+export type NotificationOutcome = 'in-app' | 'shown' | 'error' | 'no-permission' | 'unsupported' | 'unknown';
 
-    browserNotification.onclick = () => {
-      window.focus();
-      if (notification.link) window.location.href = notification.link;
-      browserNotification.close();
-    };
-  } catch {
-    // O navegador pode bloquear a criação mesmo após a permissão mudar.
+/** Evento que o <InAppToasts /> escuta para mostrar o aviso dentro do sistema. */
+export const IN_APP_TOAST_EVENT = 'vtec:in-app-toast';
+
+export function pushInAppToast(notification: NotificationPayload) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<NotificationPayload>(IN_APP_TOAST_EVENT, { detail: notification }));
+}
+
+/**
+ * Mostra um aviso. Com o vtec os aberto e em foco, o aviso aparece
+ * dentro do próprio sistema (não depende de o macOS/Windows liberar o
+ * Chrome). Com a aba em segundo plano, vai para a notificação do sistema
+ * operacional. `force` manda para o sistema operacional mesmo em foco
+ * (botão "Enviar teste").
+ */
+export function showBrowserNotification(
+  notification: NotificationPayload,
+  options: { force?: boolean } = {}
+): Promise<NotificationOutcome> {
+  if (typeof window === 'undefined') return Promise.resolve('unsupported');
+
+  if (!options.force && document.visibilityState === 'visible' && document.hasFocus()) {
+    pushInAppToast(notification);
+    return Promise.resolve('in-app');
   }
+
+  const permission = getBrowserNotificationPermission();
+  if (permission === 'unsupported') return Promise.resolve('unsupported');
+  if (permission !== 'granted') return Promise.resolve('no-permission');
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (outcome: NotificationOutcome) => {
+      if (settled) return;
+      settled = true;
+      resolve(outcome);
+    };
+
+    try {
+      const browserNotification = new Notification(notification.title, {
+        body: notification.content,
+        icon: '/icon-192.png',
+        tag: `system-notification-${notification.id}`,
+      });
+
+      browserNotification.onshow = () => finish('shown');
+      browserNotification.onerror = () => finish('error');
+      browserNotification.onclick = () => {
+        window.focus();
+        if (notification.link) window.location.href = notification.link;
+        browserNotification.close();
+      };
+      // Alguns navegadores não avisam quando o sistema operacional bloqueia.
+      setTimeout(() => finish('unknown'), 2500);
+    } catch {
+      // Ex.: Chrome no Android só cria notificação por service worker.
+      finish('error');
+    }
+  });
 }
 
 export function useBrowserNotifications() {
