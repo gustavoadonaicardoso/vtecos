@@ -15,6 +15,7 @@ import Dialer from "@/components/Dialer";
 import BrowserNotificationListener from "@/components/BrowserNotificationListener";
 import WhatsAppNotificationListener from "@/components/WhatsAppNotificationListener";
 import InAppToasts from "@/components/InAppToasts";
+import { isPublicRoute } from "@/lib/public-routes";
 // FIX #7: hook centralizado de permissões — sem duplicação
 import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
 import { isRouteAllowed } from "@/lib/plans";
@@ -28,10 +29,7 @@ function AppGuard({ children }: { children: React.ReactNode }) {
   // FIX #7: usa hook centralizado
   const { hasPermission } = usePermissions();
 
-  const isLoginPage = pathname === '/login';
-  const isDisplayPage = pathname === '/display';
-  const isTotemPage = pathname === '/totem';
-  const isPublicPage = isLoginPage || isDisplayPage || isTotemPage;
+  const isPublicPage = isPublicRoute(pathname);
 
   const fullPageRoutes = ['/chat', '/messages'];
   // O editor de planejamentos é uma rota dinâmica (/planejamentos/[id]) --
@@ -69,7 +67,7 @@ function AppGuard({ children }: { children: React.ReactNode }) {
   // renderiza nada do conteúdo protegido; o redirect cuida do resto.
   if (!isPublicPage && (isLoading || !isAuthenticated)) {
     return (
-      <div style={{ height: '100vh', background: '#0a0a0f' }} />
+      <div style={{ height: '100vh', background: 'var(--background)' }} />
     );
   }
 
@@ -81,8 +79,8 @@ function AppGuard({ children }: { children: React.ReactNode }) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#0a0a0f',
-        color: '#fff',
+        background: 'var(--background)',
+        color: 'var(--foreground)',
         textAlign: 'center',
         padding: '20px'
       }}>

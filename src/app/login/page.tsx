@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
@@ -11,64 +11,54 @@ import {
   Sparkles,
   Check,
   X,
-  Rocket
+  Rocket,
+  Moon,
+  Sun,
+  MessageCircle,
+  Mail,
+  Globe
 } from 'lucide-react';
 import Image from 'next/image';
 import styles from './login.module.css';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/components/ThemeProvider';
 
-// Link de contratação — ajuste para o canal comercial oficial (site, WhatsApp, checkout)
+// Site comercial: usado quando a Vórtice ainda não cadastrou WhatsApp/e-mail
+// em Configurações > Dados da empresa.
 const SALES_URL = 'https://vorticetecnologia.com.br';
 
-const PLANS = [
-  {
-    id: 'essencial',
-    name: 'Essencial',
-    price: 'R$ 149',
-    period: '/mês',
-    description: 'Para equipes que estão começando a organizar as vendas.',
-    features: [
-      'Pipeline visual com drag & drop',
-      'Gestão completa de leads',
-      'Relatórios e funil de conversão',
-      'Até 3 usuários',
-    ],
-    highlight: false,
-  },
-  {
-    id: 'profissional',
-    name: 'Profissional',
-    price: 'R$ 299',
-    period: '/mês',
-    description: 'Para times que vendem todos os dias pelo WhatsApp.',
-    features: [
-      'Tudo do plano Essencial',
-      'Chat e disparos via WhatsApp',
-      'Automações do pipeline',
-      'Templates e caixa unificada',
-      'Até 10 usuários',
-    ],
-    highlight: true,
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 'Sob consulta',
-    period: '',
-    description: 'Para operações que exigem escala e personalização.',
-    features: [
-      'Tudo do plano Profissional',
-      'Fiscal com IA e integrações Meta',
-      'Multi-tenant e permissões avançadas',
-      'Usuários ilimitados',
-      'Suporte dedicado',
-    ],
-    highlight: false,
-  },
-];
+interface PublicPlan {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  featured: boolean;
+  modules: { key: string; label: string; description: string }[];
+}
+
+interface SalesContact {
+  whatsapp: string | null;
+  email: string | null;
+  website: string | null;
+}
+
+const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: value % 1 ? 2 : 0 });
+
+/** Link de contratação: WhatsApp da Vórtice com a mensagem pronta, senão e-mail, senão o site. */
+function contactLink(contact: SalesContact | null, planName?: string) {
+  const text = planName
+    ? `Olá! Tenho interesse no plano ${planName} do vtec os.`
+    : 'Olá! Quero conhecer os planos do vtec os.';
+  if (contact?.whatsapp) return `https://wa.me/${contact.whatsapp}?text=${encodeURIComponent(text)}`;
+  if (contact?.email) return `mailto:${contact.email}?subject=${encodeURIComponent(planName ? `Plano ${planName}` : 'Planos do vtec os')}&body=${encodeURIComponent(text)}`;
+  return contact?.website || SALES_URL;
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { theme, toggleTheme, config } = useTheme();
+  const [plans, setPlans] = useState<PublicPlan[] | null>(null);
+  const [contact, setContact] = useState<SalesContact | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -99,17 +89,6 @@ export default function LoginPage() {
         setIsLoading(false);
         return;
       }
-
-      // Log remoto
-      await fetch('/api/audit', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({
-            user: { id: json.data.id, name: json.data.name },
-            action: 'LOGIN',
-            details: `Usuário ${json.data.name} (${json.data.role}) fez login no sistema.`
-         })
-      }).catch(() => {});
 
       login(json.data);
     } catch (err) {
@@ -142,7 +121,7 @@ export default function LoginPage() {
         throw new Error(json.error || 'Erro ao processar solicitação.');
       }
 
-      setResetMsg('Solicitação enviada com sucesso! O administrador foi notificado para redefinir sua senha.');
+      setResetMsg(json.message || 'Pedido enviado aos administradores da sua empresa.');
     } catch (err) {
       const message = err instanceof Error ? err.message : '';
       setError(message || 'Não foi possível processar a solicitação. Verifique o e-mail informado.');
@@ -150,6 +129,26 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  const openPlans = async () => {
+    setShowPlans(true);
+    if (plans) return;
+    try {
+      const response = await fetch('/api/public/plans');
+      const json = await response.json();
+      setPlans(json.data?.plans || []);
+      setContact(json.data?.contact || null);
+    } catch {
+      setPlans([]);
+    }
+  };
+
+  useEffect(() => {
+    if (!showPlans) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setShowPlans(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showPlans]);
 
   const switchMode = (toReset: boolean) => {
     setResetMode(toReset);
@@ -159,6 +158,17 @@ export default function LoginPage() {
 
   return (
     <div className={styles.loginPage}>
+      <button
+        type="button"
+        className={styles.themeToggle}
+        onClick={toggleTheme}
+        aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+        title={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+      >
+        {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        <span>{theme === 'dark' ? 'Tema claro' : 'Tema escuro'}</span>
+      </button>
+
       <motion.div
         className={styles.loginCard}
         initial={{ opacity: 0, y: 30 }}
@@ -166,24 +176,30 @@ export default function LoginPage() {
         transition={{ duration: 0.6, ease: 'easeOut' }}
       >
         <div className={styles.logoSection}>
-          <Image
-            src="/logo-dark.png"
-            alt="Vórtice Tecnologia"
-            width={300}
-            height={80}
-            className={styles.companyLogo}
-            priority
-          />
+          {config.logo_url ? (
+            // Logo da Identidade Visual (Painel Master), salvo como imagem embutida.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={config.logo_url} alt={config.app_name || 'Logo'} className={styles.companyLogo} style={{ maxHeight: 80 }} />
+          ) : (
+            <Image
+              src={theme === 'dark' ? '/logo-dark.png' : '/logo.png'}
+              alt="Vórtice Tecnologia"
+              width={300}
+              height={80}
+              className={styles.companyLogo}
+              priority
+            />
+          )}
           {resetMode ? (
             <>
               <h2 className={styles.cardTitle}>Recuperar senha</h2>
               <p className={styles.cardSubtitle}>
-                Informe seu e-mail e o administrador será notificado para redefinir sua senha.
+                Informe o e-mail de acesso. Os administradores da sua empresa recebem um aviso para definir uma nova senha para você.
               </p>
             </>
           ) : (
             <p className={styles.cardSubtitle}>
-              Acesse sua conta para gerenciar leads, pipeline e atendimentos.
+              Entre com o e-mail e a senha cadastrados pela sua empresa.
             </p>
           )}
         </div>
@@ -200,7 +216,7 @@ export default function LoginPage() {
                 <input
                   id="reset-email"
                   type="email"
-                  placeholder="seunome@vorticetecnologia.com"
+                  placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
@@ -231,7 +247,7 @@ export default function LoginPage() {
                 <input
                   id="login-email"
                   type="email"
-                  placeholder="seunome@vorticetecnologia.com"
+                  placeholder="seu@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
@@ -280,7 +296,7 @@ export default function LoginPage() {
                 <div className={styles.loader}></div>
               ) : (
                 <>
-                  Acessar CRM <ArrowRight size={18} />
+                  Entrar <ArrowRight size={18} />
                 </>
               )}
             </button>
@@ -292,7 +308,7 @@ export default function LoginPage() {
             <button
               type="button"
               className={styles.plansBtn}
-              onClick={() => setShowPlans(true)}
+              onClick={openPlans}
             >
               <Sparkles size={16} /> Conheça nossos planos
             </button>
@@ -339,51 +355,66 @@ export default function LoginPage() {
               </button>
 
               <div className={styles.plansHeader}>
-                <h2>Escolha o plano ideal para o seu time</h2>
-                <p>Plataforma completa de vendas: pipeline, WhatsApp, campanhas e IA — tudo em um só lugar.</p>
+                <h2>Escolha o plano ideal para a sua empresa</h2>
+                <p>Cada empresa tem o próprio ambiente, a própria equipe e os módulos do plano contratado.</p>
               </div>
 
-              <div className={styles.plansGrid}>
-                {PLANS.map((plan) => (
-                  <div
-                    key={plan.id}
-                    className={`${styles.planCard} ${plan.highlight ? styles.planHighlight : ''}`}
-                  >
-                    {plan.highlight && (
-                      <span className={styles.planBadge}>Mais popular</span>
-                    )}
-                    <h3>{plan.name}</h3>
-                    <div className={styles.planPrice}>
-                      <strong>{plan.price}</strong>
-                      {plan.period && <span>{plan.period}</span>}
+              {plans === null ? (
+                <div className={styles.plansLoading}>Carregando planos...</div>
+              ) : plans.length === 0 ? (
+                <div className={styles.plansEmpty}>
+                  <p>Os planos são montados conforme a necessidade da sua empresa.</p>
+                  <a href={contactLink(contact)} target="_blank" rel="noopener noreferrer" className={`${styles.planCta} ${styles.planCtaHighlight}`}>
+                    <MessageCircle size={16} /> Falar com a Vórtice
+                  </a>
+                </div>
+              ) : (
+                <div className={styles.plansGrid}>
+                  {plans.map((plan) => (
+                    <div key={plan.id} className={`${styles.planCard} ${plan.featured ? styles.planHighlight : ''}`}>
+                      {plan.featured && <span className={styles.planBadge}>Mais popular</span>}
+                      <h3>{plan.name}</h3>
+                      <div className={styles.planPrice}>
+                        <strong>{plan.price > 0 ? money(plan.price) : 'Sob consulta'}</strong>
+                        {plan.price > 0 && <span>/mês</span>}
+                      </div>
+                      {plan.description && <p className={styles.planDesc}>{plan.description}</p>}
+                      <ul className={styles.planModules}>
+                        {plan.modules.map((module) => (
+                          <li key={module.key}>
+                            <Check size={15} />
+                            <div>
+                              {module.label}
+                              <small>{module.description}</small>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <a
+                        href={contactLink(contact, plan.name)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`${styles.planCta} ${plan.featured ? styles.planCtaHighlight : ''}`}
+                      >
+                        <Rocket size={16} /> Quero este plano
+                      </a>
                     </div>
-                    <p className={styles.planDesc}>{plan.description}</p>
-                    <ul className={styles.planFeatures}>
-                      {plan.features.map((feature) => (
-                        <li key={feature}>
-                          <Check size={15} /> {feature}
-                        </li>
-                      ))}
-                    </ul>
-                    <a
-                      href={`${SALES_URL}/?plano=${plan.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`${styles.planCta} ${plan.highlight ? styles.planCtaHighlight : ''}`}
-                    >
-                      <Rocket size={16} /> Contratar agora
-                    </a>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
-              <p className={styles.plansFooter}>
-                Dúvidas sobre qual plano escolher?{' '}
-                <a href={SALES_URL} target="_blank" rel="noopener noreferrer">
-                  Fale com nosso time
-                </a>
-                .
-              </p>
+              <div className={styles.plansFooter}>
+                Dúvidas sobre qual plano escolher? Fale com a gente:
+                <div className={styles.contactRow}>
+                  {contact?.whatsapp && (
+                    <a href={contactLink(contact)} target="_blank" rel="noopener noreferrer"><MessageCircle size={14} /> WhatsApp</a>
+                  )}
+                  {contact?.email && (
+                    <a href={`mailto:${contact.email}`}><Mail size={14} /> {contact.email}</a>
+                  )}
+                  <a href={contact?.website || SALES_URL} target="_blank" rel="noopener noreferrer"><Globe size={14} /> Site</a>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}

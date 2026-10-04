@@ -296,27 +296,54 @@ export async function findProfileByEmail(email: string) {
   return data as { id: string; name: string; email: string; tenant_id: string };
 }
 
-/** Notifica os admins ativos DA EMPRESA do usuário que pediu nova senha. */
+/**
+ * Avisa quem pode definir a nova senha: os outros administradores ativos
+ * da empresa. Se não houver nenhum (ex.: quem pediu é o único admin), o
+ * pedido vai para os administradores da Vórtice, que redefinem pelo
+ * Painel Master > Empresas e Planos > Acessos.
+ */
 export async function notifyAdminsOfPasswordResetRequest(userProfile: { id: string; name: string; email: string; tenant_id: string }) {
-  const { data: admins, error: adminsError } = await supabaseAdmin
+  const { data: admins } = await supabaseAdmin
     .from('profiles')
     .select('id')
     .eq('tenant_id', userProfile.tenant_id)
     .eq('role', 'ADMIN')
-    .eq('status', 'ACTIVE');
+    .eq('status', 'ACTIVE')
+    .neq('id', userProfile.id);
 
-  if (adminsError || !admins || admins.length === 0) {
-    console.warn('Nenhum administrador ativo encontrado na empresa para receber a demanda.');
+  let recipients = (admins || []).map((admin) => admin.id);
+  let link = '/users';
+
+  if (recipients.length === 0) {
+    const { data: platform } = await supabaseAdmin.from('tenants').select('id, name').eq('is_platform', true).maybeSingle();
+    if (platform && platform.id !== userProfile.tenant_id) {
+      // tenant-scope: ok (pedido encaminhado à empresa da plataforma)
+      const { data: platformAdmins } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('tenant_id', platform.id)
+        .eq('role', 'ADMIN')
+        .eq('status', 'ACTIVE');
+      recipients = (platformAdmins || []).map((admin) => admin.id);
+      link = '/master';
+    }
+  }
+
+  if (recipients.length === 0) {
+    console.warn('Nenhum administrador ativo para receber o pedido de nova senha de', userProfile.email);
     return;
   }
 
-  const notifications = admins.map((admin) => ({
-    user_id: admin.id,
+  const { data: tenant } = await supabaseAdmin.from('tenants').select('name').eq('id', userProfile.tenant_id).maybeSingle();
+  const company = link === '/master' && tenant?.name ? ` da empresa ${tenant.name}` : '';
+
+  const notifications = recipients.map((userId) => ({
+    user_id: userId,
     type: 'task',
-    title: 'Solicitação de Senha',
-    content: `O usuário ${userProfile.name} (${userProfile.email}) solicitou a redefinição de sua senha.`,
+    title: 'Pedido de nova senha',
+    content: `${userProfile.name} (${userProfile.email})${company} esqueceu a senha e pediu uma nova. ${link === '/master' ? 'Defina em Painel Master > Empresas e Planos > Acessos.' : 'Defina na tela Equipe, no cadastro da pessoa.'}`,
     is_read: false,
-    link: '/users',
+    link,
   }));
 
   const { error: notifError } = await supabaseAdmin.from('system_notifications').insert(notifications);

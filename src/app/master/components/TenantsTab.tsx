@@ -15,6 +15,8 @@ interface Plan {
   price: number;
   modules: string[];
   active: boolean;
+  show_on_login?: boolean;
+  featured?: boolean;
   tenant_count?: number;
 }
 
@@ -49,7 +51,7 @@ const STATUS_LABEL: Record<string, string> = { ACTIVE: 'Ativa', INACTIVE: 'Inati
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const EMPTY_PLAN = { name: '', description: '', price: '', modules: ['crm'] as string[], active: true };
+const EMPTY_PLAN = { name: '', description: '', price: '', modules: ['crm'] as string[], active: true, show_on_login: true, featured: false };
 const EMPTY_TENANT = { name: '', plan_id: '', adminName: '', adminEmail: '', adminPassword: '' };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -203,7 +205,7 @@ export default function TenantsTab() {
                     <span className={styles.price}>{money(plan.price)}<small>/mês</small></span>
                   </div>
                   <div className={styles.rowActions}>
-                    <button className={styles.icon} title="Editar" onClick={() => setPlanForm({ ...plan, price: String(plan.price) })}><Pencil size={15} /></button>
+                    <button className={styles.icon} title="Editar" onClick={() => setPlanForm({ ...plan, price: String(plan.price), show_on_login: plan.show_on_login !== false, featured: plan.featured === true })}><Pencil size={15} /></button>
                     <button className={`${styles.icon} ${styles.iconDanger}`} title="Excluir" onClick={() => removePlan(plan)}><Trash2 size={15} /></button>
                   </div>
                 </header>
@@ -219,6 +221,8 @@ export default function TenantsTab() {
                 </div>
                 <footer className={styles.muted}>
                   {plan.tenant_count || 0} empresa(s){plan.active ? '' : ' · plano inativo'}
+                  {plan.active && plan.show_on_login !== false ? ' · na tela de login' : ''}
+                  {plan.featured ? ' · mais popular' : ''}
                 </footer>
               </article>
             ))}
@@ -391,6 +395,14 @@ export default function TenantsTab() {
             <label className={styles.toggle}>
               <input type="checkbox" checked={planForm.active} onChange={(event) => setPlanForm({ ...planForm, active: event.target.checked })} />
               Plano ativo (desativado, as empresas dele perdem o acesso aos módulos)
+            </label>
+            <label className={styles.toggle}>
+              <input type="checkbox" checked={planForm.show_on_login} onChange={(event) => setPlanForm({ ...planForm, show_on_login: event.target.checked })} />
+              Mostrar na tela de login, em &quot;Conheça nossos planos&quot;
+            </label>
+            <label className={styles.toggle}>
+              <input type="checkbox" checked={planForm.featured} onChange={(event) => setPlanForm({ ...planForm, featured: event.target.checked })} />
+              Destacar como &quot;Mais popular&quot;
             </label>
             <div className={styles.modalActions}>
               <button type="button" className={styles.secondary} onClick={() => setPlanForm(null)}>Cancelar</button>
