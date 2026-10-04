@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import styles from './settings.module.css';
 import { useAuth } from '@/context/AuthContext';
-import { useBrowserNotifications, showBrowserNotification } from '@/hooks/useBrowserNotifications';
+import { useBrowserNotifications, showBrowserNotification, pushInAppToast, type NotificationOutcome } from '@/hooks/useBrowserNotifications';
 import { playNotificationSound } from '@/lib/notificationSound';
 import { getNotificationPrefs, setNotificationPrefs, DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from '@/lib/notificationPrefs';
 import { PLAN_MODULES } from '@/lib/plans';
@@ -98,6 +98,83 @@ function Toggle({ label, description, checked, disabled, onChange }: { label: st
   );
 }
 
+/** Passo a passo para liberar as notificações no sistema operacional deste aparelho. */
+function osNotificationSteps(): { system: string; steps: string[] } {
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  const browser = /Edg\//.test(ua) ? 'Microsoft Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) && !/Chrome\//.test(ua) ? 'Safari' : 'Google Chrome';
+
+  if (/Mac OS X|Macintosh/.test(ua)) {
+    return {
+      system: 'Mac',
+      steps: [
+        'Abra os Ajustes do Sistema (menu da maçã, no canto superior esquerdo) > Notificações.',
+        `Na lista de apps, clique em "${browser}" e ative "Permitir notificações" (estilo "Faixas" ou "Alertas").`,
+        'Confira se o modo Foco / "Não perturbe" está desligado (Central de Controle, no canto superior direito).',
+        'Volte aqui e clique em "Enviar teste" de novo.',
+      ],
+    };
+  }
+  if (/Windows/.test(ua)) {
+    return {
+      system: 'Windows',
+      steps: [
+        'Abra Configurações > Sistema > Notificações.',
+        `Ative "Notificações" e, na lista de apps, ative "${browser}".`,
+        'Desative o "Não incomodar" / "Assistente de foco".',
+        'Volte aqui e clique em "Enviar teste" de novo.',
+      ],
+    };
+  }
+  if (/Android/.test(ua)) {
+    return {
+      system: 'Android',
+      steps: [
+        `Abra Configurações > Apps > ${browser} > Notificações e permita.`,
+        'No celular, as notificações com a aba fechada dependem de instalar o sistema como app; com a aba aberta, os avisos aparecem dentro do vtec os.',
+      ],
+    };
+  }
+  return {
+    system: 'computador',
+    steps: [
+      `Libere as notificações do ${browser} nas configurações do sistema operacional.`,
+      'Desative o modo "Não perturbe", se estiver ligado.',
+    ],
+  };
+}
+
+function TestResult({ outcome, onClose }: { outcome: NotificationOutcome; onClose: () => void }) {
+  const { system, steps } = osNotificationSteps();
+  const blockedForSure = outcome === 'error' || outcome === 'unsupported';
+  return (
+    <div className={styles.testResult} role="status">
+      <div className={styles.testResultHead}>
+        <strong>
+          {blockedForSure
+            ? `O ${system} bloqueou a notificação`
+            : outcome === 'no-permission'
+              ? 'O site ainda não tem permissão'
+              : 'A notificação apareceu no canto da tela?'}
+        </strong>
+        <button type="button" className={styles.ghostBtn} onClick={onClose} aria-label="Fechar">✕</button>
+      </div>
+      <p>
+        {outcome === 'shown'
+          ? `O navegador enviou a notificação. Se ela não apareceu, o ${system} está escondendo as notificações do navegador. Para liberar:`
+          : outcome === 'no-permission'
+            ? 'Clique em "Permitir" acima e aceite o pedido do navegador.'
+            : `O navegador não conseguiu mostrar a notificação. Para liberar no ${system}:`}
+      </p>
+      {outcome !== 'no-permission' && (
+        <ol>
+          {steps.map((step) => <li key={step}>{step}</li>)}
+        </ol>
+      )}
+      <p className={styles.hint}>Enquanto isso, com o vtec os aberto na tela os avisos aparecem dentro do sistema, como o teste que surgiu no canto superior direito.</p>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user, refreshUser } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
@@ -122,6 +199,8 @@ export default function SettingsPage() {
   const { permission, requestPermission } = useBrowserNotifications();
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [notifyFeedback, setNotifyFeedback] = useState<Feedback>(null);
+  const [testing, setTesting] = useState(false);
+  const [testOutcome, setTestOutcome] = useState<NotificationOutcome | null>(null);
 
   // ── Empresa e plano (administrador) ──────────────────────────
   const [company, setCompany] = useState<Company | null>(null);
@@ -288,9 +367,17 @@ export default function SettingsPage() {
     else if (result === 'granted') setNotifyFeedback({ type: 'success', text: 'Notificações do navegador ativadas.' });
   };
 
-  const sendTest = () => {
-    showBrowserNotification({ id: `test-${Date.now()}`, title: 'Teste do vtec os', content: 'As notificações estão funcionando neste aparelho.' });
-    setNotifyFeedback({ type: 'success', text: 'Notificação de teste enviada. Se não apareceu, confira o modo "Não perturbe" do computador.' });
+  const sendTest = async () => {
+    setTesting(true);
+    setNotifyFeedback(null);
+    // Aviso dentro do sistema: é assim que os alertas aparecem com o vtec os em foco.
+    pushInAppToast({ id: `test-app-${Date.now()}`, title: 'Teste do vtec os', content: 'Assim aparecem os avisos enquanto o sistema estiver aberto na tela.' });
+    const outcome = await showBrowserNotification(
+      { id: `test-${Date.now()}`, title: 'Teste do vtec os', content: 'As notificações do computador estão funcionando.' },
+      { force: true }
+    );
+    setTesting(false);
+    setTestOutcome(outcome);
   };
 
   // ── Ações: empresa ───────────────────────────────────────────
@@ -448,7 +535,7 @@ export default function SettingsPage() {
   );
 
   const permissionText = permission === 'granted'
-    ? 'Ativadas neste navegador.'
+    ? 'Permitidas para este site. Com o vtec os em segundo plano, os avisos vão para a central de notificações do computador.'
     : permission === 'denied'
       ? 'Bloqueadas. Libere clicando no cadeado ao lado do endereço do site e recarregue a página.'
       : permission === 'unsupported'
@@ -472,9 +559,13 @@ export default function SettingsPage() {
           <button type="button" className={styles.primaryBtn} onClick={askBrowserPermission}>Permitir</button>
         )}
         {permission === 'granted' && (
-          <button type="button" className={styles.secondaryBtn} onClick={sendTest}>Enviar teste</button>
+          <button type="button" className={styles.secondaryBtn} onClick={sendTest} disabled={testing}>
+            {testing ? <Loader2 size={16} className={styles.spin} /> : null} Enviar teste
+          </button>
         )}
       </div>
+
+      {testOutcome && testOutcome !== 'in-app' && <TestResult outcome={testOutcome} onClose={() => setTestOutcome(null)} />}
 
       {hasCrm && (
         <>
@@ -489,7 +580,6 @@ export default function SettingsPage() {
             label="Pop-up de mensagem nova"
             description="Mostra o nome do cliente e o começo da mensagem; clicar abre a conversa."
             checked={prefs.whatsappPopup}
-            disabled={permission !== 'granted'}
             onChange={() => togglePref('whatsappPopup')}
           />
           <button type="button" className={styles.linkBtn} onClick={() => playNotificationSound()}>
@@ -503,10 +593,12 @@ export default function SettingsPage() {
         label="Pop-up de avisos"
         description="Tarefas, aprovações de posts, pedidos de senha e demais avisos do sino de notificações."
         checked={prefs.systemPopup}
-        disabled={permission !== 'granted'}
         onChange={() => togglePref('systemPopup')}
       />
-      <p className={styles.hint}>Os avisos continuam sempre no sino do topo da tela, mesmo com os pop-ups desligados.</p>
+      <p className={styles.hint}>
+        Com o vtec os aberto na tela, os pop-ups aparecem no canto superior direito do próprio sistema; em segundo plano,
+        na central de notificações do computador. Os avisos continuam sempre no sino do topo, mesmo com os pop-ups desligados.
+      </p>
 
       <FeedbackBar feedback={notifyFeedback} />
     </div>
