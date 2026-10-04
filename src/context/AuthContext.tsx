@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 // Tipos centralizados em @/types
 import type { UserProfile, UserPermissions } from '@/types';
 import { resetSupabaseSession, supabase } from '@/lib/supabase';
+import { isPublicRoute } from '@/lib/public-routes';
 
 /** Troca de usuário: o client do banco passa a usar o token da nova sessão. */
 function refreshDatabaseSession() {
@@ -120,8 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const publicRoutes = ['/login', '/display', '/totem'];
-    if (!isLoading && !isAuthenticated && !publicRoutes.includes(pathname)) {
+    if (!isLoading && !isAuthenticated && !isPublicRoute(pathname)) {
       router.push('/login');
     }
     if (!isLoading && isAuthenticated && pathname === '/login') {

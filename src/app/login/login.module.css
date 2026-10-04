@@ -36,30 +36,20 @@
   --glass-radius: 18px;
   --glass-radius-lg: 24px;
 
-  /* Cores de ação */
-  --accent: #3b82f6;
-  --accent-glow: rgba(59, 130, 246, 0.25);
+  /* Cores de ação (o --accent vem do tema / Identidade Visual do Master) */
   --danger: #f87171;
   --success: #34d399;
+
+  /* Textos */
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --text-soft: #cbd5e1;
+  --placeholder: #475569;
+  --overlay: rgba(6, 6, 8, 0.7);
 
   --transition: all 0.2s ease;
   --font-family: Arial, Helvetica, sans-serif;
 
-  min-height: 100vh;
-  width: 100%;
-  background-color: var(--background);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  color: var(--foreground);
-  font-family: var(--font-family);
-  padding: 24px 16px;
-}
-
-.loginPage {
   min-height: 100vh;
   width: 100%;
   background-color: var(--background);
@@ -137,7 +127,7 @@
 
 .cardSubtitle {
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-top: 6px;
   line-height: 1.5;
 }
@@ -156,7 +146,7 @@
   display: block;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 8px;
 }
 
@@ -169,7 +159,7 @@
 .fieldIcon {
   position: absolute;
   left: 16px;
-  color: #64748b;
+  color: var(--text-subtle);
   pointer-events: none;
 }
 
@@ -181,7 +171,7 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--glass-radius-sm);
   padding: 14px 44px 14px 48px;
-  color: #f8fafc;
+  color: var(--foreground);
   font-size: 1rem;
   transition: all 0.2s ease;
   box-shadow: var(--glass-inset);
@@ -195,7 +185,7 @@
 }
 
 .inputWrapper input::placeholder {
-  color: #475569;
+  color: var(--placeholder);
 }
 
 .togglePassword {
@@ -205,27 +195,27 @@
   align-items: center;
   justify-content: center;
   padding: 6px;
-  color: #64748b;
+  color: var(--text-subtle);
   border-radius: 8px;
   transition: color 0.2s;
 }
 
 .togglePassword:hover {
-  color: #f8fafc;
+  color: var(--foreground);
 }
 
 .forgotPassword {
   display: block;
   margin-left: auto;
   font-size: 0.85rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-top: 8px;
   padding: 0;
   transition: color 0.2s;
 }
 
 .forgotPassword:hover {
-  color: #f8fafc;
+  color: var(--foreground);
 }
 
 .loginBtn {
@@ -262,7 +252,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #64748b;
+  color: var(--text-subtle);
   font-size: 0.8rem;
   margin-top: 4px;
 }
@@ -280,7 +270,7 @@
   backdrop-filter: var(--glass-blur-light);
   -webkit-backdrop-filter: var(--glass-blur-light);
   border: 1px solid var(--glass-border);
-  color: #cbd5e1;
+  color: var(--text-soft);
   padding: 12px;
   border-radius: var(--glass-radius-sm);
   font-weight: 500;
@@ -295,7 +285,7 @@
 .plansBtn:hover {
   background: var(--glass-bg-hover);
   border-color: var(--glass-border-hover);
-  color: #ffffff;
+  color: var(--foreground);
   box-shadow: var(--glass-glow);
 }
 
@@ -338,26 +328,26 @@
 .loginBranding {
   position: absolute;
   bottom: 24px;
-  color: #64748b;
+  color: var(--text-subtle);
   font-size: 0.8rem;
   z-index: 2;
   text-align: center;
 }
 
 .loginBranding a {
-  color: #94a3b8;
+  color: var(--text-muted);
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .loginBranding a:hover {
-  color: white;
+  color: var(--foreground);
 }
 
 .backBtn {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-top: 4px;
   font-size: 0.9rem;
   padding: 10px 20px;
@@ -366,7 +356,7 @@
 }
 
 .backBtn:hover {
-  color: white;
+  color: var(--foreground);
   background: var(--glass-bg-hover);
   border-color: var(--glass-border-hover);
 }
@@ -375,7 +365,7 @@
 .plansOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(6, 6, 8, 0.7);
+  background: var(--overlay);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
@@ -413,12 +403,12 @@
   border-radius: 50%;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  color: #94a3b8;
+  color: var(--text-muted);
   transition: var(--transition);
 }
 
 .plansClose:hover {
-  color: white;
+  color: var(--foreground);
   background: var(--glass-bg-hover);
   border-color: var(--glass-border-hover);
 }
@@ -435,7 +425,7 @@
 }
 
 .plansHeader p {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.95rem;
   max-width: 520px;
   margin: 0 auto;
@@ -444,7 +434,7 @@
 
 .plansGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
 }
 
@@ -508,12 +498,12 @@
 }
 
 .planPrice span {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
 .planDesc {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.85rem;
   line-height: 1.5;
   margin-bottom: 18px;
@@ -533,7 +523,7 @@
   align-items: flex-start;
   gap: 8px;
   font-size: 0.85rem;
-  color: #cbd5e1;
+  color: var(--text-soft);
   line-height: 1.4;
 }
 
@@ -554,7 +544,7 @@
   font-size: 0.9rem;
   background: var(--glass-bg-medium);
   border: 1px solid var(--glass-border);
-  color: #f8fafc;
+  color: var(--foreground);
   text-decoration: none;
   transition: var(--transition);
 }
@@ -580,7 +570,7 @@
 .plansFooter {
   text-align: center;
   margin-top: 28px;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -619,4 +609,92 @@
     position: static;
     margin-top: 24px;
   }
+}
+
+/* ── Tema claro ── */
+:global([data-theme='light']) .loginPage {
+  --background: #eef2f7;
+  --foreground: #0f172a;
+  --glass-bg: rgba(255, 255, 255, 0.88);
+  --glass-bg-medium: #f1f5f9;
+  --glass-bg-strong: #ffffff;
+  --glass-bg-input: #ffffff;
+  --glass-bg-hover: #f8fafc;
+  --glass-border: rgba(15, 23, 42, 0.12);
+  --glass-border-hover: rgba(15, 23, 42, 0.22);
+  --glass-shadow-elevated: 0 24px 60px rgba(15, 23, 42, 0.12);
+  --glass-shadow-hover: 0 18px 40px rgba(15, 23, 42, 0.1);
+  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --glass-glow: 0 0 0 rgba(0, 0, 0, 0);
+  --danger: #dc2626;
+  --success: #059669;
+  --text-muted: #475569;
+  --text-subtle: #64748b;
+  --text-soft: #334155;
+  --placeholder: #94a3b8;
+  --overlay: rgba(15, 23, 42, 0.45);
+}
+
+/* ── Alternar tema ── */
+.themeToggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur-light);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.themeToggle:hover { color: var(--foreground); border-color: var(--glass-border-hover); }
+
+/* ── Planos vindos do Painel Master ── */
+.planModules { list-style: none; margin: 0 0 24px; padding: 0; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.planModules li { display: flex; gap: 10px; align-items: flex-start; font-size: 0.86rem; color: var(--text-soft); text-align: left; }
+.planModules li svg { flex-shrink: 0; margin-top: 2px; color: var(--success); }
+.planModules small { display: block; color: var(--text-subtle); font-size: 0.76rem; line-height: 1.4; }
+
+.plansEmpty {
+  text-align: center;
+  padding: 32px 16px;
+  border-radius: var(--glass-radius);
+  border: 1px dashed var(--glass-border);
+  color: var(--text-muted);
+}
+
+.plansEmpty a { display: inline-flex; margin-top: 16px; }
+
+.plansLoading { text-align: center; color: var(--text-muted); padding: 40px 0; }
+
+.contactRow { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+.contactRow a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  color: var(--foreground);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.contactRow a:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 480px) {
+  .themeToggle { top: 12px; right: 12px; padding: 8px 10px; }
+  .themeToggle span { display: none; }
 }
