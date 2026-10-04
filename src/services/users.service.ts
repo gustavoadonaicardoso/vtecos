@@ -265,14 +265,14 @@ export async function adminResetPassword(tenantId: string, userId: string, newPa
 export async function updateOwnProfile(
   tenantId: string,
   userId: string,
-  updates: { name: string; phone?: string | null; avatar_url?: string | null }
+  updates: { name: string; phone?: string | null }
 ): Promise<ServiceResult<Row>> {
+  // A foto tem rota própria (/api/users/avatar): aqui só nome e telefone.
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update({
       name: updates.name,
       phone: updates.phone || null,
-      avatar_url: updates.avatar_url || null,
     })
     .eq('tenant_id', tenantId)
     .eq('id', userId)
