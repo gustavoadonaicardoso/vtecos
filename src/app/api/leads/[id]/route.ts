@@ -3,7 +3,7 @@ import { updateLeadInDb, deleteLeadFromDb, moveLeadToStage, fetchLeadOwner, fetc
 import { requireActiveProfile } from '@/lib/session';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { fireAutomation, onStageChanged } from '@/lib/automations/engine';
+import { fireAutomation, onStageChanged, onTagAdded } from '@/lib/automations/engine';
 
 const FIELD_LABEL: Record<string, string> = {
   name: 'nome', phone: 'telefone', email: 'e-mail', cpfCnpj: 'CPF/CNPJ', value: 'valor', pipelineStage: 'etapa',
@@ -68,9 +68,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
+    // Etiquetas antes da mudança: etiqueta nova dispara as automações dela.
+    const tagsBefore = Array.isArray(updates.tags)
+      ? (((await supabaseAdmin.from('leads').select('tags').eq('tenant_id', auth.tenantId).eq('id', leadId).maybeSingle()).data?.tags as string[] | null) || [])
+      : null;
+
     const result = await updateLeadInDb(auth.tenantId, leadId, updates);
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
     notifyStage();
+    if (tagsBefore && Array.isArray(updates.tags)) {
+      const before = new Set(tagsBefore.map((tag) => String(tag).toLowerCase()));
+      for (const tag of updates.tags as unknown[]) {
+        if (typeof tag === 'string' && tag.trim() && !before.has(tag.trim().toLowerCase())) fireAutomation(onTagAdded, auth.tenantId, leadId, tag.trim());
+      }
+    }
 
     // Quem recebeu o lead fica sabendo (sino de notificações).
     if ('assignedTo' in updates && updates.assignedTo && updates.assignedTo !== ownerBefore && updates.assignedTo !== auth.profile.id && result.data) {

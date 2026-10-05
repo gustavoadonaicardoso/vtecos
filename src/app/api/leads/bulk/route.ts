@@ -3,7 +3,7 @@ import { requireActiveProfile } from '@/lib/session';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { bulkUpdateLeads, type BulkAction } from '@/services/leads.service';
-import { fireAutomation, onStageChanged } from '@/lib/automations/engine';
+import { fireAutomation, onStageChanged, onTagAdded } from '@/lib/automations/engine';
 
 const ACTIONS = new Set<BulkAction>(['assign', 'stage', 'addTag', 'removeTag', 'block', 'unblock', 'delete']);
 const LABEL: Record<BulkAction, string> = {
@@ -33,6 +33,9 @@ export async function POST(request: Request) {
 
   if (action === 'stage' && value) {
     for (const id of result.data.ids) fireAutomation(onStageChanged, auth.tenantId, id, value);
+  }
+  if (action === 'addTag' && value) {
+    for (const id of result.data.changed) fireAutomation(onTagAdded, auth.tenantId, id, value.trim().slice(0, 40));
   }
   logAudit(
     { id: auth.profile.id, name: auth.profile.name },

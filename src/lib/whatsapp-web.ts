@@ -411,7 +411,7 @@ export async function sendWhatsAppWebMedia(
   tenantId: string,
   phone: string,
   buffer: Buffer,
-  kind: 'image' | 'document' | 'audio',
+  kind: 'image' | 'document' | 'audio' | 'video',
   options: { caption?: string; fileName?: string; mimetype: string }
 ) {
   const socket = await ensureConnectedSocket(tenantId);
@@ -425,12 +425,22 @@ export async function sendWhatsAppWebMedia(
     return socket.sendMessage(jid, { audio: buffer, mimetype: options.mimetype, ptt: false });
   }
 
+  if (kind === 'video') {
+    return socket.sendMessage(jid, { video: buffer, caption: options.caption, mimetype: options.mimetype });
+  }
+
   return socket.sendMessage(jid, {
     document: buffer,
     mimetype: options.mimetype,
     fileName: options.fileName || 'arquivo',
     caption: options.caption,
   });
+}
+
+/** Mostra "digitando..." para o contato (as automações usam antes de responder). */
+export async function sendWhatsAppWebTyping(tenantId: string, phone: string) {
+  const socket = await ensureConnectedSocket(tenantId);
+  await socket.sendPresenceUpdate('composing', toWhatsAppJid(phone)).catch(() => {});
 }
 
 export async function disconnectWhatsAppWeb(tenantId: string) {

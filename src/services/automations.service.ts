@@ -8,7 +8,8 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { cancelWaitingRuns } from '@/lib/automations/engine';
+import { randomUUID } from 'crypto';
+import { cancelWaitingRuns, newWebhookToken } from '@/lib/automations/engine';
 import { DEFAULT_CONFIG, DEFAULT_LABEL, normalizeGraph, TRIGGER_EVENT, triggerOf, validateFlow, type FlowGraph } from '@/lib/automations/flow';
 import type { ServiceResult } from '@/types';
 
@@ -26,7 +27,11 @@ export interface FlowSummary {
 
 export interface FlowDetail extends Omit<FlowSummary, 'nodes' | 'runs_7d' | 'failed_7d'> {
   graph: FlowGraph;
+  /** Só aparece para quem edita (é o segredo do gatilho "Chamada de outro sistema"). */
+  webhook_token?: string | null;
 }
+
+const DETAIL_COLUMNS = 'id, name, description, status, trigger_event, updated_at, graph, webhook_token';
 
 const missingTable = (message?: string) => Boolean(message && /automation_(flows|runs)|schema cache|does not exist/i.test(message));
 const MIGRATION_HINT = 'Rode a migration 202610090001_automations.sql no Supabase para usar as automações.';
@@ -76,7 +81,7 @@ export async function listFlows(tenantId: string): Promise<ServiceResult<FlowSum
 export async function getFlow(tenantId: string, id: string): Promise<FlowDetail | null> {
   const { data } = await supabaseAdmin
     .from('automation_flows')
-    .select('id, name, description, status, trigger_event, updated_at, graph')
+    .select(DETAIL_COLUMNS)
     .eq('tenant_id', tenantId)
     .eq('id', id)
     .maybeSingle();
@@ -101,9 +106,10 @@ export async function createFlow(tenantId: string, userId: string, input: { name
       status: 'draft',
       graph,
       trigger_event: trigger ? TRIGGER_EVENT[trigger.type] : null,
+      webhook_token: trigger?.type === 'trigger-webhook' ? newWebhookToken() : null,
       created_by: userId,
     })
-    .select('id, name, description, status, trigger_event, updated_at, graph')
+    .select(DETAIL_COLUMNS)
     .single();
   if (error) return { success: false, error: missingTable(error.message) ? MIGRATION_HINT : error.message };
   return { success: true, data: { ...data, graph: normalizeGraph(data.graph) } as FlowDetail };
@@ -116,7 +122,7 @@ export type UpdateResult = ServiceResult<FlowDetail> & { problems?: string[]; pa
  * problemas; salvar um fluxo ativo com problemas pausa o fluxo (assim
  * nada sai pela metade enquanto ele é editado).
  */
-export async function updateFlow(tenantId: string, id: string, input: { name?: unknown; description?: unknown; graph?: unknown; status?: unknown }): Promise<UpdateResult> {
+export async function updateFlow(tenantId: string, id: string, input: { name?: unknown; description?: unknown; graph?: unknown; status?: unknown; regenerateToken?: unknown }): Promise<UpdateResult> {
   const current = await getFlow(tenantId, id);
   if (!current) return { success: false, error: 'Fluxo não encontrado.' };
 
@@ -142,6 +148,10 @@ export async function updateFlow(tenantId: string, id: string, input: { name?: u
     trigger_event: trigger ? TRIGGER_EVENT[trigger.type] : null,
     updated_at: new Date().toISOString(),
   };
+  // Gatilho "Chamada de outro sistema" precisa de um endereço secreto.
+  if (trigger?.type === 'trigger-webhook' && (!current.webhook_token || input.regenerateToken === true)) updates.webhook_token = newWebhookToken();
+  // Ativou agora: horários que já passaram hoje não disparam de uma vez.
+  if (status === 'active' && current.status !== 'active') updates.last_fired_at = new Date().toISOString();
   if (input.name !== undefined) {
     const name = cleanText(input.name, 80);
     if (!name) return { success: false, error: 'Dê um nome ao fluxo.' };
@@ -154,7 +164,7 @@ export async function updateFlow(tenantId: string, id: string, input: { name?: u
     .update(updates)
     .eq('tenant_id', tenantId)
     .eq('id', id)
-    .select('id, name, description, status, trigger_event, updated_at, graph')
+    .select(DETAIL_COLUMNS)
     .single();
   if (error) return { success: false, error: error.message };
 
@@ -203,18 +213,56 @@ export async function cancelRun(tenantId: string, runId: string): Promise<Servic
   return { success: true };
 }
 
-/** Etapas do funil, equipe e WhatsApp: o que o editor precisa para os campos de escolha. */
+/** Etapas do funil, equipe, etiquetas, fluxos e WhatsApp: o que o editor precisa para os campos de escolha. */
 export async function editorOptions(tenantId: string) {
-  const [{ data: stages }, { data: team }, { data: meta }] = await Promise.all([
+  const [{ data: stages }, { data: team }, { data: meta }, { data: tags }, { data: flows }] = await Promise.all([
     supabaseAdmin.from('pipeline_stages').select('id, name').eq('tenant_id', tenantId).order('position'),
-    supabaseAdmin.from('profiles').select('id, name').eq('tenant_id', tenantId).eq('status', 'ACTIVE').order('name'),
+    supabaseAdmin.from('profiles').select('id, name, role, phone').eq('tenant_id', tenantId).eq('status', 'ACTIVE').order('name'),
     supabaseAdmin.from('integrations_config').select('provider').eq('tenant_id', tenantId).eq('provider', 'whatsapp_meta').maybeSingle(),
+    supabaseAdmin.from('lead_tags').select('name').eq('tenant_id', tenantId).order('name'),
+    supabaseAdmin.from('automation_flows').select('id, name, status').eq('tenant_id', tenantId).order('name'),
   ]);
   const { getWhatsAppWebStatus } = await import('@/lib/whatsapp-web');
   return {
     stages: stages || [],
-    team: team || [],
+    team: (team || []).map((member) => ({ id: member.id, name: member.name, role: member.role, hasPhone: Boolean(member.phone) })),
+    tags: (tags || []).map((tag) => String(tag.name)),
+    flows: flows || [],
     whatsapp: { web: getWhatsAppWebStatus(tenantId).connected, api: Boolean(meta) },
     scheduler: process.env.CONTENT_SCHEDULER_ENABLED === 'true',
+    ai: Boolean(process.env.GEMINI_API_KEY),
   };
+}
+
+/** Busca de leads para "Rodar para leads" (nome, telefone ou e-mail). */
+export async function searchLeads(tenantId: string, q: string) {
+  const term = q.trim().replace(/[,()*%\\]/g, ' ').slice(0, 60);
+  let query = supabaseAdmin.from('leads').select('id, name, phone, blocked').eq('tenant_id', tenantId).order('last_activity_at', { ascending: false, nullsFirst: false }).limit(20);
+  if (term) query = query.or(`name.ilike.%${term}%,phone.ilike.%${term.replace(/\D/g, '') || term}%,email.ilike.%${term}%`);
+  const { data } = await query;
+  return (data || []).map((lead) => ({ id: lead.id, name: lead.name, phone: lead.phone, blocked: Boolean(lead.blocked) }));
+}
+
+const MEDIA_KIND: Record<string, 'image' | 'video' | 'audio' | 'document'> = {
+  'image/jpeg': 'image', 'image/png': 'image', 'image/webp': 'image', 'image/gif': 'image',
+  'video/mp4': 'video', 'video/3gpp': 'video',
+  'audio/mpeg': 'audio', 'audio/ogg': 'audio', 'audio/mp4': 'audio', 'audio/aac': 'audio', 'audio/amr': 'audio',
+};
+const DOCUMENT_TYPES = new Set([
+  'application/pdf', 'text/plain', 'text/csv', 'application/zip',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+
+/** Arquivo do bloco "Enviar arquivo" (bucket público automation-media). */
+export async function uploadAutomationMedia(tenantId: string, file: { buffer: Buffer; type: string; size: number; name: string }) {
+  const kind = MEDIA_KIND[file.type] || (DOCUMENT_TYPES.has(file.type) ? 'document' : null);
+  if (!kind) return { error: 'Tipo de arquivo não aceito. Use imagem, vídeo MP4, áudio, PDF ou documento do Office.' };
+  if (file.size > 16 * 1024 * 1024) return { error: 'O arquivo pode ter no máximo 16 MB.' };
+  const safeName = (file.name || 'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.-]/g, '_').slice(-80);
+  const path = `${tenantId}/${randomUUID()}/${safeName}`;
+  const { error } = await supabaseAdmin.storage.from('automation-media').upload(path, file.buffer, { contentType: file.type, upsert: false });
+  if (error) return { error: /bucket/i.test(error.message) ? 'Rode a migration 202610170001_automations_v2.sql no Supabase para enviar arquivos.' : error.message };
+  return { url: supabaseAdmin.storage.from('automation-media').getPublicUrl(path).data.publicUrl, kind, fileName: file.name.slice(0, 120) };
 }

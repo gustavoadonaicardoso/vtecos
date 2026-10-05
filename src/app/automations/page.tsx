@@ -3,7 +3,7 @@
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, Clock, Download, Loader2, MoveRight, Plus, Trash2, UserPlus, Workflow, X, Zap } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Download, Hand, Hourglass, Loader2, MoveRight, Plus, Tag, Trash2, UserPlus, Webhook, Workflow, X, Zap } from 'lucide-react';
 import styles from './automations.module.css';
 import { useAuth } from '@/context/AuthContext';
 import { graphFromLegacy } from '@/lib/automations/flow';
@@ -28,6 +28,11 @@ const TRIGGER: Record<string, { label: string; icon: typeof Zap }> = {
   message_received: { label: 'Mensagem no WhatsApp', icon: Zap },
   lead_created: { label: 'Lead novo', icon: UserPlus },
   stage_changed: { label: 'Mudança de etapa', icon: MoveRight },
+  tag_added: { label: 'Etiqueta adicionada', icon: Tag },
+  lead_inactive: { label: 'Lead parado', icon: Hourglass },
+  schedule: { label: 'Data e hora marcadas', icon: CalendarClock },
+  webhook: { label: 'Chamada de outro sistema', icon: Webhook },
+  manual: { label: 'Iniciado pela equipe', icon: Hand },
 };
 
 const STATUS_LABEL = { active: 'Ativo', paused: 'Pausado', draft: 'Rascunho' };

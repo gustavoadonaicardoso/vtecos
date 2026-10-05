@@ -15,13 +15,15 @@ import {
   Plus,
   Power,
   Search,
+  Send,
   X,
 } from 'lucide-react';
 import styles from '../automations.module.css';
 import {
   isTrigger,
-  portLabel,
   portsFor,
+  SENDS_WHATSAPP,
+  USES_AI,
   validateFlow,
   type FlowConnection,
   type FlowGraph,
@@ -34,6 +36,7 @@ import { BLOCK_GROUPS, BLOCKS, describeNode, makeNode, newId, type EditorOptions
 import Inspector from './Inspector';
 import Simulator from './Simulator';
 import RunsPanel from './RunsPanel';
+import RunForLeads from './RunForLeads';
 
 export interface FlowDetail {
   id: string;
@@ -42,6 +45,7 @@ export interface FlowDetail {
   status: 'draft' | 'active' | 'paused';
   updated_at: string;
   graph: FlowGraph;
+  webhook_token?: string | null;
 }
 
 interface FlowEditorProps {
@@ -54,12 +58,27 @@ interface FlowEditorProps {
 
 const NODE_W = 260;
 const NODE_H = 124;
-const PORT_Y: Record<PortName, number> = { default: 38, yes: 76, no: 104 };
+/** Blocos com várias saídas: uma linha por saída, abaixo do resumo. */
+const PORT_TOP = 104;
+const PORT_STEP = 26;
 
 type SaveState = 'saved' | 'pending' | 'saving' | 'error';
 
+/** Saídas do bloco com a altura de cada uma e a altura total do bloco. */
+function layoutOf(node: FlowNode) {
+  const ports = portsFor(node);
+  const single = ports.length <= 1 && !ports[0]?.label;
+  return {
+    ports: ports.map((port, index) => ({ ...port, y: single ? 38 : PORT_TOP + index * PORT_STEP })),
+    single,
+    height: single ? NODE_H : PORT_TOP + (ports.length - 1) * PORT_STEP + 24,
+  };
+}
+
 function portPoint(node: FlowNode, side: 'in' | 'out', port: PortName = 'default') {
-  return side === 'in' ? { x: node.x, y: node.y + 38 } : { x: node.x + NODE_W, y: node.y + PORT_Y[port] };
+  if (side === 'in') return { x: node.x, y: node.y + 38 };
+  const found = layoutOf(node).ports.find((item) => item.id === port);
+  return { x: node.x + NODE_W, y: node.y + (found?.y ?? 38) };
 }
 
 function curve(a: { x: number; y: number }, b: { x: number; y: number }) {
@@ -85,6 +104,8 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
   const [serverProblems, setServerProblems] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
+  const [webhookToken, setWebhookToken] = useState<string | null>(flow.webhook_token || null);
+  const [runningForLeads, setRunningForLeads] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const dirty = useRef(false);
@@ -108,6 +129,7 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
       const json = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(json.error || 'Não foi possível salvar.');
       setSaveState(dirty.current ? 'pending' : 'saved');
+      if (json.data?.webhook_token !== undefined) setWebhookToken(json.data.webhook_token);
       if (json.paused) {
         setStatus('paused');
         setNotice({ type: 'error', text: 'O fluxo foi pausado porque ficou com problemas. Corrija e ative de novo.' });
@@ -150,8 +172,14 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
   const updateNode = (id: string, changes: Partial<FlowNode>) =>
     change((current) => ({ ...current, nodes: current.nodes.map((node) => (node.id === id ? { ...node, ...changes } : node)) }));
 
+  // Saída que deixou de existir (opção removida, tipo de resposta trocado...) perde a ligação.
   const updateConfig = (id: string, config: NodeConfig) =>
-    change((current) => ({ ...current, nodes: current.nodes.map((node) => (node.id === id ? { ...node, config: { ...node.config, ...config } } : node)) }));
+    change((current) => {
+      const nodes = current.nodes.map((node) => (node.id === id ? { ...node, config: { ...node.config, ...config } } : node));
+      const changed = nodes.find((node) => node.id === id);
+      const ports = new Set(changed ? portsFor(changed).map((port) => port.id) : []);
+      return { ...current, nodes, connections: current.connections.filter((connection) => connection.fromId !== id || ports.has(connection.fromPort)) };
+    });
 
   const removeNode = (id: string) => {
     change((current) => ({
@@ -197,7 +225,7 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
     const minX = Math.min(...graph.nodes.map((node) => node.x));
     const minY = Math.min(...graph.nodes.map((node) => node.y));
     const maxX = Math.max(...graph.nodes.map((node) => node.x + NODE_W));
-    const maxY = Math.max(...graph.nodes.map((node) => node.y + NODE_H));
+    const maxY = Math.max(...graph.nodes.map((node) => node.y + layoutOf(node).height));
     const fitZoom = Math.min(1.1, Math.max(0.35, Math.min((rect.width - 80) / (maxX - minX), (rect.height - 80) / (maxY - minY))));
     const nextZoom = Math.max(fitZoom, minZoom);
     setZoom(nextZoom);
@@ -316,13 +344,13 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
     const x = anchor ? anchor.x + NODE_W + 80 : 80;
     const y = anchor ? anchor.y : 160;
     const node = makeNode(type, x, y);
-    // Liga automaticamente ao bloco de onde partiu, se a saída dele estiver livre.
-    const fromPort: PortName = anchor ? portsFor(anchor.type)[0] : 'default';
-    const autoConnect = anchor && !isTrigger(type) && !graph.connections.some((connection) => connection.fromId === anchor.id && connection.fromPort === fromPort);
+    // Liga automaticamente ao bloco de onde partiu, na primeira saída livre dele.
+    const fromPort: PortName | undefined = anchor ? portsFor(anchor).map((port) => port.id).find((port) => !graph.connections.some((connection) => connection.fromId === anchor.id && connection.fromPort === port)) : undefined;
+    const autoConnect = anchor && fromPort && !isTrigger(type);
     change((current) => ({
       ...current,
       nodes: [...current.nodes, node],
-      connections: autoConnect ? [...current.connections, { id: newId('c'), fromId: anchor!.id, toId: node.id, fromPort }] : current.connections,
+      connections: autoConnect ? [...current.connections, { id: newId('c'), fromId: anchor!.id, toId: node.id, fromPort: fromPort! }] : current.connections,
     }));
     setSelected(node.id);
     setPanel(null);
@@ -359,7 +387,22 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
     }
   };
 
-  const noWhatsApp = options && !options.whatsapp.web && !options.whatsapp.api && graph.nodes.some((node) => ['send-message', 'send-media', 'question'].includes(node.type));
+  const noWhatsApp = options && !options.whatsapp.web && !options.whatsapp.api && graph.nodes.some((node) => SENDS_WHATSAPP.includes(node.type));
+  const noAi = options && !options.ai && graph.nodes.some((node) => USES_AI.includes(node.type));
+  const needsScheduler = options && !options.scheduler && graph.nodes.some((node) => ['delay', 'trigger-inactive', 'trigger-schedule', 'question', 'menu', 'wait-reply'].includes(node.type));
+
+  const regenerateToken = async () => {
+    if (webhookToken && !confirm('Gerar um endereço novo? O endereço atual para de funcionar na hora.')) return;
+    if (dirty.current) await save();
+    const response = await fetch(`/api/automations/${flow.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ regenerateToken: true }) });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setNotice({ type: 'error', text: json.error || 'Não foi possível gerar o endereço.' });
+      return;
+    }
+    setWebhookToken(json.data.webhook_token || null);
+    setNotice({ type: 'ok', text: 'Endereço novo gerado.' });
+  };
   const allProblems = problems.errors.length ? problems.errors : serverProblems;
   const filteredGroups = BLOCK_GROUPS.map((group) => ({
     ...group,
@@ -390,6 +433,11 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
             {allProblems.length ? <span>{allProblems.length}<span className={styles.hideSm}> problema(s)</span></span> : <span className={styles.hideSm}>Pronto para ativar</span>}
           </button>
           <button type="button" className={styles.secondaryBtn} onClick={() => setSimulating(true)}><Play size={15} /> <span className={styles.hideSm}>Simular</span></button>
+          {canEdit && (
+            <button type="button" className={styles.secondaryBtn} onClick={() => setRunningForLeads(true)} title="Rodar este fluxo agora para leads escolhidos">
+              <Send size={15} /> <span className={styles.hideSm}>Rodar</span>
+            </button>
+          )}
           <button type="button" className={`${styles.secondaryBtn} ${panel === 'runs' ? styles.btnOn : ''}`} onClick={() => { setPanel(panel === 'runs' ? null : 'runs'); setSelected(null); }}>
             <History size={15} /> <span className={styles.hideSm}>Execuções</span>
           </button>
@@ -405,6 +453,16 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
       {noWhatsApp && (
         <div className={styles.banner}>
           <AlertTriangle size={15} /> Nenhum WhatsApp conectado: os blocos de mensagem vão falhar. <Link href="/integrations">Conectar em Integrações</Link>
+        </div>
+      )}
+      {noAi && (
+        <div className={styles.banner}>
+          <AlertTriangle size={15} /> <span>A IA não está configurada no servidor (falta a chave <code>GEMINI_API_KEY</code>): os blocos de IA vão seguir pela saída &quot;Erro&quot;.</span>
+        </div>
+      )}
+      {needsScheduler && (
+        <div className={styles.banner}>
+          <AlertTriangle size={15} /> <span>O agendador está desligado neste servidor (<code>CONTENT_SCHEDULER_ENABLED</code>): esperas, prazos de resposta e gatilhos de tempo só andam com ele ligado.</span>
         </div>
       )}
       {!canEdit && <div className={styles.banner}>Você pode ver o fluxo e as execuções. Só administradores e gerentes editam.</div>}
@@ -461,7 +519,7 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
             <svg
               className={styles.wires}
               width={Math.max(0, ...graph.nodes.map((node) => node.x + NODE_W)) + 400}
-              height={Math.max(0, ...graph.nodes.map((node) => node.y + NODE_H)) + 400}
+              height={Math.max(0, ...graph.nodes.map((node) => node.y + layoutOf(node).height)) + 400}
             >
               {graph.connections.map((connection) => {
                 const from = graph.nodes.find((node) => node.id === connection.fromId);
@@ -495,13 +553,13 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
 
             {graph.nodes.map((node) => {
               const block = BLOCKS[node.type];
-              const ports = portsFor(node.type);
+              const layout = layoutOf(node);
               return (
                 <div
                   key={node.id}
                   data-node
                   className={`${styles.node} ${selected === node.id ? styles.nodeSelected : ''} ${connecting && connecting.nodeId !== node.id && !isTrigger(node.type) ? styles.nodeTarget : ''}`}
-                  style={{ left: node.x, top: node.y, width: NODE_W, height: NODE_H, borderTopColor: block.color }}
+                  style={{ left: node.x, top: node.y, width: NODE_W, height: layout.height, borderTopColor: block.color }}
                   onPointerDown={(e) => onNodePointerDown(e, node)}
                   onClick={() => {
                     if (connecting) {
@@ -517,25 +575,25 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
                       <small>{isTrigger(node.type) ? 'Gatilho' : block.description}</small>
                     </div>
                   </div>
-                  <p className={styles.nodeText}>{describeNode(node, options)}</p>
+                  <p className={`${styles.nodeText} ${layout.single ? '' : styles.nodeTextShort}`}>{describeNode(node, options)}</p>
 
                   {!isTrigger(node.type) && (
                     <button type="button" className={`${styles.port} ${styles.portIn}`} style={{ top: 38 - 8 }} aria-label={`Entrada de ${node.label}`}
                       onClick={(e) => { e.stopPropagation(); if (connecting) { connect(connecting, node.id); setConnecting(null); } }} />
                   )}
-                  {ports.map((port) => (
-                    <React.Fragment key={port}>
-                      {port !== 'default' && <span className={styles.portLabel} style={{ top: PORT_Y[port] - 9 }}>{portLabel(node.type, port)}</span>}
+                  {layout.ports.map((port) => (
+                    <React.Fragment key={port.id}>
+                      {!layout.single && <span className={styles.portRow} style={{ top: port.y - 11 }} title={port.label}>{port.label}</span>}
                       <button
                         type="button"
-                        className={`${styles.port} ${styles.portOut} ${port === 'yes' ? styles.portYes : port === 'no' ? styles.portNo : ''} ${connecting?.nodeId === node.id && connecting.port === port ? styles.portActive : ''}`}
-                        style={{ top: PORT_Y[port] - 8 }}
-                        aria-label={`Saída ${portLabel(node.type, port) || ''} de ${node.label}`}
+                        className={`${styles.port} ${styles.portOut} ${port.tone === 'yes' ? styles.portYes : port.tone === 'no' ? styles.portNo : port.tone === 'option' ? styles.portOption : ''} ${connecting?.nodeId === node.id && connecting.port === port.id ? styles.portActive : ''}`}
+                        style={{ top: port.y - 8 }}
+                        aria-label={`Saída ${port.label} de ${node.label}`}
                         disabled={!canEdit}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedConnection(null);
-                          setConnecting(connecting?.nodeId === node.id && connecting.port === port ? null : { nodeId: node.id, port });
+                          setConnecting(connecting?.nodeId === node.id && connecting.port === port.id ? null : { nodeId: node.id, port: port.id });
                           setPointer(null);
                         }}
                       />
@@ -579,6 +637,9 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
             graph={graph}
             options={options}
             readOnly={!canEdit}
+            flowId={flow.id}
+            webhookToken={webhookToken}
+            onRegenerateToken={regenerateToken}
             onLabel={(label) => updateNode(selectedNode.id, { label })}
             onConfig={(config) => updateConfig(selectedNode.id, config)}
             onRemoveConnection={removeConnection}
@@ -596,6 +657,14 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
       )}
 
       {simulating && <Simulator graph={graph} options={options} onClose={() => setSimulating(false)} />}
+      {runningForLeads && (
+        <RunForLeads
+          flowId={flow.id}
+          active={status === 'active'}
+          onClose={() => setRunningForLeads(false)}
+          onDone={(text) => { setRunningForLeads(false); setNotice({ type: 'ok', text }); setPanel('runs'); setSelected(null); }}
+        />
+      )}
     </div>
   );
 }

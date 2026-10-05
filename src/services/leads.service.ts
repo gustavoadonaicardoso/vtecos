@@ -277,14 +277,16 @@ export async function bulkUpdateLeads(
   action: BulkAction,
   value: string | null,
   ownerId: string | null
-): Promise<ServiceResult<{ count: number; ids: string[] }>> {
+): Promise<ServiceResult<{ count: number; ids: string[]; changed: string[] }>> {
   let query = supabase.from('leads').select('id, tags, stage_id').eq('tenant_id', tenantId).in('id', ids);
   if (ownerId) query = query.eq('assigned_to', ownerId);
   const { data: rows, error } = await query;
   if (error) return { success: false, error: error.message };
   const targets = (rows || []) as { id: string; tags: string[] | null; stage_id: string | null }[];
-  if (targets.length === 0) return { success: true, data: { count: 0, ids: [] } };
+  if (targets.length === 0) return { success: true, data: { count: 0, ids: [], changed: [] } };
   const targetIds = targets.map((row) => row.id);
+  // Leads que de fato mudaram (ex.: ganharam a etiqueta agora) -- disparam automações.
+  const changed: string[] = [];
 
   if (action === 'delete') {
     const { error: deleteError } = await supabase.from('leads').delete().eq('tenant_id', tenantId).in('id', targetIds);
@@ -307,11 +309,12 @@ export async function bulkUpdateLeads(
       const next = action === 'addTag' ? sanitizeTags([...current, tag]) : current.filter((item) => item.toLowerCase() !== tag.toLowerCase());
       const { error: tagError } = await supabase.from('leads').update({ tags: next }).eq('tenant_id', tenantId).eq('id', row.id);
       if (tagError) return { success: false, error: tagError.message };
+      changed.push(row.id);
     }
     if (action === 'addTag') await registerTags(tenantId, [tag]);
   }
 
-  return { success: true, data: { count: targetIds.length, ids: targetIds } };
+  return { success: true, data: { count: targetIds.length, ids: targetIds, changed } };
 }
 
 // ─── Etiquetas da empresa ─────────────────────────────────────
@@ -319,7 +322,7 @@ export async function bulkUpdateLeads(
 const TAG_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
 
 /** Garante que as etiquetas usadas existam no cadastro da empresa. */
-async function registerTags(tenantId: string, tags: string[]) {
+export async function registerTags(tenantId: string, tags: string[]) {
   if (tags.length === 0) return;
   const { data } = await supabase.from('lead_tags').select('name').eq('tenant_id', tenantId);
   if (!data) return; // tabela ainda não criada
