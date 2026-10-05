@@ -1,388 +1,427 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import styles from './queue.module.css';
-import { logAudit } from '@/lib/audit';
-import { useAuth } from '@/context/AuthContext';
-import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
-import { 
-  Monitor, 
-  UserPlus, 
-  Clock, 
-  ArrowRight, 
-  RotateCcw, 
-  Ticket,
-  Users,
-  Hash,
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowRight,
+  Ban,
+  CheckCircle2,
+  Clock,
+  Copy,
   ExternalLink,
-  Trash2,
-  Bell,
-  HelpCircle,
-  Clapperboard
+  Loader2,
+  MessageCircle,
+  Monitor,
+  Power,
+  RotateCcw,
+  Settings2,
+  Ticket,
+  Undo2,
+  UserPlus,
+  UserX,
+  Users,
+  X,
 } from 'lucide-react';
-import ThemeToggle from '@/components/ThemeToggle';
-import NotificationDropdown from '@/components/NotificationDropdown';
-import Link from 'next/link';
+import styles from './queue.module.css';
+import { supabase } from '@/lib/supabase';
+import {
+  DEFAULT_QUEUE_SETTINGS,
+  STATUS_LABEL,
+  deskName,
+  deskOptions,
+  minutesBetween,
+  ticketCode,
+  type QueueSettings,
+  type QueueTicket,
+} from '@/lib/queue';
 import DisplayMediaSettings from './DisplayMediaSettings';
+import QueueSettingsModal from './components/QueueSettingsModal';
 
-interface Ticket {
-  id: string;
-  number: number;
-  name?: string;
-  desk: string;
-  status: 'waiting' | 'calling' | 'completed';
-  created_at: string;
+type Notice = { type: 'ok' | 'error' | 'info'; text: string } | null;
+type QueueState = { tickets: QueueTicket[]; settings: QueueSettings; links: { display: string; totem: string } | null; canManage: boolean };
+
+const DESK_KEY = 'vtec_queue_desk';
+
+function readDesk() {
+  try {
+    return localStorage.getItem(DESK_KEY) || '01';
+  } catch {
+    return '01';
+  }
 }
 
+async function post<T>(url: string, body?: unknown): Promise<T> {
+  const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(json.error || 'Algo deu errado. Tente de novo.');
+  return json.data as T;
+}
+
+const time = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+const waitLabel = (minutes: number) => (minutes < 1 ? 'agora' : minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}`);
+
 export default function QueuePage() {
-  const { user } = useAuth();
-  const [desk, setDesk] = useState('01');
+  const [state, setState] = useState<QueueState | null>(null);
+  const [loadError, setLoadError] = useState('');
+  const [desk, setDeskState] = useState('01');
+  const [now, setNow] = useState(() => Date.now());
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
+  const [whatsapp, setWhatsapp] = useState<{ ok: boolean; text: string } | null>(null);
+  const [form, setForm] = useState({ name: '', whatsapp: '', document: '', priority: false });
+  const [showSettings, setShowSettings] = useState(false);
+  const [showMedia, setShowMedia] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
-  // Totem e painel levam a chave da empresa na URL (cada empresa, sua fila).
-  const openQueueLink = async (kind: 'display' | 'totem') => {
-    const popup = window.open('', '_blank');
+  const settings = state?.settings ?? DEFAULT_QUEUE_SETTINGS;
+  const tickets = useMemo(() => state?.tickets ?? [], [state]);
+
+  const load = useCallback(async () => {
     try {
-      const response = await fetch('/api/queue/links', { cache: 'no-store' });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Não foi possível abrir.');
-      if (popup) popup.location.href = result.data[kind];
-      else window.open(result.data[kind], '_blank');
+      const response = await fetch('/api/queue/state', { cache: 'no-store' });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json.error || 'Não foi possível carregar a fila.');
+      setState(json.data);
+      setLoadError('');
     } catch (error) {
-      popup?.close();
-      alert(error instanceof Error ? error.message : 'Não foi possível abrir.');
+      setLoadError((error as Error).message);
     }
-  };
-  const [totalDesks, setTotalDesks] = useState(5);
-  const [waitingTickets, setWaitingTickets] = useState<Ticket[]>([]);
-  const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
-  const [lastTicketIssued, setLastTicketIssued] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Manual entry states
-  const [manualName, setManualName] = useState('');
-  const [manualWhatsapp, setManualWhatsapp] = useState('');
-  const [manualDocument, setManualDocument] = useState('');
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [showMediaSettings, setShowMediaSettings] = useState(false);
-  const [whatsNotice, setWhatsNotice] = useState<{ ok: boolean; text: string } | null>(null);
-  const canManageDisplay = user?.role === 'ADMIN' || user?.role === 'MANAGER';
-
-  const fetchSettings = async () => {
-    if (!supabase) return;
-    // O banco devolve só a configuração da empresa logada (RLS).
-    const { data } = await supabase.from('queue_settings').select('*').limit(1).maybeSingle();
-    if (data) setTotalDesks(data.total_desks);
-  };
-
-  useEffect(() => {
-    fetchQueue();
-    fetchSettings();
-    const channel = supabase
-      ?.channel('queue_staff')
-      .on(
-        'postgres_changes',
-        { event: '*', table: 'attendance_queue_tickets', schema: 'public' },
-        () => fetchQueue()
-      )
-      .subscribe();
-
-    return () => {
-      supabase?.removeChannel(channel!);
-    };
   }, []);
 
-  // Realtime System Notifications
-  // Notificações não lidas -- a leitura passa pela API autenticada
-  // (/api/notifications), então atualiza por polling.
+  // Fila ao vivo: Realtime do banco + conferência a cada 15s (se o Realtime cair).
   useEffect(() => {
-    if (!user) return;
+    void load();
+    const channel = supabase
+      ?.channel('queue_staff')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance_queue_tickets' }, () => void load())
+      .subscribe();
+    const poll = setInterval(() => void load(), 15_000);
+    const clock = setInterval(() => setNow(Date.now()), 30_000);
+    return () => {
+      if (channel) supabase?.removeChannel(channel);
+      clearInterval(poll);
+      clearInterval(clock);
+    };
+  }, [load]);
 
-    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
+  // Guichê escolhido neste computador (lido depois de montar, para não divergir do servidor).
+  useEffect(() => {
+    const timer = setTimeout(() => setDeskState(readDesk()), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
-    fetchCount();
-    const interval = setInterval(fetchCount, 20_000);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
-    return () => clearInterval(interval);
-  }, [user]);
-
-  const fetchQueue = async () => {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from('attendance_queue_tickets')
-      .select('*')
-      .order('created_at', { ascending: true });
-
-    if (data) {
-      setWaitingTickets(data.filter((t: Ticket) => t.status === 'waiting'));
-      
-      // Find the one currently being "called" by this desk
-      const calling = data.find((t: Ticket) => t.status === 'calling' && t.desk === desk);
-      setCurrentTicket(calling || null);
-
-      // Find highest ticket number issued
-      const maxNum = data.length > 0 ? Math.max(...data.map((t: Ticket) => t.number)) : 0;
-      setLastTicketIssued(maxNum);
-    }
-    setIsLoading(false);
+  const setDesk = (value: string) => {
+    setDeskState(value);
+    setWhatsapp(null);
+    try {
+      localStorage.setItem(DESK_KEY, value);
+    } catch {}
   };
 
-  const generateTicket = async () => {
+  // Guichê salvo que não existe mais (diminuíram a quantidade).
+  const desks = deskOptions(settings.totalDesks);
+  const activeDesk = desks.includes(desk) ? desk : desks[0];
+
+  const waiting = tickets.filter((t) => t.status === 'waiting').sort((a, b) => Number(b.priority) - Number(a.priority) || a.number - b.number);
+  const mine = tickets.find((t) => t.status === 'calling' && t.desk === activeDesk) || null;
+  const otherDesks = tickets.filter((t) => t.status === 'calling' && t.desk !== activeDesk).sort((a, b) => String(a.desk).localeCompare(String(b.desk)));
+  const finished = tickets.filter((t) => ['completed', 'no_show', 'canceled'].includes(t.status)).sort((a, b) => String(b.finishedAt || b.calledAt).localeCompare(String(a.finishedAt || a.calledAt)));
+  const called = tickets.filter((t) => t.calledAt);
+  const avgWait = called.length ? Math.round(called.reduce((sum, t) => sum + minutesBetween(t.createdAt, t.calledAt!), 0) / called.length) : null;
+  const attended = tickets.filter((t) => t.status === 'completed').length;
+  const noShow = tickets.filter((t) => t.status === 'no_show').length;
+  const priorityWaiting = waiting.filter((t) => t.priority).length;
+  const nextNumber = tickets.reduce((max, t) => Math.max(max, t.number), 0) + 1;
+
+  const run = async (key: string, task: () => Promise<void>) => {
+    setBusy(key);
+    try {
+      await task();
+    } catch (error) {
+      setNotice({ type: 'error', text: (error as Error).message });
+    } finally {
+      setBusy(null);
+      void load();
+    }
+  };
+
+  const showWhatsapp = (result?: { sent: boolean; reason?: string }) => {
+    if (!result) return setWhatsapp(null);
+    if (result.sent) setWhatsapp({ ok: true, text: 'Aviso enviado no WhatsApp.' });
+    else if (result.reason === 'Sem WhatsApp cadastrado.') setWhatsapp(null);
+    else setWhatsapp({ ok: false, text: `WhatsApp não enviado: ${result.reason || 'falha no envio'}` });
+  };
+
+  const callNext = () => run('next', async () => {
+    const result = await post<{ ticket: QueueTicket | null; whatsapp?: { sent: boolean; reason?: string } }>('/api/queue/call-next', { desk: activeDesk });
+    if (!result.ticket) {
+      setNotice({ type: 'info', text: mine ? 'Atendimento finalizado. Não há mais ninguém aguardando.' : 'Não há ninguém aguardando.' });
+      setWhatsapp(null);
+    } else showWhatsapp(result.whatsapp);
+  });
+
+  const act = (ticket: QueueTicket, action: 'call' | 'recall' | 'finish' | 'no_show' | 'cancel' | 'requeue') => {
+    if (action === 'cancel' && !confirm(`Cancelar a senha ${ticketCode(ticket.number, ticket.priority)}?`)) return;
+    return run(`${action}-${ticket.id}`, async () => {
+      const result = await post<{ ticket: QueueTicket; whatsapp?: { sent: boolean; reason?: string } }>(`/api/queue/tickets/${ticket.id}`, { action, desk: activeDesk });
+      if (action === 'call' || action === 'recall') showWhatsapp(result.whatsapp);
+      else setWhatsapp(null);
+    });
+  };
+
+  const issue = () => run('issue', async () => {
     const response = await fetch('/api/queue/tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: manualName || 'Cliente (Manual)',
-        whatsapp: manualWhatsapp,
-        document: manualDocument,
-        origin: 'recepcao',
-      }),
+      body: JSON.stringify({ name: form.name.trim() || 'Cliente (Manual)', whatsapp: form.whatsapp, document: form.document, priority: form.priority, origin: 'recepcao' }),
     });
-    const result: { number?: number; error?: string } = await response.json();
-    const insertError = response.ok ? null : new Error(result.error || 'Não foi possível gerar a senha.');
-    const nextNumber = result.number ?? lastTicketIssued + 1;
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(json.error || 'Não foi possível gerar a senha.');
+    setForm({ name: '', whatsapp: '', document: '', priority: false });
+    setNotice({ type: 'ok', text: `Senha ${ticketCode(json.number, json.priority)} gerada. ${json.ahead ? `${json.ahead} na frente.` : 'É a próxima.'}` });
+  });
 
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      alert(`Erro ao gerar senha: ${insertError?.message || 'Verifique o banco de dados'}`);
-    } else {
-      // Audit Log
-      logAudit(
-        user,
-        'TICKET_CREATE',
-        `Senha #${nextNumber} gerada manualmente no Painel para ${manualName || 'Cliente'}.`,
-        'ticket',
-        nextNumber.toString()
-      );
-
-      // O lead é criado/atualizado no servidor junto com a senha (/api/queue/tickets).
-
-      setManualName('');
-      
-      // A confirmação no WhatsApp sai do servidor junto com a senha.
-
-      setManualWhatsapp('');
-      setManualDocument('');
-    }
-    fetchQueue();
+  const closeDay = () => {
+    if (!confirm(`Encerrar a fila de hoje? ${waiting.length ? `${waiting.length} senha(s) aguardando serão canceladas. ` : ''}O histórico continua salvo e amanhã a numeração recomeça do 1.`)) return;
+    void run('close', async () => {
+      const result = await post<{ canceled: number; finished: number }>('/api/queue/close-day');
+      setNotice({ type: 'ok', text: `Fila encerrada: ${result.canceled} cancelada(s), ${result.finished} finalizada(s).` });
+    });
   };
 
-  /** Avisa a pessoa no WhatsApp que a senha foi chamada; mostra o resultado no cartão. */
-  const notifyByWhatsApp = async (ticketId: string, kind: 'call' | 'recall') => {
-    setWhatsNotice({ ok: true, text: 'Enviando aviso no WhatsApp…' });
+  const openLink = (kind: 'display' | 'totem') => {
+    if (state?.links) window.open(state.links[kind], '_blank', 'noopener');
+  };
+
+  const copyLink = async (kind: 'display' | 'totem') => {
+    if (!state?.links) return;
     try {
-      const response = await fetch(`/api/queue/tickets/${ticketId}/notify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind }),
-      });
-      const result = await response.json().catch(() => ({}));
-      const data = result?.data as { sent?: boolean; reason?: string } | undefined;
-      if (response.ok && data?.sent) setWhatsNotice({ ok: true, text: 'Aviso enviado no WhatsApp ✓' });
-      else setWhatsNotice({ ok: false, text: data?.reason || result?.error || 'Aviso no WhatsApp não enviado.' });
+      await navigator.clipboard.writeText(`${window.location.origin}${state.links[kind]}`);
+      setNotice({ type: 'ok', text: `Link ${kind === 'totem' ? 'do totem' : 'da TV'} copiado.` });
     } catch {
-      setWhatsNotice({ ok: false, text: 'Aviso no WhatsApp não enviado (sem conexão).' });
+      setNotice({ type: 'error', text: 'Não foi possível copiar. Abra o link e copie da barra de endereço.' });
     }
   };
 
-  const callNext = async () => {
-    if (waitingTickets.length === 0) {
-      alert('Não há senhas aguardando');
-      return;
-    }
-
-    const nextOne = waitingTickets[0];
-    
-    // Mark previous current ticket (if any) as completed
-    if (currentTicket) {
-      await supabase?.from('attendance_queue_tickets')
-        .update({ status: 'completed' })
-        .eq('id', currentTicket.id);
-      
-      logAudit(
-        user,
-        'TICKET_COMPLETE',
-        `Atendimento da senha #${currentTicket.number} finalizado no Guichê ${desk}.`,
-        'ticket',
-        currentTicket.id
-      );
-    }
-
-    // Call the next one
-    const { error } = await supabase?.from('attendance_queue_tickets')
-      .update({ status: 'calling', desk: desk })
-      .eq('id', nextOne.id) || { error: 'Supabase client missing' };
-
-    if (!error) {
-      void notifyByWhatsApp(nextOne.id, 'call');
-      logAudit(
-        user,
-        'TICKET_CALL',
-        `Senha #${nextOne.number} chamada para o Guichê ${desk}.`,
-        'ticket',
-        nextOne.id
-      );
-    } else {
-      alert('Erro ao chamar próxima');
-    }
-    fetchQueue();
-  };
-
-  const recallCurrent = async () => {
-    if (!currentTicket) return;
-    
-    const { error } = await supabase?.from('attendance_queue_tickets')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', currentTicket.id) || { error: 'Supabase client missing' };
-
-    if (!error) {
-      void notifyByWhatsApp(currentTicket.id, 'recall');
-      logAudit(
-        user,
-        'TICKET_CALL',
-        `Senha #${currentTicket.number} rechamada para o Guichê ${desk}.`,
-        'ticket',
-        currentTicket.id
-      );
-    } else {
-      alert('Erro ao chamar novamente');
-    }
-  };
-
-  const resetQueue = async () => {
-    if (!confirm('ATENÇÃO: Isso irá apagar TODAS as senhas da fila hoje. Deseja continuar?')) {
-      return;
-    }
-
-    const { error } = await supabase?.from('attendance_queue_tickets').delete().gt('number', 0) || { error: 'Supabase client missing' };
-
-    if (!error) {
-      logAudit(user, 'SETTINGS_UPDATE', 'Fila de senhas reiniciada completamente por ação administrativa.');
-      setWaitingTickets([]);
-      setCurrentTicket(null);
-      setLastTicketIssued(0);
-      alert('Fila reiniciada com sucesso!');
-    } else {
-      console.error('Reset error:', (error as any).message || error);
-      alert(`Erro ao reiniciar fila: ${(error as any).message || 'Verifique as permissões do banco de dados'}`);
-    }
-  };
+  if (!state && loadError) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.errorBox}><AlertCircle size={16} /> {loadError} <button type="button" className={styles.linkBtn} onClick={() => void load()}>Tentar de novo</button></div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <div className={styles.titleArea}>
-          <Monitor size={28} color="var(--accent)" />
-          <h1>Painel de Chamada</h1>
+        <div className={styles.titleBlock}>
+          <h1>Senhas</h1>
+          <p>Fila de atendimento presencial: totem, recepção e TV.</p>
         </div>
-        
         <div className={styles.headerActions}>
-
-           <button onClick={() => openQueueLink('display')} className={styles.linkBtn}>
-            <ExternalLink size={18} /> Ver Display
-           </button>
-           <button onClick={() => openQueueLink('totem')} className={styles.linkBtn}>
-            <ExternalLink size={18} /> Ver Totem
-           </button>
-           {canManageDisplay && (
-             <button onClick={() => setShowMediaSettings(true)} className={styles.linkBtn}>
-              <Clapperboard size={18} /> Mídia do Painel
-             </button>
-           )}
-           <button onClick={resetQueue} className={styles.resetBtn}>
-            <Trash2 size={18} /> Reiniciar Fila
-           </button>
-        </div>
-
-        <div className={styles.deskSelector}>
-          <label>Guichê Ativo</label>
-          <select value={desk} onChange={(e) => setDesk(e.target.value)}>
-            {Array.from({ length: totalDesks }, (_, i) => {
-              const num = (i + 1).toString().padStart(2, '0');
-              return <option key={num} value={num}>{num}</option>;
-            })}
-          </select>
+          <span className={styles.linkGroup}>
+            <button type="button" className={styles.secondaryBtn} onClick={() => openLink('totem')} disabled={!state?.links}><ExternalLink size={15} /> Totem</button>
+            <button type="button" className={styles.iconBtn} onClick={() => copyLink('totem')} disabled={!state?.links} title="Copiar link do totem" aria-label="Copiar link do totem"><Copy size={15} /></button>
+          </span>
+          <span className={styles.linkGroup}>
+            <button type="button" className={styles.secondaryBtn} onClick={() => openLink('display')} disabled={!state?.links}><Monitor size={15} /> TV</button>
+            <button type="button" className={styles.iconBtn} onClick={() => copyLink('display')} disabled={!state?.links} title="Copiar link da TV" aria-label="Copiar link da TV"><Copy size={15} /></button>
+          </span>
+          {state?.canManage && (
+            <>
+              <button type="button" className={styles.secondaryBtn} onClick={() => setShowSettings(true)}><Settings2 size={15} /> Configurações</button>
+              <button type="button" className={styles.dangerBtn} onClick={closeDay} disabled={busy !== null}><Power size={15} /> Encerrar o dia</button>
+            </>
+          )}
         </div>
       </header>
-      
-      <div className={styles.grid}>
-        {/* Atendimento Atual */}
-        <section className={styles.currentSection}>
-          <h2><Clock size={18} /> Atendimento Atual</h2>
-          {currentTicket ? (
-            <div className={styles.ticketCardLarge}>
-              <div className={styles.ticketNumber}>
-                <Hash size={32} style={{ opacity: 0.5 }} />
-                {currentTicket.number.toString().padStart(2, '0')}
-              </div>
-              <div className={styles.ticketName}>{currentTicket.name || 'Sem nome'}</div>
-              {whatsNotice && (
-                <div className={whatsNotice.ok ? styles.whatsOk : styles.whatsFail}>{whatsNotice.text}</div>
-              )}
-              <div className={styles.actions}>
-                <button onClick={recallCurrent} className={styles.recallBtn}>
-                  <RotateCcw size={18} /> Chamar Novamente
-                </button>
-                <button onClick={callNext} className={styles.nextBtn}>
-                  Chamar Próximo <ArrowRight size={18} />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.emptyState}>
-              <p>Nenhum chamado ativo no seu guichê.</p>
-              <button onClick={callNext} className={styles.nextBtn}>
-                Chamar Próximo <ArrowRight size={18} />
-              </button>
-            </div>
-          )}
-        </section>
 
-        {/* Formulário de Senha Manual */}
-        <section className={styles.manualSection}>
-          <h2><UserPlus size={18} /> Gerar Senha Manual</h2>
-          <div className={styles.manualForm}>
-            <input 
-              type="text" 
-              placeholder="Nome do Cliente" 
-              value={manualName} 
-              onChange={(e) => setManualName(e.target.value)} 
-            />
-            <input 
-              type="text" 
-              placeholder="WhatsApp" 
-              value={manualWhatsapp} 
-              onChange={(e) => setManualWhatsapp(e.target.value)} 
-            />
-            <input 
-              type="text" 
-              placeholder="Documento" 
-              value={manualDocument} 
-              onChange={(e) => setManualDocument(e.target.value)} 
-            />
-            <button onClick={generateTicket} className={styles.generateBtn}>
-              <Ticket size={18} /> Gerar Ticket #{lastTicketIssued + 1}
-            </button>
-          </div>
-        </section>
-
-        {/* Fila de Espera */}
-        <section className={styles.queueSection}>
-          <h2><Users size={18} /> Aguardando ({waitingTickets.length})</h2>
-          <div className={styles.ticketList}>
-            {waitingTickets.map((ticket) => (
-              <div key={ticket.id} className={styles.ticketItem}>
-                <span className={styles.itemNumber}>#{ticket.number.toString().padStart(2, '0')}</span>
-                <span className={styles.itemName}>{ticket.name || 'Visitante'}</span>
-                <span className={styles.itemTime}>{new Date(ticket.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+      <div className={styles.stats}>
+        <span className={styles.stat}><Users size={15} /> <strong>{waiting.length}</strong> aguardando{priorityWaiting ? ` (${priorityWaiting} pref.)` : ''}</span>
+        <span className={styles.stat}><CheckCircle2 size={15} /> <strong>{attended}</strong> atendidas hoje</span>
+        <span className={styles.stat}><Clock size={15} /> espera média <strong>{avgWait === null ? '—' : waitLabel(avgWait)}</strong></span>
+        {noShow > 0 && <span className={styles.stat}><UserX size={15} /> <strong>{noShow}</strong> não compareceram</span>}
       </div>
 
-      {showMediaSettings && <DisplayMediaSettings onClose={() => setShowMediaSettings(false)} />}
+      <div className={styles.grid}>
+        <div className={styles.column}>
+          <section className={`${styles.card} ${styles.deskCard}`} aria-label="Meu atendimento">
+            <div className={styles.cardHead}>
+              <h2>Meu atendimento</h2>
+              <label className={styles.deskSelect}>
+                <span>{settings.deskLabel}</span>
+                <select value={activeDesk} onChange={(e) => setDesk(e.target.value)}>
+                  {desks.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+            </div>
+
+            {mine ? (
+              <div className={styles.current}>
+                <span className={styles.currentLabel}>Chamando agora</span>
+                <strong className={styles.currentCode} style={{ color: settings.primaryColor }}>{ticketCode(mine.number, mine.priority)}</strong>
+                <span className={styles.currentName}>{mine.name || 'Sem nome'}</span>
+                <span className={styles.currentMeta}>
+                  {mine.priority && <span className={styles.prefBadge}>Preferencial</span>}
+                  Esperou {waitLabel(minutesBetween(mine.createdAt, mine.calledAt || now))}
+                  {mine.callCount > 1 && ` · chamada ${mine.callCount}x`}
+                </span>
+                {whatsapp && <span className={whatsapp.ok ? styles.whatsOk : styles.whatsFail}><MessageCircle size={13} /> {whatsapp.text}</span>}
+                <div className={styles.currentActions}>
+                  <button type="button" className={styles.secondaryBtn} onClick={() => act(mine, 'recall')} disabled={busy !== null}>
+                    {busy === `recall-${mine.id}` ? <Loader2 size={15} className={styles.spin} /> : <RotateCcw size={15} />} Chamar de novo
+                  </button>
+                  <button type="button" className={styles.secondaryBtn} onClick={() => act(mine, 'no_show')} disabled={busy !== null}>
+                    <UserX size={15} /> Não veio
+                  </button>
+                  <button type="button" className={styles.secondaryBtn} onClick={() => act(mine, 'finish')} disabled={busy !== null}>
+                    <CheckCircle2 size={15} /> Finalizar
+                  </button>
+                </div>
+                <button type="button" className={styles.linkBtn} onClick={() => act(mine, 'requeue')} disabled={busy !== null}><Undo2 size={13} /> Chamou por engano? Devolver à fila</button>
+              </div>
+            ) : (
+              <div className={styles.idle}>
+                <Ticket size={28} />
+                <p>Nenhuma senha no {deskName(settings.deskLabel, activeDesk)}.</p>
+              </div>
+            )}
+
+            <button type="button" className={`${styles.primaryBtn} ${styles.nextBtn}`} onClick={callNext} disabled={busy !== null || (!mine && waiting.length === 0)}>
+              {busy === 'next' ? <Loader2 size={18} className={styles.spin} /> : <ArrowRight size={18} />}
+              {mine ? 'Finalizar e chamar a próxima' : 'Chamar a próxima'}
+              {waiting.length > 0 && <span className={styles.nextPeek}>{ticketCode(waiting[0].number, waiting[0].priority)}</span>}
+            </button>
+          </section>
+
+          <section className={styles.card} aria-label="Gerar senha na recepção">
+            <div className={styles.cardHead}><h2><UserPlus size={16} /> Senha na recepção</h2></div>
+            <div className={styles.form}>
+              <input className={styles.input} placeholder="Nome (opcional)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <div className={styles.row2}>
+                <input className={styles.input} placeholder="WhatsApp" inputMode="tel" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
+                <input className={styles.input} placeholder="CPF ou RG" inputMode="numeric" value={form.document} onChange={(e) => setForm({ ...form, document: e.target.value })} />
+              </div>
+              <label className={styles.check}>
+                <input type="checkbox" checked={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.checked })} />
+                <span>Preferencial</span>
+              </label>
+              <button type="button" className={styles.primaryBtn} onClick={issue} disabled={busy !== null}>
+                {busy === 'issue' ? <Loader2 size={16} className={styles.spin} /> : <Ticket size={16} />} Gerar senha {ticketCode(nextNumber, form.priority)}
+              </button>
+              <small className={styles.hint}>Com WhatsApp, a pessoa recebe a senha e o aviso quando for chamada.</small>
+            </div>
+          </section>
+        </div>
+
+        <section className={styles.card} aria-label="Fila">
+          <div className={styles.cardHead}>
+            <h2><Users size={16} /> Fila</h2>
+            <span className={styles.count}>{waiting.length}</span>
+          </div>
+          {!state && <p className={styles.empty}><Loader2 size={14} className={styles.spin} /> Carregando...</p>}
+          {state && waiting.length === 0 && <p className={styles.empty}>Ninguém aguardando.</p>}
+          <ol className={styles.list}>
+            {waiting.map((ticket, index) => {
+              const minutes = minutesBetween(ticket.createdAt, now);
+              return (
+                <li key={ticket.id} className={styles.ticketRow}>
+                  <span className={`${styles.code} ${ticket.priority ? styles.codePref : ''}`}>{ticketCode(ticket.number, ticket.priority)}</span>
+                  <span className={styles.rowBody}>
+                    <strong>{ticket.name || 'Visitante'}</strong>
+                    <small>
+                      {index === 0 ? 'Próxima · ' : ''}{ticket.origin === 'recepcao' ? 'Recepção' : 'Totem'} · {time(ticket.createdAt)}
+                    </small>
+                  </span>
+                  <span className={`${styles.wait} ${minutes >= 30 ? styles.waitLong : ''}`}>{waitLabel(minutes)}</span>
+                  <span className={styles.rowActions}>
+                    <button type="button" className={styles.smallBtn} onClick={() => act(ticket, 'call')} disabled={busy !== null} title={`Chamar para o ${deskName(settings.deskLabel, activeDesk)}`}>
+                      {busy === `call-${ticket.id}` ? <Loader2 size={13} className={styles.spin} /> : 'Chamar'}
+                    </button>
+                    <button type="button" className={styles.iconBtn} onClick={() => act(ticket, 'cancel')} disabled={busy !== null} title="Cancelar senha" aria-label={`Cancelar senha ${ticketCode(ticket.number, ticket.priority)}`}>
+                      <Ban size={14} />
+                    </button>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+
+        <div className={styles.column}>
+          <section className={styles.card} aria-label="Em atendimento">
+            <div className={styles.cardHead}><h2><Monitor size={16} /> Outros {settings.deskLabel.toLowerCase()}s</h2></div>
+            {otherDesks.length === 0 && <p className={styles.empty}>Nenhum outro atendimento agora.</p>}
+            <ul className={styles.list}>
+              {otherDesks.map((ticket) => (
+                <li key={ticket.id} className={styles.ticketRow}>
+                  <span className={`${styles.code} ${ticket.priority ? styles.codePref : ''}`}>{ticketCode(ticket.number, ticket.priority)}</span>
+                  <span className={styles.rowBody}>
+                    <strong>{ticket.name || 'Visitante'}</strong>
+                    <small>{deskName(settings.deskLabel, ticket.desk)} · desde {time(ticket.calledAt)}</small>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className={styles.card} aria-label="Histórico de hoje">
+            <button type="button" className={styles.cardToggle} onClick={() => setHistoryOpen((value) => !value)} aria-expanded={historyOpen}>
+              <h2><Clock size={16} /> Histórico de hoje</h2>
+              <span className={styles.count}>{finished.length}</span>
+            </button>
+            {historyOpen && (
+              <>
+                {finished.length === 0 && <p className={styles.empty}>Nada finalizado ainda.</p>}
+                <ul className={styles.list}>
+                  {finished.slice(0, 50).map((ticket) => (
+                    <li key={ticket.id} className={styles.ticketRow}>
+                      <span className={`${styles.code} ${styles.codeMuted}`}>{ticketCode(ticket.number, ticket.priority)}</span>
+                      <span className={styles.rowBody}>
+                        <strong>{ticket.name || 'Visitante'}</strong>
+                        <small>
+                          {STATUS_LABEL[ticket.status]}
+                          {ticket.desk && ticket.status !== 'canceled' ? ` · ${deskName(settings.deskLabel, ticket.desk)}` : ''}
+                          {ticket.calledAt ? ` · esperou ${waitLabel(minutesBetween(ticket.createdAt, ticket.calledAt))}` : ''}
+                        </small>
+                      </span>
+                      <span className={styles.wait}>{time(ticket.finishedAt || ticket.calledAt)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        </div>
+      </div>
+
+      {showSettings && (
+        <QueueSettingsModal
+          settings={settings}
+          onSaved={(next) => {
+            setState((current) => (current ? { ...current, settings: next } : current));
+            setShowSettings(false);
+            setNotice({ type: 'ok', text: 'Configurações salvas. O totem e a TV atualizam em instantes.' });
+          }}
+          onOpenMedia={() => { setShowSettings(false); setShowMedia(true); }}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+      {showMedia && <DisplayMediaSettings onClose={() => setShowMedia(false)} />}
+
+      {notice && (
+        <div className={`${styles.toast} ${notice.type === 'error' ? styles.toastError : ''}`} role="status">
+          {notice.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+          <span>{notice.text}</span>
+          <button type="button" onClick={() => setNotice(null)} aria-label="Fechar aviso"><X size={14} /></button>
+        </div>
+      )}
     </div>
   );
 }

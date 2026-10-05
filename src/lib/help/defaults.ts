@@ -255,10 +255,12 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     title: 'Senhas, totem e painel da TV',
     summary: 'Fila de atendimento presencial: retirada de senha no totem e chamada na TV.',
     sections: [
-      { title: 'Links do totem e da TV', text: 'Em **Senhas**, copie os links do **Totem** e do **Painel (TV)**. Cada empresa tem os próprios links: abra cada um no aparelho correspondente (tablet do totem e navegador da TV) em tela cheia.' },
-      { title: 'Retirada de senha', text: 'No totem, o cliente escolhe o tipo de atendimento e informa os dados pedidos. Com telefone, ele recebe a senha e a chamada pelo WhatsApp (se houver WhatsApp conectado) e vira lead.' },
-      { title: 'Chamar a próxima senha', text: 'No **Painel de Chamada**, o atendente escolhe o guichê e chama a próxima senha. A TV mostra a senha com aviso sonoro.' },
-      { title: 'Mídia na TV', text: 'Imagens e vídeos podem ser exibidos no painel da TV entre as chamadas (configuração em Senhas).' },
+      { title: 'Links do totem e da TV', text: 'Em **Senhas**, use os botões **Totem** e **TV** para abrir (ou o ícone ao lado para copiar) os links da sua empresa. Abra cada um no aparelho correspondente, em tela cheia. Na TV, toque uma vez na tela para liberar o som: o navegador bloqueia áudio até alguém tocar.' },
+      { title: 'Retirada de senha', text: 'No totem, a pessoa escolhe **Atendimento normal** ou **Preferencial** (idosos, gestantes, pessoas com deficiência ou com criança de colo) e informa nome, WhatsApp e documento (opcionais). Ela vê quantas pessoas estão na frente. Com WhatsApp, recebe a senha e o aviso quando for chamada (se houver WhatsApp conectado) e vira lead. A recepção também gera senhas em **Senha na recepção**.' },
+      { title: 'Chamar e atender', text: 'Escolha o seu **guichê** (fica salvo neste computador) e clique em **Chamar a próxima**: as preferenciais vêm primeiro, depois a ordem de chegada. Dois guichês nunca chamam a mesma senha. Com a senha na tela: **Chamar de novo**, **Não veio**, **Finalizar** ou **Devolver à fila** (se chamou por engano). Na lista da fila dá para chamar uma senha fora de ordem ou cancelar.' },
+      { title: 'Numeração e fim do dia', text: 'A numeração recomeça do 1 todo dia, sozinha. No fim do expediente, administradores e gerentes clicam em **Encerrar o dia**: quem ainda espera vira cancelada e o histórico continua salvo (tempo de espera, atendidas e quem não compareceu).' },
+      { title: 'Configurações', text: 'Administradores e gerentes, em **Configurações**: logo, nome e cor do totem e da TV, recado do rodapé, quantidade de pontos de atendimento e como chamá-los (Guichê, Mesa, Sala...), senha preferencial no totem e voz na TV (lê a senha em voz alta).' },
+      { title: 'Mídia na TV', text: 'Imagens e vídeos podem ser exibidos na TV entre as chamadas (Senhas > Configurações > Imagens e vídeos na TV).' },
     ],
   },
 

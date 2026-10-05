@@ -1,85 +1,122 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Volume2, VolumeX } from 'lucide-react';
 import styles from './display.module.css';
 import { DisplayMediaLayer, useDisplayMedia } from './DisplayMedia';
+import { DEFAULT_QUEUE_SETTINGS, deskName, spokenCall, ticketCode, type QueueSettings } from '@/lib/queue';
 
-interface Ticket {
+interface CalledTicket {
   id: string;
   number: number;
-  name?: string;
-  desk: string;
+  priority: boolean;
+  name: string;
+  desk: string | null;
   status: string;
-  created_at: string;
-  updated_at: string;
+  calledAt: string;
+  callCount: number;
 }
 
-interface QueueSettings {
-  logo_url: string;
-  banner_url: string;
-  app_name: string;
-  primary_color: string;
-  secondary_color: string;
-  welcome_text: string;
+/** Aviso de duas notas gerado no próprio navegador (não depende de arquivo externo). */
+function playChime(ctx: AudioContext) {
+  const start = ctx.currentTime + 0.05;
+  [
+    [880, 0],
+    [1320, 0.22],
+  ].forEach(([frequency, delay]) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, start + delay);
+    gain.gain.exponentialRampToValueAtTime(0.4, start + delay + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + delay + 1.1);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(start + delay);
+    osc.stop(start + delay + 1.2);
+  });
+}
+
+function speak(text: string) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'pt-BR';
+  utterance.rate = 0.95;
+  const voice = window.speechSynthesis.getVoices().find((item) => item.lang?.toLowerCase().startsWith('pt'));
+  if (voice) utterance.voice = voice;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
 }
 
 export default function DisplayPage() {
-  const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
-  const [history, setHistory] = useState<Ticket[]>([]);
-  const [settings, setSettings] = useState<QueueSettings | null>(null);
-  // Keep the server render and the client's first render identical. The real
-  // time is populated after hydration, when the browser has mounted the page.
+  const [current, setCurrent] = useState<CalledTicket | null>(null);
+  const [history, setHistory] = useState<CalledTicket[]>([]);
+  const [settings, setSettings] = useState<QueueSettings>(DEFAULT_QUEUE_SETTINGS);
+  const [waiting, setWaiting] = useState(0);
+  // Mesmo HTML no servidor e no primeiro render do navegador: a hora entra depois.
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   // Chave da empresa na URL (/display?k=...): o painel mostra só a fila dela.
   const [displayKey, setDisplayKey] = useState<string | null>(null);
   const [missingKey, setMissingKey] = useState(false);
   const { mode: mediaMode, media, active: mediaActive, notifyCall } = useDisplayMedia(displayKey);
   const [mediaSlot, setMediaSlot] = useState<HTMLDivElement | null>(null);
-  // fetchTickets roda dentro do efeito de montagem; o ref sempre aponta pra versão atual.
-  const notifyCallRef = useRef(notifyCall);
-  notifyCallRef.current = notifyCall;
-  const lastCallKey = useRef<string | null>(null);
-  // Destaque animado no cartão da senha logo depois de uma chamada.
   const [highlightCall, setHighlightCall] = useState(false);
-  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // O navegador só libera som depois de um toque/clique na tela.
+  const [soundOn, setSoundOn] = useState(false);
 
-  const fetchTickets = async (key: string) => {
+  const audioCtx = useRef<AudioContext | null>(null);
+  const lastCallKey = useRef<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const live = useRef({ notifyCall, settings, soundOn });
+  useEffect(() => {
+    live.current = { notifyCall, settings, soundOn };
+  }, [notifyCall, settings, soundOn]);
+
+  const enableSound = useCallback(() => {
+    try {
+      audioCtx.current ??= new AudioContext();
+      void audioCtx.current.resume();
+      setSoundOn(true);
+    } catch {
+      // Navegador sem Web Audio: segue só com a voz (se houver).
+      setSoundOn(true);
+    }
+  }, []);
+
+  const announce = useCallback((ticket: CalledTicket) => {
+    const { notifyCall: hideMedia, settings: cfg, soundOn: canPlay } = live.current;
+    hideMedia();
+    setHighlightCall(true);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => setHighlightCall(false), 8000);
+    if (!canPlay) return;
+    if (audioCtx.current) playChime(audioCtx.current);
+    if (cfg.voiceEnabled) setTimeout(() => speak(spokenCall(ticket, cfg.deskLabel)), 1300);
+  }, []);
+
+  const fetchTickets = useCallback(async (key: string) => {
     try {
       const response = await fetch(`/api/queue/display/tickets?key=${encodeURIComponent(key)}`, { cache: 'no-store' });
       if (!response.ok) {
         if (response.status === 404) setMissingKey(true);
         return;
       }
-      const payload: { settings: QueueSettings | null; tickets: Ticket[] } = await response.json();
+      const payload: { settings: QueueSettings | null; tickets: CalledTicket[]; waiting: number } = await response.json();
       if (payload.settings) setSettings(payload.settings);
-      const data = payload.tickets;
+      setWaiting(payload.waiting ?? 0);
+      const list = payload.tickets || [];
+      const calling = list.find((ticket) => ticket.status === 'calling') || list[0] || null;
+      setCurrent(calling);
+      setHistory(list.filter((ticket) => ticket.id !== calling?.id).slice(0, 5));
 
-      if (data && data.length > 0) {
-        const calling = data.find(t => t.status === 'calling') || data[0];
-        setCurrentTicket(calling);
-
-        // Senha nova chamada (ou rechamada): toca o aviso e tira a mídia da frente.
-        const callKey = calling.status === 'calling' ? `${calling.id}-${calling.updated_at}` : null;
-        if (callKey && lastCallKey.current !== null && callKey !== lastCallKey.current) {
-          audioRef.current?.play().catch(() => {});
-          notifyCallRef.current();
-          setHighlightCall(true);
-          if (highlightTimer.current) clearTimeout(highlightTimer.current);
-          highlightTimer.current = setTimeout(() => setHighlightCall(false), 8000);
-        }
-        lastCallKey.current = callKey ?? lastCallKey.current ?? '';
-
-        setHistory(data.filter(t => t.id !== calling.id));
-      } else {
-        setCurrentTicket(null);
-        setHistory([]);
-        if (lastCallKey.current === null) lastCallKey.current = '';
-      }
+      // Senha nova chamada (ou chamada de novo): aviso, voz e a mídia sai da frente.
+      const callKey = calling && calling.status === 'calling' ? `${calling.id}-${calling.calledAt}` : '';
+      if (lastCallKey.current !== null && callKey && callKey !== lastCallKey.current) announce(calling!);
+      lastCallKey.current = callKey || lastCallKey.current || '';
     } catch {
       // Sem rede: mantém o que está na tela e tenta de novo no próximo ciclo.
     }
-  };
+  }, [announce]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -91,73 +128,65 @@ export default function DisplayPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // A fila é consultada pelo servidor a cada 3s (não há mais leitura anônima no banco).
+  // A fila é consultada pelo servidor a cada 3s (não há leitura anônima no banco).
   useEffect(() => {
     if (!displayKey) return;
     queueMicrotask(() => void fetchTickets(displayKey));
     const poll = setInterval(() => void fetchTickets(displayKey), 3000);
     return () => clearInterval(poll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayKey]);
+  }, [displayKey, fetchTickets]);
 
   if (missingKey) {
     return (
       <div className={styles.container} style={{ placeItems: 'center', display: 'grid' }}>
-        <p className={styles.footerText}>Painel sem empresa. Abra o link do painel pela tela de Senhas do sistema.</p>
+        <p className={styles.footerText}>Painel sem empresa. Abra o link da TV pela tela de Senhas do sistema.</p>
       </div>
     );
   }
 
-  return (
-    <div className={styles.container}>
-      {/* Invisible audio element for the chime */}
-      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
+  const color = settings.primaryColor || '#4f00cb';
 
+  return (
+    <div className={styles.container} onClick={soundOn ? undefined : enableSound}>
       <header className={styles.header}>
         <div className={styles.logo}>
-          {/* Logo configurada no painel (queue_settings) ou a da Vórtice. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={settings?.logo_url || '/brand/vortice-logo.png'} alt={settings?.app_name || 'Vórtice Tecnologia'} className={styles.logoImage} />
+          <img src={settings.logoUrl || '/brand/vortice-logo.png'} alt={settings.appName || 'Vórtice Tecnologia'} className={styles.logoImage} />
         </div>
         <div className={styles.clock}>
-          {currentTime
-            ? currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-            : '--:--'}
+          {currentTime ? currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
         </div>
       </header>
 
       <main className={styles.mainDisplay}>
         <div className={`${styles.currentTicketCard} ${highlightCall ? styles.calling : ''}`}>
-          <span className={styles.label}>Senha Atual</span>
-          <h1 key={currentTicket?.id ?? 'none'} className={styles.ticketNumber} style={{ color: settings?.primary_color || '#4f00cb' }}>
-            {currentTicket ? currentTicket.number.toString().padStart(2, '0') : '--'}
+          <span className={styles.label}>{current?.priority ? 'Senha preferencial' : 'Senha atual'}</span>
+          <h1 key={current ? `${current.id}-${current.calledAt}` : 'none'} className={styles.ticketNumber} style={{ color }}>
+            {current ? ticketCode(current.number, current.priority) : '--'}
           </h1>
-          {currentTicket?.name && (
-            <div className={styles.clientName}>
-              {currentTicket.name}
-            </div>
-          )}
-          <div className={styles.deskInfo} style={{ color: settings?.primary_color || '#7c3aed' }}>
-            {currentTicket ? `GUICHÊ ${currentTicket.desk}` : 'AGUARDANDO...'}
+          {current?.name && <div className={styles.clientName}>{current.name}</div>}
+          <div className={styles.deskInfo} style={{ color }}>
+            {current ? deskName(settings.deskLabel, current.desk).toUpperCase() : 'AGUARDANDO...'}
           </div>
+          {waiting > 0 && <div className={styles.waitingInfo}>{waiting === 1 ? '1 pessoa aguardando' : `${waiting} pessoas aguardando`}</div>}
         </div>
 
         <div className={styles.history}>
           {mediaActive && mediaMode === 'minimized' && <div ref={setMediaSlot} className={styles.mediaSlot} />}
-          <h2 className={styles.historyTitle}>Últimas Senhas</h2>
+          <h2 className={styles.historyTitle}>Últimas senhas</h2>
           {history.length > 0 ? (
             history.map((ticket) => (
               <div key={ticket.id} className={styles.historyItem}>
                 <div className={styles.historyContent}>
                   <span className={styles.historyTicket}>
-                    #{ticket.number.toString().padStart(2, '0')}
+                    {ticketCode(ticket.number, ticket.priority)}
                     {ticket.name && <span className={styles.historyName}>{ticket.name}</span>}
                   </span>
                   <span className={styles.historyTime}>
-                    {new Date(ticket.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(ticket.calledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <span className={styles.historyDesk}>Guichê {ticket.desk}</span>
+                <span className={styles.historyDesk} style={{ color }}>{deskName(settings.deskLabel, ticket.desk)}</span>
               </div>
             ))
           ) : (
@@ -171,26 +200,34 @@ export default function DisplayPage() {
         media={media}
         slot={mediaSlot}
         ticketBadge={
-          currentTicket ? (
+          current ? (
             <div className={styles.mediaTicketBadge}>
               <span>Senha</span>
-              <strong style={{ color: settings?.primary_color || '#4f00cb' }}>{currentTicket.number.toString().padStart(2, '0')}</strong>
-              <span>Guichê {currentTicket.desk}</span>
+              <strong style={{ color }}>{ticketCode(current.number, current.priority)}</strong>
+              <span>{deskName(settings.deskLabel, current.desk)}</span>
             </div>
           ) : null
         }
       />
 
       <footer className={styles.footer}>
-        <div className={styles.footerText}>
-          {settings?.welcome_text || 'ATENÇÃO AO NÚMERO CHAMADO NO PAINEL'}
-        </div>
-        {settings?.banner_url && (
+        <div className={styles.footerText}>{settings.welcomeText || 'ATENÇÃO AO NÚMERO CHAMADO NO PAINEL'}</div>
+        {settings.bannerUrl && (
           <div className={styles.banner}>
-            <img src={settings.banner_url} alt="Banner" className={styles.bannerImage} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={settings.bannerUrl} alt="Banner" className={styles.bannerImage} />
           </div>
         )}
       </footer>
+
+      <button
+        type="button"
+        className={`${styles.soundHint} ${soundOn ? styles.soundOn : ''}`}
+        onClick={(e) => { e.stopPropagation(); if (soundOn) { setSoundOn(false); } else { enableSound(); } }}
+        aria-label={soundOn ? 'Desligar o som' : 'Ativar o som'}
+      >
+        {soundOn ? <Volume2 size={18} /> : <><VolumeX size={18} /> Toque na tela para ativar o som</>}
+      </button>
     </div>
   );
 }

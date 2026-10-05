@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, FormEvent } from 'react';
-import { CheckCircle2, IdCard, Phone, ShieldCheck, Ticket, User } from 'lucide-react';
+import { useEffect, useState, FormEvent, type CSSProperties } from 'react';
+import { Accessibility, ArrowLeft, CheckCircle2, IdCard, Phone, ShieldCheck, Ticket, User, Users } from 'lucide-react';
 import styles from './totem.module.css';
 import {
   formatBrazilDocument,
@@ -12,6 +12,7 @@ import {
   validateBrazilDocument,
   validateBrazilPhone,
 } from '@/lib/brazilian-fields';
+import { ticketCode } from '@/lib/queue';
 
 /** Depois de mostrar a senha, o totem volta sozinho para o próximo cliente. */
 const AUTO_RESET_SECONDS = 15;
@@ -20,7 +21,12 @@ export default function TotemPage() {
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [document, setDocument] = useState('');
-  const [issuedTicket, setIssuedTicket] = useState<number | null>(null);
+  const [issuedTicket, setIssuedTicket] = useState<{ number: number; priority: boolean; ahead: number } | null>(null);
+  // Normal ou preferencial (a tela de escolha só aparece se a empresa usa preferencial).
+  const [kind, setKind] = useState<'normal' | 'priority' | null>(null);
+  const [priorityEnabled, setPriorityEnabled] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [brandColor, setBrandColor] = useState('');
   const [sentToWhatsapp, setSentToWhatsapp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -46,7 +52,10 @@ export default function TotemPage() {
             return;
           }
           const data = await response.json();
-          setCompanyName(data?.settings?.app_name || data?.tenant?.name || '');
+          setCompanyName(data?.settings?.appName || data?.tenant?.name || '');
+          setPriorityEnabled(data?.settings?.priorityEnabled === true);
+          setLogoUrl(data?.settings?.logoUrl || '');
+          setBrandColor(/^#[0-9a-f]{6}$/i.test(data?.settings?.primaryColor || '') ? data.settings.primaryColor : '');
         })
         .catch(() => {});
     });
@@ -60,6 +69,7 @@ export default function TotemPage() {
 
   const handleReset = () => {
     setIssuedTicket(null);
+    setKind(null);
     setSentToWhatsapp(false);
     setName('');
     setWhatsapp('');
@@ -109,16 +119,15 @@ export default function TotemPage() {
       const response = await fetch('/api/queue/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: totemKey, name, whatsapp: normalizedWhatsapp, document: normalizedDocument, origin: 'totem' }),
+        body: JSON.stringify({ key: totemKey, name, whatsapp: normalizedWhatsapp, document: normalizedDocument, origin: 'totem', priority: kind === 'priority' }),
       });
-      const result: { number?: number; error?: string } = await response.json();
+      const result: { number?: number; priority?: boolean; ahead?: number; error?: string } = await response.json();
 
       if (!response.ok || typeof result.number !== 'number') {
         throw new Error(result.error || 'Não foi possível gerar a senha.');
       }
 
-      const nextNumber = result.number;
-      setIssuedTicket(nextNumber);
+      setIssuedTicket({ number: result.number, priority: result.priority === true, ahead: result.ahead ?? 0 });
 
       // A confirmação no WhatsApp sai do servidor, junto com a senha.
       if (normalizedWhatsapp) setSentToWhatsapp(true);
@@ -142,10 +151,10 @@ export default function TotemPage() {
   }
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} style={brandColor ? ({ '--brand': brandColor, '--brand-2': brandColor } as CSSProperties) : undefined}>
       <header className={styles.topBar}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/vortice-logo.png" alt="Vórtice Tecnologia" className={styles.logo} />
+        <img src={logoUrl || '/brand/vortice-logo.png'} alt={companyName || 'Vórtice Tecnologia'} className={styles.logo} />
         <div className={styles.clock}>
           {now && (
             <>
@@ -157,8 +166,28 @@ export default function TotemPage() {
       </header>
 
       <main className={styles.card}>
-        {issuedTicket === null ? (
+        {issuedTicket === null && priorityEnabled && kind === null ? (
           <>
+            <span className={styles.eyebrow}><Ticket size={16} /> Atendimento presencial</span>
+            <h1 className={styles.title}>Retire sua senha</h1>
+            <p className={styles.subtitle}>Escolha o tipo de atendimento.</p>
+            <div className={styles.typeGrid}>
+              <button type="button" className={styles.typeBtn} onClick={() => setKind('normal')}>
+                <Users size={40} />
+                <strong>Atendimento normal</strong>
+              </button>
+              <button type="button" className={`${styles.typeBtn} ${styles.typeBtnPref}`} onClick={() => setKind('priority')}>
+                <Accessibility size={40} />
+                <strong>Preferencial</strong>
+                <small>Idosos (60+), gestantes, pessoas com deficiência ou com criança de colo</small>
+              </button>
+            </div>
+          </>
+        ) : issuedTicket === null ? (
+          <>
+            {priorityEnabled && (
+              <button type="button" className={styles.backBtn} onClick={() => setKind(null)}><ArrowLeft size={18} /> {kind === 'priority' ? 'Preferencial' : 'Atendimento normal'}</button>
+            )}
             <span className={styles.eyebrow}><Ticket size={16} /> Atendimento presencial</span>
             <h1 className={styles.title}>Retire sua senha</h1>
             <p className={styles.subtitle}>Preencha seus dados e acompanhe o painel para ser chamado.</p>
@@ -234,9 +263,12 @@ export default function TotemPage() {
             <CheckCircle2 size={64} className={styles.successIcon} />
             <h1 className={styles.title}>Senha gerada!</h1>
             <div className={styles.ticketBox}>
-              <span>Sua senha</span>
-              <strong>{issuedTicket.toString().padStart(2, '0')}</strong>
+              <span>{issuedTicket.priority ? 'Sua senha preferencial' : 'Sua senha'}</span>
+              <strong>{ticketCode(issuedTicket.number, issuedTicket.priority)}</strong>
             </div>
+            <p className={styles.ahead}>
+              {issuedTicket.ahead === 0 ? 'Você é o próximo!' : issuedTicket.ahead === 1 ? '1 pessoa na sua frente' : `${issuedTicket.ahead} pessoas na sua frente`}
+            </p>
             <p className={styles.subtitle}>
               Aguarde ser chamado no painel.
               {sentToWhatsapp && <><br />Também enviamos a senha para o seu WhatsApp.</>}

@@ -5,7 +5,7 @@ import {
   validateBrazilDocument,
   validateBrazilPhone,
 } from '@/lib/brazilian-fields';
-import { createQueueTicket } from '@/services/queue.service';
+import { createQueueTicket, getQueueSettings } from '@/services/queue.service';
 import { requireActiveProfile } from '@/lib/session';
 import { resolveTenantByDisplayKey } from '@/services/tenant-public.service';
 
@@ -45,9 +45,12 @@ export async function POST(request: Request) {
     }
 
     const origin = payload.origin === 'recepcao' ? 'recepcao' : 'totem';
-    const ticket = await createQueueTicket(tenant, { name, whatsapp: whatsapp || null, document: document || null, origin });
+    // Preferencial só quando a empresa usa (a recepção sempre pode marcar).
+    const settings = await getQueueSettings(tenant);
+    const priority = payload.priority === true && (origin === 'recepcao' || settings.priorityEnabled);
+    const ticket = await createQueueTicket(tenant, { name, whatsapp: whatsapp || null, document: document || null, origin, priority });
 
-    return NextResponse.json({ number: ticket.number }, { status: 201 });
+    return NextResponse.json(ticket, { status: 201 });
   } catch (error: unknown) {
     const details = error && typeof error === 'object' ? error as Record<string, unknown> : null;
     const message =

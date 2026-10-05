@@ -52,6 +52,9 @@ const todayKey = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+/** Dia da fila de senhas (fuso de São Paulo, igual ao banco). */
+const queueDay = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+
 const startOfToday = () => {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -127,9 +130,9 @@ export async function buildDashboardSummary(profile: UserProfile, tenantId: stri
     allowed('senhas', 'integrations.view')
       ? safe(async () => {
           const [waiting, calling, completedToday] = await Promise.all([
-            count('attendance_queue_tickets', (q) => q.eq('status', 'waiting')),
-            count('attendance_queue_tickets', (q) => q.eq('status', 'calling')),
-            count('attendance_queue_tickets', (q) => q.eq('status', 'completed').gte('updated_at', startOfToday())),
+            count('attendance_queue_tickets', (q) => q.eq('queue_date', queueDay()).eq('status', 'waiting')),
+            count('attendance_queue_tickets', (q) => q.eq('queue_date', queueDay()).eq('status', 'calling')),
+            count('attendance_queue_tickets', (q) => q.eq('queue_date', queueDay()).eq('status', 'completed')),
           ]);
           return { waiting, calling, completedToday };
         })
