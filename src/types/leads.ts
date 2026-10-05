@@ -26,6 +26,8 @@ export type Lead = {
   valueNumber?: number;
   notes?: string;
   lastActivityAt?: string | null;
+  /** Quando o lead entrou na etapa atual (dias na etapa no funil). */
+  stageChangedAt?: string | null;
 };
 
 /** Etiqueta cadastrada pela empresa. */
