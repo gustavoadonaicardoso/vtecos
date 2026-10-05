@@ -41,7 +41,7 @@ export const PLAN_MODULES: PlanModule[] = [
 export const ALL_MODULE_KEYS = PLAN_MODULES.map((module) => module.key);
 
 /** Páginas que toda empresa tem, independente do plano. */
-export const BASE_ROUTES = ['/', '/chat', '/users', '/integrations', '/settings', '/notificacoes', '/help'];
+export const BASE_ROUTES = ['/', '/chat', '/users', '/integrations', '/settings', '/notificacoes', '/help', '/suporte'];
 
 export function moduleByKey(key: string) {
   return PLAN_MODULES.find((module) => module.key === key);
