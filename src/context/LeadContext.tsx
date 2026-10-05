@@ -4,9 +4,10 @@
  * ============================================================
  * VÓRTICE CRM — LeadContext
  * ============================================================
- * Estado global de Leads e Pipeline.
- * Toda lógica de banco foi delegada para @/services/leads.service.ts.
- * Este context lida apenas com estado React e UI.
+ * Estado global de Leads e Pipeline. Toda gravação passa pelas rotas
+ * /api/leads (sessão + empresa verificadas no servidor); aqui fica só
+ * o estado da tela. Sem dados de exemplo: se o servidor recusar, a
+ * tela volta ao que está salvo e mostra o erro.
  * ============================================================
  */
 
@@ -14,60 +15,38 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 
-// Tipos agora vêm do arquivo centralizado
-import type { Lead, PipelineStage } from '@/types';
+import type { Lead, LeadTag, PipelineStage } from '@/types';
 
-// Re-exporta os tipos para compatibilidade com imports existentes
-export type { Lead, PipelineStage };
+export type { Lead, LeadTag, PipelineStage };
 
-// Helper isLocalLeadId mantido local no frontend para mocks
-const isLocalLeadId = (id: string) => id.startsWith('lead-');
+/** Campos que a tela pode alterar (o resto é calculado pelo servidor). */
+const EDITABLE: (keyof Lead)[] = ['name', 'email', 'phone', 'cpfCnpj', 'value', 'pipelineStage', 'assignedTo', 'tags', 'notes', 'status'];
 
-// ─── Mock data (apenas em desenvolvimento) ────────────────────
+export type LeadInput = Partial<Pick<Lead, 'name' | 'email' | 'phone' | 'cpfCnpj' | 'pipelineStage' | 'assignedTo' | 'tags' | 'notes' | 'status'>> & { value?: string | number };
 
-const IS_DEV = process.env.NODE_ENV === 'development';
+export type AddLeadResult =
+  | { ok: true; lead: Lead }
+  | { ok: false; error: string; duplicate?: { id: string | null; name: string | null } };
 
-const DEV_PIPELINE_STAGES: PipelineStage[] = [
-  { id: 'novo', name: 'Novos Leads', color: '#3b82f6', leads: ['lead-1', 'lead-2'] },
-  { id: 'contato', name: 'Primeiro Contato', color: '#8b5cf6', leads: ['lead-3'] },
-  { id: 'negociacao', name: 'Negociação', color: '#f59e0b', leads: ['lead-4'] },
-  { id: 'proposta', name: 'Proposta Enviada', color: '#8b5cf6', leads: ['lead-6'] },
-  { id: 'ganho', name: 'Ganhos', color: '#10b981', leads: ['lead-5'] },
-];
+export type BulkAction = 'assign' | 'stage' | 'addTag' | 'removeTag' | 'block' | 'unblock' | 'delete';
 
-const DEV_LEADS: Lead[] = [
-  { id: 'lead-1', name: 'Mário Lima', cpfCnpj: '', email: 'mario@terra.com', phone: '(11) 99876-5432', tags: ['Quente', 'SSD'], pipelineStage: 'novo', entryDate: '26/03/2026', lastMsg: '2 min atrás', status: 'Ativo', color: '#3b82f6', channels: ['whatsapp', 'instagram'], value: 'R$ 15.000', days: 2 },
-  { id: 'lead-2', name: 'Ana Souza', cpfCnpj: '', email: 'ana@gmail.com', phone: '(21) 98765-4321', tags: ['Frio'], pipelineStage: 'novo', entryDate: '25/03/2026', lastMsg: '1h atrás', status: 'Ativo', color: '#10b981', channels: ['whatsapp'], value: 'R$ 8.500', days: 1 },
-  { id: 'lead-3', name: 'Roberto Carlos', cpfCnpj: '', email: 'roberto@globo.com', phone: '(31) 97654-3210', tags: ['Inativa'], pipelineStage: 'contato', entryDate: '24/03/2026', lastMsg: '1 dia atrás', status: 'Bloqueado', color: '#ef4444', channels: ['facebook'], value: 'R$ 25.000', days: 4 },
-  { id: 'lead-4', name: 'Juliana Paes', cpfCnpj: '', email: 'juh@gmail.com', phone: '(11) 91234-5678', tags: ['VIP', 'SSD'], pipelineStage: 'negociacao', entryDate: '23/03/2026', lastMsg: '5 min atrás', status: 'Ativo', color: '#8b5cf6', channels: ['instagram', 'site'], value: 'R$ 45.000', days: 12 },
-  { id: 'lead-5', name: 'Fabio T.', cpfCnpj: '', email: 'fabio@techhub.io', phone: '(41) 92345-6789', tags: ['Ganhos'], pipelineStage: 'ganho', entryDate: '22/03/2026', lastMsg: '3h atrás', status: 'Ativo', color: '#f59e0b', channels: ['whatsapp'], value: 'R$ 12.000', days: 20 },
-  { id: 'lead-6', name: 'Daniel K.', cpfCnpj: '', email: 'daniel@solucaotech.com', phone: '(51) 99888-7777', tags: ['Proposta'], pipelineStage: 'proposta', entryDate: '20/03/2026', lastMsg: '2 dias atrás', status: 'Ativo', color: '#3b82f6', channels: ['whatsapp', 'email'], value: 'R$ 30.000', days: 3 },
-];
-
-// Estado inicial: mocks só em dev, vazio em produção
-const INITIAL_LEADS: Lead[] = IS_DEV ? DEV_LEADS : [];
-const INITIAL_STAGES: PipelineStage[] = IS_DEV ? DEV_PIPELINE_STAGES : [
-  { id: 'novo', name: 'Novos Leads', color: '#3b82f6', leads: [] },
-  { id: 'contato', name: 'Primeiro Contato', color: '#8b5cf6', leads: [] },
-  { id: 'negociacao', name: 'Negociação', color: '#f59e0b', leads: [] },
-  { id: 'proposta', name: 'Proposta Enviada', color: '#8b5cf6', leads: [] },
-  { id: 'ganho', name: 'Ganhos', color: '#10b981', leads: [] },
-];
-
-// ─── Context type ──────────────────────────────────────────────
+type Result = { ok: true } | { ok: false; error: string };
 
 type LeadContextType = {
   leads: Lead[];
   pipelineStages: PipelineStage[];
+  /** Já carregou do servidor ao menos uma vez. */
+  loaded: boolean;
   isModalOpen: boolean;
   openModal: () => void;
   closeModal: () => void;
-  addLead: (leadData: Omit<Lead, 'id' | 'entryDate' | 'status' | 'color' | 'channels' | 'lastMsg'>) => void;
-  updateLead: (leadId: string, updates: Partial<Lead>) => void;
-  deleteLead: (leadId: string) => void;
-  tags: string[];
-  addTag: (tag: string) => void;
-  deleteTag: (tag: string) => void;
+  addLead: (input: LeadInput, options?: { force?: boolean }) => Promise<AddLeadResult>;
+  updateLead: (leadId: string, updates: Partial<Lead> | LeadInput) => Promise<Result>;
+  deleteLead: (leadId: string) => Promise<Result>;
+  bulkUpdate: (ids: string[], action: BulkAction, value?: string | null) => Promise<Result & { count?: number }>;
+  /** Etiquetas cadastradas pela empresa. */
+  tags: LeadTag[];
+  refreshTags: () => Promise<void>;
   updatePipelineStages: (newStages: PipelineStage[]) => void;
   /** Salva a estrutura do funil (criar, renomear, cor, excluir, reordenar etapas). */
   savePipelineStructure: (newStages: PipelineStage[], options?: { debounce?: boolean }) => void;
@@ -83,188 +62,161 @@ export const useLeads = () => {
   return context;
 };
 
+async function send(url: string, method: string, body?: unknown) {
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const json = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, json };
+  } catch {
+    return { ok: false, status: 0, json: { error: 'Falha de conexão. Confira a internet e tente de novo.' } };
+  }
+}
+
 // ─── Provider ─────────────────────────────────────────────────
 
 export const LeadProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
-  const [leads, setLeads] = useState<Lead[]>(INITIAL_LEADS);
-  const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>(INITIAL_STAGES);
-  const [tags, setTags] = useState<string[]>(['Quente', 'Frio', 'VIP', 'SSD', 'Inativa', 'Ganhos', 'Proposta']);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([]);
+  const [tags, setTags] = useState<LeadTag[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const leadsRef = useRef<Lead[]>([]);
+  useEffect(() => {
+    leadsRef.current = leads;
+  }, [leads]);
 
-  // Busca dados do banco via API
   const fetchDatabase = useCallback(async () => {
-    try {
-      const headers: Record<string, string> = {};
-      if (user?.id) headers['x-user-id'] = user.id;
-      if (user?.role) headers['x-user-role'] = user.role;
-
-      const resp = await fetch('/api/leads', { headers });
-      if (resp.ok) {
-        const { data } = await resp.json();
-        setDbStatus(true);
-        setLeads(data.leads);
-        if (data.stages.length > 0) setPipelineStages(data.stages);
-      }
-    } catch (e) {
-      console.error('Falha ao buscar leads via API', e);
+    const { ok, json } = await send('/api/leads', 'GET');
+    if (ok && json.data) {
+      setDbStatus(true);
+      setLeads(json.data.leads);
+      setPipelineStages(json.data.stages);
     }
-  }, [user?.id, user?.role]);
+    setLoaded(true);
+  }, []);
+
+  const refreshTags = useCallback(async () => {
+    const { ok, json } = await send('/api/leads/tags', 'GET');
+    if (ok && Array.isArray(json.data)) setTags(json.data);
+  }, []);
 
   // Empresa sem o módulo de CRM no plano: nada de leads/pipeline.
   const hasCrm = !user?.workspace || user.workspace.modules.includes('crm');
 
   useEffect(() => {
-    // Sem usuário ainda (sessão carregando) ou sem CRM no plano: não busca.
     if (!user || !hasCrm) return;
-    fetchDatabase();
-    if (!supabase) return;
+    // Primeira carga logo depois de montar (fora do corpo do efeito).
+    let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      fetchDatabase();
+      refreshTags();
+    }, 0);
+    if (!supabase) return () => { if (timer) clearTimeout(timer); };
 
-    // Realtime: qualquer mudança em leads ou stages refaz o fetch
+    // Realtime: mudanças em leads ou etapas refazem a busca (agrupadas).
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(fetchDatabase, 400);
+    };
     const channel = supabase
       .channel('leads_realtime_changes')
-      .on('postgres_changes', { event: '*', table: 'leads', schema: 'public' }, fetchDatabase)
-      .on('postgres_changes', { event: '*', table: 'pipeline_stages', schema: 'public' }, fetchDatabase)
+      .on('postgres_changes', { event: '*', table: 'leads', schema: 'public' }, schedule)
+      .on('postgres_changes', { event: '*', table: 'pipeline_stages', schema: 'public' }, schedule)
       .subscribe();
 
-    return () => { supabase?.removeChannel(channel); };
-  }, [fetchDatabase, hasCrm, user]);
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase?.removeChannel(channel);
+    };
+  }, [fetchDatabase, refreshTags, hasCrm, user]);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
   // ─── addLead ────────────────────────────────────────────────
-  const addLead = async (leadData: Omit<Lead, 'id' | 'entryDate' | 'status' | 'color' | 'channels' | 'lastMsg'>) => {
-    if (dbStatus) {
-      try {
-        const resp = await fetch('/api/leads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(leadData)
-        });
-        
-        if (resp.ok) {
-          const { data: newLead } = await resp.json();
-
-          // Log remoto
-          fetch('/api/audit', {
-            method: 'POST',
-            body: JSON.stringify({
-              user,
-              action: 'LEAD_CREATE',
-              details: `Lead ${newLead.name} criado manualmente.`,
-              entityType: 'lead',
-              entityId: newLead.id
-            })
-          }).catch(() => {});
-
-          setLeads((prev) => [newLead, ...prev]);
-          setPipelineStages((prev) =>
-            prev.map((s) => s.id === newLead.pipelineStage ? { ...s, leads: [newLead.id, ...s.leads] } : s)
-          );
-          return;
-        }
-      } catch (e) {
-         console.error('Falha ao criar lead via API');
-      }
-    }
-
-    // Fallback local (dev ou sem banco)
-    const newLeadId = `lead-${Date.now()}`;
-    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
-    const newLead: Lead = {
-      ...leadData,
-      id: newLeadId,
-      entryDate: new Date().toLocaleDateString('pt-BR'),
-      status: 'Ativo',
-      color: colors[Math.floor(Math.random() * colors.length)],
-      channels: ['whatsapp'],
-      lastMsg: 'Agora mesmo',
-      assignedTo: leadData.assignedTo || null,
-    };
-    setLeads((prev) => [newLead, ...prev]);
-    setPipelineStages((prev) =>
-      prev.map((s) => s.id === leadData.pipelineStage ? { ...s, leads: [newLeadId, ...s.leads] } : s)
-    );
+  const addLead = async (input: LeadInput, options: { force?: boolean } = {}): Promise<AddLeadResult> => {
+    const { ok, json } = await send('/api/leads', 'POST', { ...input, force: options.force });
+    if (!ok || !json.data) return { ok: false, error: json.error || 'Não foi possível cadastrar o lead.', duplicate: json.duplicate };
+    const lead = json.data as Lead;
+    setLeads((prev) => [lead, ...prev.filter((item) => item.id !== lead.id)]);
+    setPipelineStages((prev) => prev.map((s) => (s.id === lead.pipelineStage ? { ...s, leads: [lead.id, ...s.leads] } : s)));
+    if (input.tags?.length) refreshTags();
+    return { ok: true, lead };
   };
 
   // ─── updateLead ─────────────────────────────────────────────
-  const updateLead = async (leadId: string, updates: Partial<Lead>) => {
-    // Persiste no banco somente para IDs reais (não mocks locais)
-    if (dbStatus && !isLocalLeadId(leadId)) {
-      try {
-        await fetch(`/api/leads/${leadId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates)
-        });
-
-        fetch('/api/audit', {
-          method: 'POST',
-          body: JSON.stringify({
-            user,
-            action: 'LEAD_UPDATE',
-            details: `Lead ${leadId} atualizado. Campos: ${Object.keys(updates).join(', ')}`,
-            entityType: 'lead',
-            entityId: leadId
-          })
-        }).catch(() => {});
-      } catch (e) {}
+  // Manda só o que mudou: telas que passam o lead inteiro (Pipeline)
+  // não regravam campos antigos sem querer.
+  const updateLead = async (leadId: string, updates: Partial<Lead> | LeadInput): Promise<Result> => {
+    const current = leadsRef.current.find((lead) => lead.id === leadId);
+    const changed: Record<string, unknown> = {};
+    for (const key of EDITABLE) {
+      if (!(key in updates)) continue;
+      const next = (updates as Record<string, unknown>)[key];
+      const before = current ? (current as Record<string, unknown>)[key] : undefined;
+      if (JSON.stringify(next ?? null) !== JSON.stringify(before ?? null)) changed[key] = next;
     }
-    // Atualiza estado local imediatamente (optimistic update)
-    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, ...updates } : l));
+    if (Object.keys(changed).length === 0) return { ok: true };
+
+    const previous = leadsRef.current;
+    setLeads((prev) => prev.map((lead) => (lead.id === leadId ? { ...lead, ...(changed as Partial<Lead>) } : lead)));
+    const { ok, json } = await send(`/api/leads/${leadId}`, 'PATCH', changed);
+    if (!ok) {
+      setLeads(previous);
+      return { ok: false, error: json.error || 'Não foi possível salvar o lead.' };
+    }
+    if (json.data) setLeads((prev) => prev.map((lead) => (lead.id === leadId ? (json.data as Lead) : lead)));
+    if ('pipelineStage' in changed) {
+      setPipelineStages((prev) => prev.map((s) => ({
+        ...s,
+        leads: s.id === changed.pipelineStage ? [leadId, ...s.leads.filter((id) => id !== leadId)] : s.leads.filter((id) => id !== leadId),
+      })));
+    }
+    if ('tags' in changed) refreshTags();
+    return { ok: true };
   };
 
   // ─── deleteLead ─────────────────────────────────────────────
-  const deleteLead = async (leadId: string) => {
-    if (dbStatus && !isLocalLeadId(leadId)) {
-      try {
-        await fetch(`/api/leads/${leadId}`, { method: 'DELETE' });
-
-        fetch('/api/audit', {
-          method: 'POST',
-          body: JSON.stringify({
-             user,
-             action: 'LEAD_DELETE',
-             details: `Lead ${leadId} removido permanentemente.`,
-             entityType: 'lead',
-             entityId: leadId
-          })
-        }).catch(() => {});
-      } catch (e) {}
-    }
+  const deleteLead = async (leadId: string): Promise<Result> => {
+    const { ok, json } = await send(`/api/leads/${leadId}`, 'DELETE');
+    if (!ok) return { ok: false, error: json.error || 'Não foi possível excluir o lead.' };
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
-    setPipelineStages((prev) =>
-      prev.map((s) => ({ ...s, leads: s.leads.filter((id) => id !== leadId) }))
-    );
+    setPipelineStages((prev) => prev.map((s) => ({ ...s, leads: s.leads.filter((id) => id !== leadId) })));
+    return { ok: true };
+  };
+
+  // ─── Ações em massa ─────────────────────────────────────────
+  const bulkUpdate = async (ids: string[], action: BulkAction, value: string | null = null) => {
+    const { ok, json } = await send('/api/leads/bulk', 'POST', { ids, action, value });
+    await fetchDatabase();
+    if (action === 'addTag' || action === 'removeTag') refreshTags();
+    return ok ? { ok: true as const, count: json.data?.count as number } : { ok: false as const, error: json.error || 'Não foi possível aplicar.' };
   };
 
   // ─── updatePipelineStages (drag & drop) ─────────────────────
   const updatePipelineStages = async (newStages: PipelineStage[]) => {
-    if (dbStatus) {
-      // Detecta qual lead foi movido e para qual stage
-      for (const newStage of newStages) {
-        const oldStage = pipelineStages.find((s) => s.id === newStage.id);
-        if (oldStage) {
-          const addedLeads = newStage.leads.filter((id) => !oldStage.leads.includes(id));
-          if (addedLeads.length > 0) {
-            const movedId = addedLeads[0];
-            if (!isLocalLeadId(movedId)) {
-              try {
-                await fetch(`/api/leads/${movedId}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'move_stage', stageId: newStage.id })
-                });
-              } catch(e) {}
-            }
-            break;
-          }
-        }
-      }
-    }
+    const previous = pipelineStages;
     setPipelineStages(newStages);
+    if (!dbStatus) return;
+    // Detecta qual lead foi movido e para qual etapa.
+    for (const newStage of newStages) {
+      const oldStage = previous.find((s) => s.id === newStage.id);
+      const movedId = oldStage ? newStage.leads.find((id) => !oldStage.leads.includes(id)) : undefined;
+      if (!movedId) continue;
+      const { ok, json } = await send(`/api/leads/${movedId}`, 'PATCH', { action: 'move_stage', stageId: newStage.id });
+      if (!ok) {
+        setPipelineStages(previous);
+        alert(json.error || 'Não foi possível mover o lead.');
+        return;
+      }
+      setLeads((prev) => prev.map((lead) => (lead.id === movedId ? { ...lead, pipelineStage: newStage.id } : lead)));
+      break;
+    }
   };
 
   // ─── savePipelineStructure (etapas: nome, cor, ordem) ───────
@@ -283,43 +235,25 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
       const stagesToSave = pendingStages.current;
       pendingStages.current = null;
       if (!stagesToSave) return;
-      try {
-        const resp = await fetch('/api/pipeline/stages', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            stages: stagesToSave.map((stage) => ({ id: stage.id, name: stage.name, color: stage.color })),
-          }),
-        });
-        const result = await resp.json().catch(() => ({}));
-        if (!resp.ok) {
-          alert(result.error || 'Não foi possível salvar as etapas do funil.');
-          await fetchDatabase(); // volta para o que está salvo
-          return;
-        }
-        // Leads de etapas excluídas mudaram de etapa no servidor.
-        if (result.data?.movedLeads > 0) await fetchDatabase();
-      } catch {
-        alert('Falha de conexão ao salvar as etapas do funil.');
-        await fetchDatabase();
+      const { ok, json } = await send('/api/pipeline/stages', 'PUT', {
+        stages: stagesToSave.map((stage) => ({ id: stage.id, name: stage.name, color: stage.color })),
+      });
+      if (!ok) {
+        alert(json.error || 'Não foi possível salvar as etapas do funil.');
+        await fetchDatabase(); // volta para o que está salvo
+        return;
       }
+      // Leads de etapas excluídas mudaram de etapa no servidor.
+      if (json.data?.movedLeads > 0) await fetchDatabase();
     }, options.debounce ? 700 : 0);
-  };
-
-  // ─── Tags ────────────────────────────────────────────────────
-  const addTag = (tag: string) => {
-    if (!tags.includes(tag)) setTags((prev) => [...prev, tag]);
-  };
-  const deleteTag = (tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag));
   };
 
   return (
     <LeadContext.Provider value={{
-      leads, pipelineStages, isModalOpen,
+      leads, pipelineStages, loaded, isModalOpen,
       openModal, closeModal,
-      addLead, updateLead, deleteLead,
-      tags, addTag, deleteTag,
+      addLead, updateLead, deleteLead, bulkUpdate,
+      tags, refreshTags,
       updatePipelineStages,
       savePipelineStructure,
       dbStatus, refreshDatabase: fetchDatabase,
