@@ -13,10 +13,12 @@ export async function GET(_request: Request, { params }: Params) {
   const { id } = await params;
   const flow = await getFlow(auth.tenantId, id);
   if (!flow) return NextResponse.json({ error: 'Fluxo não encontrado.' }, { status: 404 });
+  // O endereço secreto do webhook de entrada só aparece para quem edita.
+  if (!['ADMIN', 'MANAGER'].includes(auth.profile.role)) flow.webhook_token = null;
   return NextResponse.json({ data: flow });
 }
 
-// PATCH { name?, description?, graph?, status? }
+// PATCH { name?, description?, graph?, status?, regenerateToken? }
 export async function PATCH(request: Request, { params }: Params) {
   const auth = await requireAdminOrManagerProfile({ module: 'crm' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
