@@ -22,7 +22,7 @@ function formatPhone(input: string) {
 }
 
 const NewLeadModal = () => {
-  const { isModalOpen, closeModal, addLead, pipelineStages, tags: tagOptions } = useLeads();
+  const { isModalOpen, closeModal, addLead, pipelineStages, tags: tagOptions, modalDefaults } = useLeads();
   const { user } = useAuth();
   const canAssign = user?.role === 'ADMIN' || user?.role === 'MANAGER';
   const team = useTeam(isModalOpen && canAssign);
@@ -58,7 +58,7 @@ const NewLeadModal = () => {
         email: form.email.trim(),
         cpfCnpj: form.cpfCnpj.trim(),
         value: form.value,
-        pipelineStage: form.pipelineStage || pipelineStages[0]?.id,
+        pipelineStage: form.pipelineStage || modalDefaults.pipelineStage || pipelineStages[0]?.id,
         assignedTo: canAssign ? form.assignedTo || null : user?.id ?? null,
         tags,
         notes: form.notes.trim(),
@@ -119,7 +119,7 @@ const NewLeadModal = () => {
             </label>
             <label className={styles.field}>
               <span>Etapa do funil</span>
-              <select className={styles.input} value={form.pipelineStage || pipelineStages[0]?.id || ''} onChange={(e) => set('pipelineStage', e.target.value)}>
+              <select className={styles.input} value={form.pipelineStage || modalDefaults.pipelineStage || pipelineStages[0]?.id || ''} onChange={(e) => set('pipelineStage', e.target.value)}>
                 {pipelineStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
               </select>
             </label>

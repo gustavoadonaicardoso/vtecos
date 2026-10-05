@@ -154,7 +154,7 @@ function LeadsContent() {
           <button type="button" className={styles.secondaryBtn} onClick={() => exportCsv(filtered, stageName, ownerName)} disabled={filtered.length === 0}>
             <Download size={16} /> Exportar {hasFilters ? 'filtrados' : ''}
           </button>
-          <button type="button" className={styles.primaryBtn} onClick={openModal}>
+          <button type="button" className={styles.primaryBtn} onClick={() => openModal()}>
             <Plus size={16} /> Novo lead
           </button>
         </div>

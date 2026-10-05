@@ -1,813 +1,313 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  MoreVertical, 
-  MessageCircle, 
-  Mail, 
-  CircleDot,
-  Clock,
-  Grab,
-  Filter,
-  Edit2,
-  Palette,
-  BarChart2,
-  User,
-  Phone,
-  Hash,
-  ShoppingBag,
-  History,
-  X,
-  Trash2,
-  Kanban,
-  Save,
-  ChevronRight,
-  Globe
-} from 'lucide-react';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd';
+import { AlertTriangle, BarChart2, CheckCircle2, Kanban, Loader2, Plus, Search, X } from 'lucide-react';
 import styles from './pipeline.module.css';
 import { useLeads } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
-import ThemeToggle from '@/components/ThemeToggle';
-import NotificationDropdown from '@/components/NotificationDropdown';
-import { ArrowLeft, ArrowRight, Bell, ChevronDown, ChevronUp, GripVertical, HelpCircle } from 'lucide-react';
-import Link from 'next/link';
+import type { Lead, PipelineStage } from '@/types';
+import { useTeam } from '@/components/leads/useTeam';
+import LeadPanel from '@/app/leads/components/LeadPanel';
+import LeadCard from './components/LeadCard';
+import StageHeader from './components/StageHeader';
+import FunnelView from './components/FunnelView';
 
-const PRESET_COLORS = [
-  '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', 
-  '#f97316', '#f59e0b', '#84cc16', '#10b981', 
-  '#14b8a6', '#06b6d4', '#0ea5e9', '#6366f1'
-];
+/** Etapa de ganhos: metas, relatórios e o Início dependem dela. */
+const WON_STAGE = 'ganho';
+const DAY = 86400_000;
+const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
-const CustomColorPicker = ({ color, onChange }: { color: string, onChange: (c: string) => void }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  return (
-    <div style={{ position: 'relative' }}>
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          backgroundColor: color,
-          border: 'none',
-          cursor: 'pointer',
-          boxShadow: `0 0 12px ${color}88`,
-          transition: 'transform 0.2s'
-        }}
-        title="Mudar Cor da Etapa"
-      />
-      
-      {isOpen && (
-        <>
-          <div 
-            style={{ position: 'fixed', inset: 0, zIndex: 10 }} 
-            onClick={() => setIsOpen(false)} 
-          />
-          <div 
-            style={{
-              position: 'absolute',
-              top: '120%',
-              left: 0,
-              zIndex: 20,
-              background: 'var(--panel-bg)',
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-              padding: 12,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: 8,
-              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-              width: 170
-            }}
-          >
-            {PRESET_COLORS.map(c => (
-              <button
-                key={c}
-                onClick={() => {
-                  onChange(c);
-                  setIsOpen(false);
-                }}
-                style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: 6,
-                  backgroundColor: c,
-                  border: c === color ? '2px solid var(--foreground)' : 'none',
-                  cursor: 'pointer',
-                  transform: c === color ? 'scale(1.15)' : 'scale(1)',
-                  transition: 'transform 0.2s',
-                  boxShadow: c === color ? `0 0 10px ${c}` : 'none'
-                }}
-              />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-export default function Pipeline() {
-  const router = useRouter();
-  const { pipelineStages, updatePipelineStages, savePipelineStructure, leads, openModal, updateLead, deleteLead } = useLeads();
-  const [isReady, setIsReady] = useState(false);
-  const [viewMode, setViewMode] = useState<'kanban' | 'funnel'>('kanban');
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [selectedLead, setSelectedLead] = useState<any | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<any>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [filterMine, setFilterMine] = useState(false);
-  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
+function PipelineContent() {
+  const { pipelineStages, leads, loaded, moveLead, savePipelineStructure, structureError, clearStructureError, openModal, tags, updateLead, deleteLead } = useLeads();
   const { user } = useAuth();
-  // Etapas são compartilhadas pela equipe: só admin e gerente mudam a estrutura.
-  const canEditStages = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const team = useTeam(Boolean(user));
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const openId = params.get('lead');
+  const view = params.get('view') === 'funil' ? 'funnel' : 'board';
 
-  const toggleMenu = (stageId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveMenu(activeMenu === stageId ? null : stageId);
+  const [query, setQuery] = useState('');
+  const [owner, setOwner] = useState('');
+  const [tag, setTag] = useState('');
+  const [now] = useState(() => Date.now());
+  const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  const setParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(params.toString());
+    if (value) next.set(key, value);
+    else next.delete(key);
+    const text = next.toString();
+    router.replace(text ? `${pathname}?${text}` : pathname, { scroll: false });
   };
 
-  useEffect(() => {
-    const handleClickOutside = () => setActiveMenu(null);
-    window.addEventListener('click', handleClickOutside);
-    return () => window.removeEventListener('click', handleClickOutside);
-  }, []);
+  const daysIn = (lead: Lead) => {
+    const since = lead.stageChangedAt || lead.createdAt;
+    return since ? Math.max(0, Math.floor((now - new Date(since).getTime()) / DAY)) : 0;
+  };
+  const ownerName = (id?: string | null) => (id ? team.find((member) => member.id === id)?.name || 'Membro inativo' : null);
+  const tagColor = (name: string) => tags.find((item) => item.name.toLowerCase() === name.toLowerCase())?.color;
 
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      if (!supabase) return;
-      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').order('name');
-      if (data) setProfiles(data);
-    };
-    fetchProfiles();
-  }, []);
-
-  useEffect(() => {
-    setIsReady(true);
-  }, []);
-
-  // Notificações não lidas -- a leitura passa pela API autenticada
-  // (/api/notifications), então atualiza por polling.
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
-
-    fetchCount();
-    const interval = setInterval(fetchCount, 20_000);
-
-    return () => clearInterval(interval);
-  }, [user]);
-
-  const onDragEnd = (result: DropResult) => {
-    const { source, destination } = result;
-
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-
-    // Arrastou uma coluna inteira: muda a ordem das etapas.
-    if (result.type === 'COLUMN') {
-      const reordered = [...pipelineStages];
-      const [moved] = reordered.splice(source.index, 1);
-      reordered.splice(destination.index, 0, moved);
-      savePipelineStructure(reordered);
-      return;
+  // Leads visíveis por etapa (filtros aplicados), mais recentes na etapa primeiro.
+  const leadsByStage = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    const phone = query.replace(/\D/g, '');
+    const map = new Map<string, Lead[]>(pipelineStages.map((stage) => [stage.id, []]));
+    for (const lead of leads) {
+      if (owner === 'mine' && lead.assignedTo !== user?.id) continue;
+      if (owner === 'none' && lead.assignedTo) continue;
+      if (owner && !['mine', 'none'].includes(owner) && lead.assignedTo !== owner) continue;
+      if (tag && !lead.tags.some((item) => item.toLowerCase() === tag.toLowerCase())) continue;
+      if (text && !(lead.name.toLowerCase().includes(text) || lead.email.toLowerCase().includes(text) || (phone.length >= 3 && lead.phone.replace(/\D/g, '').includes(phone)) || lead.tags.some((item) => item.toLowerCase().includes(text)))) continue;
+      map.get(lead.pipelineStage)?.push(lead);
     }
+    const time = (lead: Lead) => new Date(lead.stageChangedAt || lead.createdAt || 0).getTime();
+    map.forEach((list) => list.sort((a, b) => time(b) - time(a)));
+    return map;
+  }, [leads, pipelineStages, query, owner, tag, user?.id]);
 
-    const sourceStageIdx = pipelineStages.findIndex(s => s.id === source.droppableId);
-    const destStageIdx = pipelineStages.findIndex(s => s.id === destination.droppableId);
-    
-    const newStages = [...pipelineStages];
-    
-    // Copy arrays to avoid mutating the context directly before setting
-    const sourceLeads = [...newStages[sourceStageIdx].leads];
-    const [movedLeadId] = sourceLeads.splice(source.index, 1);
+  const hasFilters = Boolean(query || owner || tag);
+  const orphans = leads.filter((lead) => !pipelineStages.some((stage) => stage.id === lead.pipelineStage)).length;
+  const openLead = leads.find((lead) => lead.id === openId) || null;
 
-    if (source.droppableId === destination.droppableId) {
-      sourceLeads.splice(destination.index, 0, movedLeadId);
-      newStages[sourceStageIdx] = { ...newStages[sourceStageIdx], leads: sourceLeads };
-    } else {
-      const destLeads = [...newStages[destStageIdx].leads];
-      destLeads.splice(destination.index, 0, movedLeadId);
-      newStages[sourceStageIdx] = { ...newStages[sourceStageIdx], leads: sourceLeads };
-      newStages[destStageIdx] = { ...newStages[destStageIdx], leads: destLeads };
-    }
-
-    updatePipelineStages(newStages);
+  // ── Etapas ──
+  const saveStages = (next: PipelineStage[], debounce = false) => {
+    clearStructureError();
+    savePipelineStructure(next, { debounce });
   };
-
-  const updateStageConfig = (stageId: string, updates: { name?: string; color?: string }) => {
-    const newStages = pipelineStages.map(s => s.id === stageId ? { ...s, ...updates } : s);
-    // Digitando o nome: espera uma pausa antes de salvar.
-    savePipelineStructure(newStages, { debounce: updates.name !== undefined });
-  };
-
-  const moveStage = (stageId: string, direction: -1 | 1) => {
-    const index = pipelineStages.findIndex(s => s.id === stageId);
+  const renameStage = (id: string, name: string) => saveStages(pipelineStages.map((stage) => (stage.id === id ? { ...stage, name } : stage)));
+  const colorStage = (id: string, color: string) => saveStages(pipelineStages.map((stage) => (stage.id === id ? { ...stage, color } : stage)));
+  const moveStage = (id: string, direction: -1 | 1) => {
+    const index = pipelineStages.findIndex((stage) => stage.id === id);
     const target = index + direction;
     if (index < 0 || target < 0 || target >= pipelineStages.length) return;
-    const reordered = [...pipelineStages];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    savePipelineStructure(reordered);
+    const next = [...pipelineStages];
+    [next[index], next[target]] = [next[target], next[index]];
+    saveStages(next);
+  };
+  const deleteStage = (id: string) => {
+    if (id === WON_STAGE || pipelineStages.length <= 1) return;
+    const stage = pipelineStages.find((item) => item.id === id);
+    const remaining = pipelineStages.filter((item) => item.id !== id);
+    const count = stage?.leads.length ?? 0;
+    const message = count > 0 ? `Excluir a etapa "${stage?.name}"? Os ${count} lead(s) dela vão para "${remaining[0].name}".` : `Excluir a etapa "${stage?.name}"?`;
+    if (confirm(message)) saveStages(remaining);
+  };
+  const addStage = () => {
+    const stage: PipelineStage = { id: `etapa-${Date.now()}`, name: 'Nova etapa', color: '#06b6d4', leads: [] };
+    // Entra antes de "Ganhos", que costuma ser a última etapa.
+    const wonIndex = pipelineStages.findIndex((item) => item.id === WON_STAGE);
+    const next = [...pipelineStages];
+    next.splice(wonIndex >= 0 ? wonIndex : next.length, 0, stage);
+    saveStages(next);
+    setNotice({ type: 'ok', text: 'Etapa criada. Use o menu ⋮ da coluna para renomear.' });
   };
 
-  const deleteStage = (stageId: string) => {
-    if (stageId === 'ganho') {
-      alert('A etapa de ganhos não pode ser excluída: metas, relatórios e o dashboard dependem dela. Você pode renomear ou mudar a cor.');
+  // ── Arrastar ──
+  const onDragEnd = async (result: DropResult) => {
+    const { source, destination, draggableId, type } = result;
+    if (!destination) return;
+    if (type === 'COLUMN') {
+      if (source.index === destination.index) return;
+      const next = [...pipelineStages];
+      const [moved] = next.splice(source.index, 1);
+      next.splice(destination.index, 0, moved);
+      saveStages(next);
       return;
     }
-    if (pipelineStages.length <= 1) return;
-    const stage = pipelineStages.find(s => s.id === stageId);
-    const remaining = pipelineStages.filter(s => s.id !== stageId);
-    const leadCount = stage?.leads.length ?? 0;
-    const message = leadCount > 0
-      ? `Excluir a etapa "${stage?.name}"? Os ${leadCount} lead(s) dela vão para "${remaining[0].name}".`
-      : `Excluir a etapa "${stage?.name}"?`;
-    if (confirm(message)) savePipelineStructure(remaining);
-  };
-
-  const addStage = () => {
-    const newStage = {
-      id: `etapa-${Date.now()}`,
-      name: 'Nova Etapa',
-      color: '#06b6d4',
-      leads: []
-    };
-    // Entra antes de "Ganhos", que costuma ser a última etapa do funil.
-    const wonIndex = pipelineStages.findIndex(s => s.id === 'ganho');
-    const next = [...pipelineStages];
-    next.splice(wonIndex >= 0 ? wonIndex : next.length, 0, newStage);
-    savePipelineStructure(next);
-  };
-
-  if (!isReady) return null;
-
-  // Helper to map global leads to the pipeline payload
-  const getLeadData = (leadId: string) => {
-    const lead = leads.find(l => l.id === leadId);
-    if (!lead) return undefined;
-
-    const isSeller = user?.role === 'SELLER';
-    if ((isSeller || filterMine) && lead.assignedTo !== user?.id) {
-      return undefined;
-    }
-    return lead;
+    // Dentro da mesma coluna a ordem é sempre "mais recente na etapa primeiro".
+    if (source.droppableId === destination.droppableId) return;
+    const target = pipelineStages.find((stage) => stage.id === destination.droppableId);
+    const moved = await moveLead(draggableId, destination.droppableId);
+    if (!moved.ok) setNotice({ type: 'error', text: moved.error });
+    else if (destination.droppableId === WON_STAGE) setNotice({ type: 'ok', text: `Venda ganha! O lead foi para "${target?.name}".` });
   };
 
   return (
-    <div>
-      <header className={styles.headerRow}>
-        <div className={styles.welcomeText}>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 700 }}>
-            {user?.role === 'SELLER' ? 'Meu Funil' : 'Funil de Vendas'}
-          </h2>
-          <p style={{ color: 'var(--foreground)', opacity: 0.5 }}>
-            {user?.role === 'SELLER' 
-              ? 'Arraste os cartões para atualizar o status de seus leads.'
-              : (viewMode === 'kanban' ? 'Arraste os cartões ou use a barra abaixo para navegar.' : 'Configure suas etapas e analise as conversões.')}
-          </p>
+    <div className={styles.container}>
+      <header className={styles.header}>
+        <div>
+          <h1>{canManage ? 'Funil de vendas' : 'Meu funil'}</h1>
+          <p>{view === 'board' ? 'Arraste os cartões entre as etapas. Clique em um cartão para ver e editar o lead.' : 'Quantos leads e quanto valor há em cada etapa.'}</p>
         </div>
-
         <div className={styles.headerActions}>
-          {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
-            <button
-              className="glass"
-              style={{ 
-                color: filterMine ? '#3b82f6' : 'var(--foreground)', 
-                borderColor: filterMine ? '#3b82f6' : 'var(--border)',
-                padding: '10px 20px', 
-                borderRadius: '12px', 
-                fontSize: '0.9rem', 
-                fontWeight: 600, 
-                display: 'flex', 
-                gap: '8px', 
-                alignItems: 'center', 
-                cursor: 'pointer',
-                backgroundColor: filterMine ? 'rgba(59, 130, 246, 0.1)' : 'transparent'
-              }}
-              onClick={() => setFilterMine(!filterMine)}
-            >
-              <User size={18} />
-              {filterMine ? 'Ver Todos os Leads' : 'Ver Apenas Meus'}
-            </button>
-          )}
-
-          <button 
-            className="glass" 
-            style={{ color: 'var(--foreground)', padding: '10px 20px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', gap: '8px', alignItems: 'center', cursor: 'pointer' }}
-            onClick={() => setViewMode(v => v === 'kanban' ? 'funnel' : 'kanban')}
-          >
-            {viewMode === 'kanban' ? <BarChart2 size={18} /> : <Kanban size={18} />}
-            {viewMode === 'kanban' ? 'Visual de Funil' : 'Visual Kanban'}
-          </button>
-          
-          {viewMode === 'kanban' && canEditStages && (
-            <button 
-              style={{ background: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer' }}
-              onClick={addStage}
-            >
-              <Plus size={18} /> Nova Etapa
-            </button>
-          )}
+          <div className={styles.segmented} role="tablist" aria-label="Visualização">
+            <button type="button" role="tab" aria-selected={view === 'board'} className={view === 'board' ? styles.segmentOn : ''} onClick={() => setParam('view', null)}><Kanban size={15} /> Quadro</button>
+            <button type="button" role="tab" aria-selected={view === 'funnel'} className={view === 'funnel' ? styles.segmentOn : ''} onClick={() => setParam('view', 'funil')}><BarChart2 size={15} /> Funil</button>
+          </div>
+          {canManage && view === 'board' && <button type="button" className={styles.secondaryBtn} onClick={addStage}><Plus size={15} /> Etapa</button>}
+          <button type="button" className={styles.primaryBtn} onClick={() => openModal()}><Plus size={15} /> Novo lead</button>
         </div>
       </header>
 
-      {viewMode === 'funnel' ? (
-        <div className={styles.funnelContainer}>
-          {/* Configuração do Funil */}
-          <div className={styles.funnelConfig}>
-            <h3>Configuração Estratégica das Etapas</h3>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {pipelineStages.map((stage, i) => (
-                <div key={stage.id} className={styles.stageConfigRow}>
-                  <div style={{ fontWeight: 'bold', color: 'var(--foreground)', opacity: 0.5, width: 24, textAlign: 'center' }}>{i + 1}</div>
-                  {canEditStages && (
-                    <div className={styles.reorderButtons}>
-                      <button type="button" onClick={() => moveStage(stage.id, -1)} disabled={i === 0} title="Subir etapa" aria-label="Subir etapa">
-                        <ChevronUp size={14} />
-                      </button>
-                      <button type="button" onClick={() => moveStage(stage.id, 1)} disabled={i === pipelineStages.length - 1} title="Descer etapa" aria-label="Descer etapa">
-                        <ChevronDown size={14} />
-                      </button>
-                    </div>
-                  )}
-                  <CustomColorPicker 
-                    color={stage.color} 
-                    onChange={(color) => updateStageConfig(stage.id, { color })} 
-                  />
-                  <input 
-                    type="text" 
-                    value={stage.name || ''} 
-                    onChange={(e) => updateStageConfig(stage.id, { name: e.target.value })}
-                    disabled={!canEditStages}
-                    className={styles.stageInput}
-                    placeholder="Nome da Etapa"
-                  />
-                  {canEditStages && stage.id !== 'ganho' && (
-                    <button className={styles.deleteStageBtn} onClick={() => deleteStage(stage.id)} title="Excluir Etapa">
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {canEditStages && (
-              <button className={styles.addStageBtn} onClick={addStage}>
-                <Plus size={18} /> Adicionar Nova Etapa
-              </button>
-            )}
-          </div>
+      <div className={styles.filters}>
+        <label className={styles.search}>
+          <Search size={15} />
+          <input type="search" placeholder="Buscar no funil" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </label>
+        {canManage && (
+          <select className={styles.select} value={owner} onChange={(e) => setOwner(e.target.value)} aria-label="Responsável">
+            <option value="">Todos os responsáveis</option>
+            <option value="mine">Só os meus</option>
+            <option value="none">Sem responsável</option>
+            {team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+          </select>
+        )}
+        {tags.length > 0 && (
+          <select className={styles.select} value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Etiqueta">
+            <option value="">Todas as etiquetas</option>
+            {tags.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+          </select>
+        )}
+        {hasFilters && <button type="button" className={styles.linkBtn} onClick={() => { setQuery(''); setOwner(''); setTag(''); }}><X size={14} /> Limpar</button>}
+      </div>
 
-          {/* Relatório Visual do Funil */}
-          <div className={styles.funnelGraph}>
-            <h3>Relatório Visual de Posicionamento</h3>
-            <div className={styles.techFunnelWrapper}>
-              {pipelineStages.map((stage, i) => {
-                const widthPercentage = 100 - (i * (60 / Math.max(pipelineStages.length - 1, 1)));
-                
-                // Calculate total financial value in this stage
-                const totalValue = stage.leads.reduce((acc, leadId) => {
-                  const l = getLeadData(leadId);
-                  if(!l || !l.value) return acc;
-                  const val = parseFloat(l.value.replace(/[^0-9,-]+/g,"").replace(",",".") || "0");
-                  return acc + (isNaN(val) ? 0 : val);
-                }, 0);
+      {structureError && (
+        <div className={styles.errorBox}><AlertTriangle size={16} /> {structureError} <button type="button" className={styles.linkBtn} onClick={clearStructureError}>Fechar</button></div>
+      )}
+      {orphans > 0 && (
+        <div className={styles.warnBox}><AlertTriangle size={16} /> {orphans} lead(s) estão numa etapa que não existe mais e não aparecem no quadro. Mova-os pela tela de Leads.</div>
+      )}
 
-                return (
-                  <div key={stage.id} className={styles.techFunnelRow}>
-                    
-                    <div className={styles.techFunnelCol}>
-                      <div 
-                         className={styles.techFunnelSlice} 
-                         style={{ 
-                           width: `${widthPercentage}%`,
-                           background: `linear-gradient(90deg, transparent, ${stage.color}44)`,
-                           borderTop: `1px solid ${stage.color}88`,
-                           borderLeft: `2px solid ${stage.color}`,
-                           borderBottom: `1px solid ${stage.color}44`,
-                           borderRight: `4px solid ${stage.color}`,
-                           clipPath: `polygon(15% 0, 100% 0, 100% 100%, 0% 100%)`
-                         }}
-                      >
-                         <div className={styles.sliceGlow} style={{ boxShadow: `inset -15px 0 30px ${stage.color}88` }} />
-                      </div>
-                    </div>
-                    
-                    <div className={styles.techConnectionCol}>
-                       <div className={styles.techLine} style={{ backgroundColor: stage.color }} />
-                       <div className={styles.techDot} style={{ backgroundColor: stage.color, boxShadow: `0 0 10px ${stage.color}` }} />
-                    </div>
-
-                    <div className={styles.techLabelCol}>
-                      <div className={styles.techLabelCard} style={{ borderLeftColor: stage.color }}>
-                         <h4 style={{ color: stage.color }}>{stage.name}</h4>
-                         <div className={styles.techStats}>
-                           <span className={styles.techLeadCount}>
-                             {stage.leads.filter(id => !!getLeadData(id)).length} Leads
-                           </span>
-                           <span className={styles.techDivider}>/</span>
-                           <span className={styles.techValue}>
-                              R$ {totalValue > 0 ? totalValue.toLocaleString('pt-BR') : '0,00'}
-                           </span>
-                         </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.8rem', marginTop: '1rem' }}>
-              Baseado nos dados atuais do pipeline.
-            </div>
-          </div>
-        </div>
+      {!loaded ? (
+        <p className={styles.loading}><Loader2 size={16} className={styles.spin} /> Carregando funil...</p>
+      ) : view === 'funnel' ? (
+        <FunnelView
+          stages={pipelineStages}
+          leadsByStage={leadsByStage}
+          daysIn={daysIn}
+          wonId={WON_STAGE}
+          canEdit={canManage}
+          onRename={renameStage}
+          onColor={colorStage}
+          onMove={moveStage}
+          onDelete={deleteStage}
+          onAdd={addStage}
+        />
       ) : (
-        <div className={styles.scrollOuter}>
+        <div className={styles.boardScroll}>
           <DragDropContext onDragEnd={onDragEnd}>
             <Droppable droppableId="pipeline-board" type="COLUMN" direction="horizontal">
-            {(boardProvided) => (
-            <div className={styles.pipelineWrapper} ref={boardProvided.innerRef} {...boardProvided.droppableProps}>
-              {pipelineStages.map((stage, stageIndex) => (
-                <Draggable key={stage.id} draggableId={`column-${stage.id}`} index={stageIndex} isDragDisabled={!canEditStages}>
-                {(columnProvided, columnSnapshot) => (
-                <div
-                  ref={columnProvided.innerRef}
-                  {...columnProvided.draggableProps}
-                  className={`${styles.stage} ${columnSnapshot.isDragging ? styles.stageDragging : ''}`}
-                >
-                  <div className={styles.stageHeader} {...columnProvided.dragHandleProps} title={canEditStages ? 'Arraste para mudar a ordem da etapa' : undefined}>
-                    <div className={styles.stageTitle}>
-                      {canEditStages && <GripVertical size={14} className={styles.columnGrip} />}
-                      <CircleDot size={16} style={{ color: stage.color }} />
-                      <span>{stage.name}</span>
-                      <span className={styles.leadCount}>
-                        {stage.leads.filter(id => !!getLeadData(id)).length}
-                      </span>
-                    </div>
-                    
-                    {canEditStages && (
-                    <div style={{ position: 'relative' }}>
-                      <MoreVertical 
-                        size={16} 
-                        style={{ color: 'var(--foreground)', opacity: 0.3, cursor: 'pointer' }} 
-                        onClick={(e) => toggleMenu(stage.id, e)}
-                      />
-                      
-                      <AnimatePresence>
-                        {activeMenu === stage.id && (
-                          <motion.div 
-                            className={styles.stageMenu}
-                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className={styles.menuHeader}>Ações da Etapa</div>
-                            
-                            <button className={styles.menuItem} onClick={() => {
-                              const newName = prompt('Novo nome da etapa:', stage.name);
-                              if (newName) updateStageConfig(stage.id, { name: newName });
-                              setActiveMenu(null);
-                            }}>
-                              <Edit2 size={14} />
-                              <span>Renomear Etapa</span>
-                            </button>
-                            
-                            <div className={styles.menuItem}>
-                              <Palette size={14} />
-                              <span>Mudar Cor</span>
-                              <div style={{ marginLeft: 'auto' }}>
-                                <CustomColorPicker 
-                                  color={stage.color} 
-                                  onChange={(color) => updateStageConfig(stage.id, { color })} 
-                                />
-                              </div>
-                            </div>
-
-                            <button
-                              className={styles.menuItem}
-                              disabled={stageIndex === 0}
-                              onClick={() => { moveStage(stage.id, -1); setActiveMenu(null); }}
-                            >
-                              <ArrowLeft size={14} />
-                              <span>Mover para a esquerda</span>
-                            </button>
-                            <button
-                              className={styles.menuItem}
-                              disabled={stageIndex === pipelineStages.length - 1}
-                              onClick={() => { moveStage(stage.id, 1); setActiveMenu(null); }}
-                            >
-                              <ArrowRight size={14} />
-                              <span>Mover para a direita</span>
-                            </button>
-
-                            {stage.id !== 'ganho' && (
-                              <>
-                                <div className={styles.menuDivider} />
-                                <button className={`${styles.menuItem} ${styles.deleteItem}`} onClick={() => {
-                                  deleteStage(stage.id);
-                                  setActiveMenu(null);
-                                }}>
-                                  <Trash2 size={14} />
-                                  <span>Excluir Etapa</span>
-                                </button>
-                              </>
-                            )}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                    )}
-                  </div>
-
-                  <Droppable droppableId={stage.id} type="LEAD">
-                    {(provided, snapshot) => (
-                      <div 
-                        className={`${styles.leadList} ${snapshot.isDraggingOver ? styles.draggingOver : ''}`}
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                      >
-                        <AnimatePresence>
-                          {stage.leads.map((leadId, index) => {
-                            const lead = getLeadData(leadId);
-                            if (!lead) return null; // If lead is broken/missing
-
-                            return (
-                              <Draggable key={lead.id} draggableId={lead.id} index={index}>
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className={`${styles.leadCard} ${snapshot.isDragging ? styles.dragging : ''}`}
-                                    style={{ ...provided.draggableProps.style }}
-                                    onClick={() => setSelectedLead(lead)}
-                                  >
-                                    <div className={styles.cardHeader}>
-                                      <span className={styles.companyName}>{lead.name}</span>
-                                      <Grab size={14} className={styles.dragHandleIcon} />
-                                    </div>
-                                    <div className={styles.contactInfo} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <span style={{ fontSize: '0.8rem', color: 'var(--foreground)', opacity: 0.6 }}>{lead.cpfCnpj || lead.email}</span>
-                                      {lead.assignedTo && (
-                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', width: 'fit-content', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 500 }}>
-                                          <User size={10} />
-                                          {profiles.find(p => p.id === lead.assignedTo)?.name || 'Carregando...'}
+              {(board) => (
+                <div className={styles.board} ref={board.innerRef} {...board.droppableProps}>
+                  {pipelineStages.map((stage, stageIndex) => {
+                    const list = leadsByStage.get(stage.id) || [];
+                    const total = list.reduce((sum, lead) => sum + (lead.valueNumber ?? 0), 0);
+                    return (
+                      <Draggable key={stage.id} draggableId={`column-${stage.id}`} index={stageIndex} isDragDisabled={!canManage}>
+                        {(column, columnState) => (
+                          <section ref={column.innerRef} {...column.draggableProps} className={`${styles.column} ${columnState.isDragging ? styles.columnDragging : ''} ${stage.id === WON_STAGE ? styles.columnWon : ''}`} aria-label={`Etapa ${stage.name}`}>
+                            <StageHeader
+                              name={stage.name}
+                              color={stage.color}
+                              count={list.length}
+                              total={total > 0 ? brl(total) : ''}
+                              canEdit={canManage}
+                              isWon={stage.id === WON_STAGE}
+                              isFirst={stageIndex === 0}
+                              isLast={stageIndex === pipelineStages.length - 1}
+                              dragHandle={column.dragHandleProps as Record<string, unknown> | null}
+                              onRename={(name) => renameStage(stage.id, name)}
+                              onColor={(color) => colorStage(stage.id, color)}
+                              onMove={(direction) => moveStage(stage.id, direction)}
+                              onDelete={() => deleteStage(stage.id)}
+                            />
+                            <Droppable droppableId={stage.id} type="LEAD">
+                              {(drop, dropState) => (
+                                <div ref={drop.innerRef} {...drop.droppableProps} className={`${styles.cards} ${dropState.isDraggingOver ? styles.cardsOver : ''}`}>
+                                  {list.map((lead, index) => (
+                                    <Draggable key={lead.id} draggableId={lead.id} index={index}>
+                                      {(drag, dragState) => (
+                                        <div
+                                          ref={drag.innerRef}
+                                          {...drag.draggableProps}
+                                          {...drag.dragHandleProps}
+                                          role="button"
+                                          tabIndex={0}
+                                          aria-label={`Abrir ${lead.name}`}
+                                          onClick={() => setParam('lead', lead.id)}
+                                          onKeyDown={(e) => e.key === 'Enter' && setParam('lead', lead.id)}
+                                        >
+                                          <LeadCard
+                                            lead={lead}
+                                            ownerName={ownerName(lead.assignedTo)}
+                                            days={daysIn(lead)}
+                                            tagColor={tagColor}
+                                            showOwner={canManage}
+                                            dragging={dragState.isDragging}
+                                          />
                                         </div>
                                       )}
-                                    </div>
-                                    <div className={styles.leadValue}>{lead.value || 'R$ 0'}</div>
-                                                                        <div className={styles.leadMeta}>
-                                      <div style={{ display: 'flex', gap: '8px' }}>
-                                        {lead.channels?.map((type: string) => {
-                                          switch (type.toLowerCase()) {
-                                            case 'whatsapp': return <MessageCircle key={type} size={14} style={{ color: '#25D366' }} />;
-                                            case 'instagram': return <Globe key={type} size={14} style={{ color: '#E4405F' }} />;
-                                            case 'facebook': return <Globe key={type} size={14} style={{ color: '#1877F2' }} />;
-                                            case 'site': return <Globe key={type} size={14} style={{ color: '#3498db' }} />;
-                                            default: return <Globe key={type} size={14} />;
-                                          }
-                                        })}
-                                        {lead.email && <Mail size={14} style={{ color: '#3b82f6' }} />}
-                                      </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Clock size={12} />
-                                        <span>{lead.days || 0}d</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            );
-                          })}
-                        </AnimatePresence>
-                        {provided.placeholder}
-                        
-                        <button className={styles.addLeadBtn} onClick={openModal}>
-                          <Plus size={16} /> Adicionar Lead
-                        </button>
-                      </div>
-                    )}
-                  </Droppable>
+                                    </Draggable>
+                                  ))}
+                                  {drop.placeholder}
+                                  {list.length === 0 && !dropState.isDraggingOver && <p className={styles.emptyColumn}>{hasFilters ? 'Nada com esses filtros' : 'Arraste leads para cá'}</p>}
+                                  <button type="button" className={styles.addLead} onClick={() => openModal({ pipelineStage: stage.id })}>
+                                    <Plus size={14} /> Lead nesta etapa
+                                  </button>
+                                </div>
+                              )}
+                            </Droppable>
+                          </section>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {board.placeholder}
                 </div>
-                )}
-                </Draggable>
-              ))}
-              {boardProvided.placeholder}
-            </div>
-            )}
+              )}
             </Droppable>
           </DragDropContext>
         </div>
       )}
 
-      {/* Modal de Detalhes do Lead */}
-      <AnimatePresence>
-        {selectedLead && (
-          <div className={styles.modalOverlayCentered} onClick={() => {
-            setSelectedLead(null);
-            setIsEditing(false);
-          }}>
-            <motion.div 
-              className={`${styles.detailsModalCentered} ${isEditing ? styles.editingMode : ''}`}
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={styles.detailsHeader}>
-                <div className={styles.userIconLarge} style={{ background: selectedLead.color }}>
-                   <User size={32} color="white" />
-                </div>
-                <div className={styles.headerInfo}>
-                   {isEditing ? (
-                     <input 
-                       className={styles.editTitleInput}
-                       value={editForm?.name || ''} 
-                       onChange={e => setEditForm({...editForm, name: e.target.value})}
-                     />
-                   ) : (
-                     <h3 onClick={() => {
-                        setEditForm(selectedLead);
-                        setIsEditing(true);
-                     }} style={{ cursor: 'pointer' }}>{selectedLead.name}</h3>
-                   )}
-                   <span className={styles.entryDate}>Registrado em {selectedLead.entryDate || 'N/A'}</span>
-                </div>
-                <div className={styles.modalActions}>
-                  {!isEditing && (
-                    <button className={styles.deleteLeadBtn} onClick={() => {
-                      if (confirm(`Tem certeza que deseja excluir o lead ${selectedLead.name}?`)) {
-                        deleteLead(selectedLead.id);
-                        setSelectedLead(null);
-                      }
-                    }}>
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                  <button className={styles.closeDetails} onClick={() => {
-                    setSelectedLead(null);
-                    setIsEditing(false);
-                  }}>
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
+      {openLead && (
+        <LeadPanel
+          key={openLead.id}
+          lead={openLead}
+          stages={pipelineStages}
+          team={team}
+          tagOptions={tags}
+          canAssign={canManage}
+          onSave={async (changes) => {
+            const result = await updateLead(openLead.id, changes);
+            if (!result.ok) return result.error;
+            setNotice({ type: 'ok', text: 'Lead salvo.' });
+            return null;
+          }}
+          onDelete={async () => {
+            const result = await deleteLead(openLead.id);
+            if (!result.ok) return result.error;
+            setParam('lead', null);
+            setNotice({ type: 'ok', text: 'Lead excluído.' });
+            return null;
+          }}
+          onClose={() => setParam('lead', null)}
+        />
+      )}
 
-              <div className={styles.detailsBody}>
-                <div className={styles.infoGrid}>
-                  <div className={styles.infoCard}>
-                    <div className={styles.infoIcon}><Mail size={16} /></div>
-                    <div className={styles.infoContent}>
-                      <label>E-mail</label>
-                      {isEditing ? (
-                        <input className={styles.editInput} value={editForm?.email || ''} onChange={e => setEditForm({...editForm, email: e.target.value})} />
-                      ) : (
-                        <span>{selectedLead.email || 'Não informado'}</span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className={styles.infoCard}>
-                    <div className={styles.infoIcon}><Phone size={16} /></div>
-                    <div className={styles.infoContent}>
-                      <label>Telefone</label>
-                      {isEditing ? (
-                        <input className={styles.editInput} value={editForm?.phone || ''} onChange={e => setEditForm({...editForm, phone: e.target.value})} />
-                      ) : (
-                        <span>{selectedLead.phone || 'Não informado'}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={styles.infoCard}>
-                    <div className={styles.infoIcon}><Hash size={16} /></div>
-                    <div className={styles.infoContent}>
-                      <label>CPF / CNPJ</label>
-                      {isEditing ? (
-                        <input className={styles.editInput} value={editForm?.cpfCnpj || ''} onChange={e => setEditForm({...editForm, cpfCnpj: e.target.value})} />
-                      ) : (
-                        <span>{selectedLead.cpfCnpj || 'Não informado'}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={styles.infoCard}>
-                    <div className={styles.infoIcon}><ShoppingBag size={16} /></div>
-                    <div className={styles.infoContent}>
-                      <label>Valor Estimado</label>
-                      {isEditing ? (
-                        <input className={styles.editInput} value={editForm?.value || ''} onChange={e => setEditForm({...editForm, value: e.target.value})} />
-                      ) : (
-                        <span className={styles.importantValue}>{selectedLead.value || 'R$ 0,00'}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={styles.infoCard}>
-                    <div className={styles.infoIcon}><User size={16} /></div>
-                    <div className={styles.infoContent}>
-                      <label>Responsável</label>
-                      {isEditing ? (
-                        (user?.role === 'ADMIN' || user?.role === 'MANAGER') ? (
-                          <select 
-                            className={styles.editInput} 
-                            value={editForm?.assignedTo || ''} 
-                            onChange={e => setEditForm({...editForm, assignedTo: e.target.value || null})}
-                            style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--foreground)', outline: 'none' }}
-                          >
-                            <option value="">Sem responsável</option>
-                            {profiles.map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span>
-                            {editForm?.assignedTo 
-                              ? (profiles.find(p => p.id === editForm.assignedTo)?.name || 'Carregando...') 
-                              : 'Sem responsável'}
-                          </span>
-                        )
-                      ) : (
-                        <span>
-                          {selectedLead.assignedTo 
-                            ? (profiles.find(p => p.id === selectedLead.assignedTo)?.name || 'Carregando...') 
-                            : 'Sem responsável'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.detailsSection}>
-                  <label><History size={14} /> Histórico e Notas</label>
-                  <div className={styles.notesArea}>
-                     <div className={styles.noteItem}>
-                        <div className={styles.noteDot} style={{ background: selectedLead.color }} />
-                        <div className={styles.noteContent}>
-                           <p>Lead adicionado à etapa <strong>{pipelineStages.find(s => s.id === selectedLead.pipelineStage)?.name}</strong></p>
-                           <span>Há {selectedLead.days || 0} dias</span>
-                        </div>
-                     </div>
-                  </div>
-                </div>
-
-                <div className={styles.tagSection}>
-                   <label>Tags</label>
-                   <div className={styles.detailsTags}>
-                      {selectedLead.tags?.map((tag: string) => (
-                        <span key={tag} className={styles.detailsTag}>{tag}</span>
-                      ))}
-                      {(!selectedLead.tags || selectedLead.tags.length === 0) && <span style={{ opacity: 0.3 }}>Nenhuma tag aplicada</span>}
-                   </div>
-                </div>
-              </div>
-
-              <div className={styles.detailsFooter}>
-                 {isEditing ? (
-                   <>
-                    <button className={styles.cancelEditBtn} onClick={() => setIsEditing(false)}>
-                      Cancelar
-                    </button>
-                    <button className={styles.saveBtn} onClick={() => {
-                        updateLead(selectedLead.id, editForm);
-                        setSelectedLead({...selectedLead, ...editForm});
-                        setIsEditing(false);
-                    }}>
-                      <Save size={18} />
-                      Salvar Alterações
-                    </button>
-                   </>
-                 ) : (
-                   <>
-                    <button className={styles.whatsappBtn} onClick={() => router.push(`/messages?chatId=${selectedLead.id}`)}>
-                        <MessageCircle size={18} />
-                        Conversar via WhatsApp
-                    </button>
-                    <button className={styles.editBtn} onClick={() => {
-                        setEditForm(selectedLead);
-                        setIsEditing(true);
-                    }}>
-                        <Edit2 size={16} />
-                    </button>
-                   </>
-                 )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {notice && (
+        <div className={`${styles.toast} ${notice.type === 'error' ? styles.toastError : ''}`} role="status">
+          {notice.type === 'error' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {notice.text}
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function PipelinePage() {
+  return (
+    <Suspense fallback={null}>
+      <PipelineContent />
+    </Suspense>
   );
 }

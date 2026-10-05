@@ -38,7 +38,9 @@ type LeadContextType = {
   /** Já carregou do servidor ao menos uma vez. */
   loaded: boolean;
   isModalOpen: boolean;
-  openModal: () => void;
+  /** Abre o "Novo lead"; `defaults.pipelineStage` já escolhe a etapa (botão da coluna do funil). */
+  openModal: (defaults?: { pipelineStage?: string }) => void;
+  modalDefaults: { pipelineStage?: string };
   closeModal: () => void;
   addLead: (input: LeadInput, options?: { force?: boolean }) => Promise<AddLeadResult>;
   updateLead: (leadId: string, updates: Partial<Lead> | LeadInput) => Promise<Result>;
@@ -47,7 +49,11 @@ type LeadContextType = {
   /** Etiquetas cadastradas pela empresa. */
   tags: LeadTag[];
   refreshTags: () => Promise<void>;
-  updatePipelineStages: (newStages: PipelineStage[]) => void;
+  /** Move um lead de etapa (arrastar no funil). Volta atrás se o servidor recusar. */
+  moveLead: (leadId: string, stageId: string) => Promise<Result>;
+  /** Erro ao salvar as etapas do funil (a tela mostra e limpa). */
+  structureError: string;
+  clearStructureError: () => void;
   /** Salva a estrutura do funil (criar, renomear, cor, excluir, reordenar etapas). */
   savePipelineStructure: (newStages: PipelineStage[], options?: { debounce?: boolean }) => void;
   dbStatus: boolean;
@@ -84,6 +90,8 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
   const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([]);
   const [tags, setTags] = useState<LeadTag[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalDefaults, setModalDefaults] = useState<{ pipelineStage?: string }>({});
+  const [structureError, setStructureError] = useState('');
   const [dbStatus, setDbStatus] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const leadsRef = useRef<Lead[]>([]);
@@ -135,7 +143,11 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [fetchDatabase, refreshTags, hasCrm, user]);
 
-  const openModal = () => setIsModalOpen(true);
+  const openModal = (defaults?: { pipelineStage?: string }) => {
+    // Também é usado direto como onClick (recebe o evento): só aceita o objeto de opções.
+    setModalDefaults(defaults && typeof defaults === 'object' && 'pipelineStage' in defaults ? { pipelineStage: defaults.pipelineStage } : {});
+    setIsModalOpen(true);
+  };
   const closeModal = () => setIsModalOpen(false);
 
   // ─── addLead ────────────────────────────────────────────────
@@ -198,25 +210,27 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     return ok ? { ok: true as const, count: json.data?.count as number } : { ok: false as const, error: json.error || 'Não foi possível aplicar.' };
   };
 
-  // ─── updatePipelineStages (drag & drop) ─────────────────────
-  const updatePipelineStages = async (newStages: PipelineStage[]) => {
-    const previous = pipelineStages;
-    setPipelineStages(newStages);
-    if (!dbStatus) return;
-    // Detecta qual lead foi movido e para qual etapa.
-    for (const newStage of newStages) {
-      const oldStage = previous.find((s) => s.id === newStage.id);
-      const movedId = oldStage ? newStage.leads.find((id) => !oldStage.leads.includes(id)) : undefined;
-      if (!movedId) continue;
-      const { ok, json } = await send(`/api/leads/${movedId}`, 'PATCH', { action: 'move_stage', stageId: newStage.id });
-      if (!ok) {
-        setPipelineStages(previous);
-        alert(json.error || 'Não foi possível mover o lead.');
-        return;
-      }
-      setLeads((prev) => prev.map((lead) => (lead.id === movedId ? { ...lead, pipelineStage: newStage.id } : lead)));
-      break;
+  // ─── moveLead (arrastar no funil) ───────────────────────────
+  const moveLead = async (leadId: string, stageId: string): Promise<Result> => {
+    const lead = leadsRef.current.find((item) => item.id === leadId);
+    if (!lead || lead.pipelineStage === stageId) return { ok: true };
+    const previousLeads = leadsRef.current;
+    const placed = (stages: PipelineStage[]) => stages.map((s) => ({
+      ...s,
+      leads: s.id === stageId ? [leadId, ...s.leads.filter((id) => id !== leadId)] : s.leads.filter((id) => id !== leadId),
+    }));
+    setLeads((prev) => prev.map((item) => (item.id === leadId ? { ...item, pipelineStage: stageId, stageChangedAt: new Date().toISOString() } : item)));
+    setPipelineStages(placed);
+    const { ok, json } = await send(`/api/leads/${leadId}`, 'PATCH', { action: 'move_stage', stageId });
+    if (!ok) {
+      setLeads(previousLeads);
+      setPipelineStages((stages) => stages.map((s) => ({
+        ...s,
+        leads: s.id === lead.pipelineStage ? [leadId, ...s.leads.filter((id) => id !== leadId)] : s.leads.filter((id) => id !== leadId),
+      })));
+      return { ok: false, error: json.error || 'Não foi possível mover o lead.' };
     }
+    return { ok: true };
   };
 
   // ─── savePipelineStructure (etapas: nome, cor, ordem) ───────
@@ -239,7 +253,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
         stages: stagesToSave.map((stage) => ({ id: stage.id, name: stage.name, color: stage.color })),
       });
       if (!ok) {
-        alert(json.error || 'Não foi possível salvar as etapas do funil.');
+        setStructureError(json.error || 'Não foi possível salvar as etapas do funil.');
         await fetchDatabase(); // volta para o que está salvo
         return;
       }
@@ -251,10 +265,10 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
   return (
     <LeadContext.Provider value={{
       leads, pipelineStages, loaded, isModalOpen,
-      openModal, closeModal,
+      openModal, modalDefaults, closeModal,
       addLead, updateLead, deleteLead, bulkUpdate,
       tags, refreshTags,
-      updatePipelineStages,
+      moveLead, structureError, clearStructureError: () => setStructureError(''),
       savePipelineStructure,
       dbStatus, refreshDatabase: fetchDatabase,
     }}>

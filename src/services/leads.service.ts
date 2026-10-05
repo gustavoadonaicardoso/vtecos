@@ -67,6 +67,7 @@ function mapDbRowToLead(row: Row): Lead {
     assignedTo: (row.assigned_to as string) || null,
     notes: String(row.notes || ''),
     lastActivityAt: (row.last_activity_at as string) || null,
+    stageChangedAt: (row.stage_changed_at as string) || (row.created_at as string) || null,
   };
 }
 
