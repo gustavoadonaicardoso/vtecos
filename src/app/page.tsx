@@ -38,7 +38,7 @@ import { buildReport, isWon, leadValue } from './relatorios/report-data';
 import { canViewGoal, getGoalPace, getGoalProgress, type GoalPlan } from '@/lib/goals';
 import { fetchGoalsFromServer, migrateLocalGoalsIfAny } from '@/lib/goals-client';
 import type { DashboardSummary } from '@/services/dashboard.service';
-import type { PlatformBanner } from '@/types';
+import type { HomeBanner } from '@/lib/banners';
 
 const PERIODS = [
   { value: 1, label: 'Hoje' },
@@ -142,7 +142,7 @@ export default function HomePage() {
   const [period, setPeriod] = useState(7);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [goals, setGoals] = useState<GoalPlan[]>([]);
-  const [banners, setBanners] = useState<PlatformBanner[]>([]);
+  const [banners, setBanners] = useState<HomeBanner[]>([]);
   const [updates, setUpdates] = useState<Array<{ user_name: string; action: string; target?: string; created_at: string }>>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -175,10 +175,11 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!supabase) return;
-    // O banco guarda o ícone em icon_name; o carrossel lê iconName.
-    supabase.from('platform_banners').select('*').order('created_at', { ascending: false }).then(({ data }) => {
-      setBanners((data || []).map((row) => ({ ...row, iconName: row.icon_name ?? undefined })));
-    });
+    // Banners: o servidor já devolve só os desta empresa, plano, cargo e período.
+    fetch('/api/banners', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : { data: [] }))
+      .then((json) => setBanners(Array.isArray(json.data) ? json.data : []))
+      .catch(() => setBanners([]));
     supabase
       .from('system_updates')
       .select('*')
@@ -388,7 +389,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <BannerCarousel banners={banners} user={user} />
+      <BannerCarousel banners={banners} />
 
       <section className={styles.kpiGrid} aria-label="Indicadores principais">
         {kpis.map((kpi) => (

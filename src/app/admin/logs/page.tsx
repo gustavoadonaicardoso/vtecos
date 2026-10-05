@@ -42,6 +42,7 @@ const ACTION_ICONS: Record<string, any> = {
   'TICKET_CALL': Activity,
   'TICKET_COMPLETE': Shield,
   'SETTINGS_UPDATE': Settings,
+  'SUPPORT_ACCESS': Shield,
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -54,6 +55,7 @@ const ACTION_COLORS: Record<string, string> = {
   'TICKET_CALL': '#06b6d4',
   'TICKET_COMPLETE': '#10b981',
   'SETTINGS_UPDATE': '#6366f1',
+  'SUPPORT_ACCESS': '#f59e0b',
 };
 
 export default function AuditLogsPage() {
@@ -134,6 +136,7 @@ export default function AuditLogsPage() {
               <option value="LEAD_CREATE">Criação de Leads</option>
               <option value="TICKET_CREATE">Senhas Geradas</option>
               <option value="TICKET_CALL">Chamadas de Senha</option>
+              <option value="SUPPORT_ACCESS">Acesso da equipe Vórtice</option>
             </select>
           </div>
         </div>

@@ -1,0 +1,47 @@
+/* Faixa do modo suporte (sempre visível no topo do conteúdo). */
+.bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #f59e0b;
+  color: #1c1300;
+  font-size: 0.84rem;
+  position: relative;
+  z-index: 50;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leave {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #1c1300;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.leave:disabled {
+  opacity: 0.6;
+}
+
+@media (max-width: 600px) {
+  .text {
+    white-space: normal;
+  }
+}

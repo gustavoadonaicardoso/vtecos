@@ -19,6 +19,7 @@ import { cookies } from 'next/headers';
 import { supabaseAuth } from '@/lib/supabase-auth';
 import { fetchProfileById, fetchProfileByEmail } from '@/services/profile-lookup.server';
 import { loadWorkspace } from '@/services/workspace.service';
+import { applySupportAccess } from '@/services/support-access.service';
 import type { UserProfile } from '@/types';
 
 const ACCESS_COOKIE = 'vortice_at';
@@ -63,9 +64,17 @@ function tokenExpiry(token: string) {
 }
 
 export interface AuthSession {
+  /** Perfil em uso: no modo suporte, já "dentro" da empresa do cliente. */
   profile: UserProfile;
+  /** Perfil de verdade (fora do modo suporte é o mesmo de profile). */
+  realProfile: UserProfile;
   accessToken: string;
   expiresAt: number;
+}
+
+async function sessionFor(profile: UserProfile | null, accessToken: string): Promise<AuthSession | null> {
+  if (!profile) return null;
+  return { profile: await applySupportAccess(profile), realProfile: profile, accessToken, expiresAt: tokenExpiry(accessToken) };
 }
 
 /**
@@ -81,8 +90,7 @@ export async function getAuthSession(): Promise<AuthSession | null> {
   if (accessToken) {
     const { data, error } = await supabaseAuth.auth.getUser(accessToken);
     if (!error && data.user) {
-      const profile = await resolveProfileFromAuthUser(data.user);
-      return profile ? { profile, accessToken, expiresAt: tokenExpiry(accessToken) } : null;
+      return sessionFor(await resolveProfileFromAuthUser(data.user), accessToken);
     }
   }
 
@@ -102,10 +110,7 @@ export async function getAuthSession(): Promise<AuthSession | null> {
     refreshed.session.expires_in
   );
 
-  const profile = await resolveProfileFromAuthUser(refreshed.user);
-  return profile
-    ? { profile, accessToken: refreshed.session.access_token, expiresAt: tokenExpiry(refreshed.session.access_token) }
-    : null;
+  return sessionFor(await resolveProfileFromAuthUser(refreshed.user), refreshed.session.access_token);
 }
 
 export async function getAuthenticatedProfile(): Promise<UserProfile | null> {

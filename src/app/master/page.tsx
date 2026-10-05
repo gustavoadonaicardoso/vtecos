@@ -21,22 +21,6 @@ const IMAGE_LIMITS = { logoUrl: 300 * 1024, faviconUrl: 100 * 1024 };
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const ROLE_LABELS: Record<Role, string> = { ADMIN: 'Administrador', MANAGER: 'Gerente', SELLER: 'Vendedor / Atendente' };
 
-type BannerRow = {
-  id: string; title: string; description: string; date: string; type: string;
-  color: string; icon_name: string | null; target_roles: string[] | null;
-};
-
-const toBanner = (row: BannerRow): BannerItem => ({
-  id: row.id,
-  title: row.title,
-  description: row.description,
-  date: row.date,
-  type: row.type,
-  color: row.color,
-  iconName: row.icon_name ?? undefined,
-  target_roles: row.target_roles ?? [],
-});
-
 /** Configuração salva → campos da aba (cor hex fora dos presets = "Personalizado"). */
 function settingsFromConfig(config: BrandingConfig | undefined) {
   const sidebar = config?.sidebar_bg || '';
@@ -88,14 +72,16 @@ export default function MasterPage() {
   // ── Banners ──────────────────────────────────────────────────
 
   const fetchBanners = useCallback(async () => {
-    if (!supabase) return;
     setBannerLoading(true);
-    const { data, error: loadError } = await supabase
-      .from('platform_banners')
-      .select('*')
-      .order('created_at', { ascending: false });
-    setBannerError(loadError ? `Não foi possível carregar os banners: ${loadError.message}` : '');
-    setBanners(((data || []) as BannerRow[]).map(toBanner));
+    try {
+      const response = await fetch('/api/master/banners', { cache: 'no-store' });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json.error || 'Falha ao carregar.');
+      setBanners(json.data as BannerItem[]);
+      setBannerError('');
+    } catch (loadError) {
+      setBannerError(`Não foi possível carregar os banners: ${(loadError as Error).message}`);
+    }
     setBannerLoading(false);
   }, []);
 
@@ -107,20 +93,13 @@ export default function MasterPage() {
   };
 
   const saveBanner = async (banner: BannerItem): Promise<string | null> => {
-    if (!supabase) return 'Banco de dados indisponível.';
-    const row = {
-      title: banner.title,
-      description: banner.description,
-      date: banner.date,
-      type: banner.type,
-      color: banner.color,
-      icon_name: banner.iconName ?? null,
-      target_roles: banner.target_roles,
-    };
-    const { error: saveError } = banner.id
-      ? await supabase.from('platform_banners').update(row).eq('id', banner.id)
-      : await supabase.from('platform_banners').insert(row);
-    if (saveError) return `Não foi possível salvar: ${saveError.message}`;
+    const response = await fetch(banner.id ? `/api/master/banners/${banner.id}` : '/api/master/banners', {
+      method: banner.id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(banner),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) return `Não foi possível salvar: ${json.error || 'erro desconhecido'}`;
 
     setEditingBanner(null);
     setBannerSaved(true);
@@ -130,23 +109,45 @@ export default function MasterPage() {
   };
 
   const removeBanner = async (banner: BannerItem): Promise<string | null> => {
-    if (!supabase || !banner.id) return null;
-    const { error: removeError } = await supabase.from('platform_banners').delete().eq('id', banner.id);
-    if (removeError) return `Não foi possível remover: ${removeError.message}`;
+    if (!banner.id) return null;
+    const response = await fetch(`/api/master/banners/${banner.id}`, { method: 'DELETE' });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) return `Não foi possível remover: ${json.error || 'erro desconhecido'}`;
     setEditingBanner(null);
     await fetchBanners();
     return null;
+  };
+
+  /** Sobe/desce um banner no carrossel. */
+  const moveBanner = async (banner: BannerItem, direction: -1 | 1) => {
+    const index = banners.findIndex((item) => item.id === banner.id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= banners.length) return;
+    const next = [...banners];
+    [next[index], next[target]] = [next[target], next[index]];
+    setBanners(next);
+    await fetch('/api/master/banners/order', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: next.map((item) => item.id) }) });
   };
 
   const addBanner = () => {
     setEditingBanner({
       title: 'Novo comunicado',
       description: 'Descreva aqui o conteúdo do banner.',
-      date: new Date().toLocaleDateString('pt-BR'),
-      type: 'Comunicado',
+      date: '',
+      type: 'Novidade',
       color: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
       iconName: 'sparkles',
+      imageUrl: '',
+      linkUrl: '/suporte',
+      buttonLabel: 'Abrir',
+      startsAt: '',
+      endsAt: '',
+      active: true,
+      audience: 'clients',
+      targetTenants: [],
+      targetModules: [],
       target_roles: [],
+      dismissible: true,
     });
   };
 
@@ -324,6 +325,7 @@ export default function MasterPage() {
             bannerLoading={bannerLoading}
             error={bannerError}
             onEditBanner={setEditingBanner}
+            onMove={moveBanner}
           />
         ) : activeTab === 'tenants' ? (
           <TenantsTab key="tenants" />

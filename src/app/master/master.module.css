@@ -791,3 +791,25 @@
 
 .spin { animation: masterSpin 0.9s linear infinite; }
 @keyframes masterSpin { to { transform: rotate(360deg); } }
+
+/* Banners: situação, ordem e campos novos do editor. */
+.bannerSlot { display: flex; flex-direction: column; gap: 6px; }
+.bannerSlot .bannerEdit { align-self: flex-start; margin-top: 4px; }
+.bannerOff { filter: grayscale(0.7); opacity: 0.6; }
+.bannerState { padding: 3px 9px; border-radius: 100px; font-size: 0.66rem; font-weight: 800; }
+.state_on { background: rgba(16, 185, 129, 0.9); color: #fff; }
+.state_soon { background: rgba(245, 158, 11, 0.95); color: #1c1300; }
+.state_off { background: rgba(0, 0, 0, 0.45); color: #fff; }
+.bannerOrder { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted, #94a3b8); font-size: 0.78rem; font-weight: 700; }
+.bannerOrder button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 28px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--glass-bg); color: var(--foreground); cursor: pointer; }
+.bannerOrder button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.bannerSection { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; border-top: 1px solid var(--card-border); }
+.bannerSection h4 { margin: 8px 0 0; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; }
+.toggleRow { display: flex; align-items: center; gap: 10px; font-size: 0.86rem; cursor: pointer; }
+.toggleRow input { width: 18px; height: 18px; accent-color: var(--brand); }
+.tenantPick { display: flex; flex-direction: column; gap: 4px; max-height: 180px; padding: 8px; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 12px; }
+.tenantPick label { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; font-size: 0.86rem; cursor: pointer; }
+.tenantPick label:hover { background: var(--glass-bg); }
+.imageRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.previewBtn { display: inline-flex; align-self: flex-start; padding: 7px 14px; border-radius: 10px; background: rgba(255, 255, 255, 0.95); color: #111; font-size: 0.8rem; font-weight: 800; }
