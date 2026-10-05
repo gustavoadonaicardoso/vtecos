@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdminProfile } from '@/lib/session';
 import { applyRolePermissions } from '@/services/users.service';
+import { sanitizePermissions } from '@/lib/permissions.constants';
 
 const ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
 
@@ -14,7 +15,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Dados inválidos.' }, { status: 400 });
   }
 
-  const result = await applyRolePermissions(auth.tenantId, role, permissions);
+  const result = await applyRolePermissions(auth.tenantId, role, sanitizePermissions(permissions));
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true });
 }

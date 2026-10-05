@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { updateTeamMember, deleteTeamMember } from '@/services/users.service';
+import { updateTeamMember, deleteTeamMember, fetchMemberSummary, fetchTenantProfile } from '@/services/users.service';
+import { sanitizePermissions } from '@/lib/permissions.constants';
 import { requireAdminProfile } from '@/lib/session';
 
 const ALLOWED_ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
 const ALLOWED_STATUSES = new Set(['ACTIVE', 'INACTIVE']);
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Resumo do membro (leads e metas dele) -- mostrado antes de remover. */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdminProfile();
+  if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+  const { id } = await params;
+  if (!(await fetchTenantProfile(auth.tenantId, id))) return NextResponse.json({ error: 'Membro não encontrado.' }, { status: 404 });
+  return NextResponse.json({ data: await fetchMemberSummary(auth.tenantId, id) });
+}
 
 /**
  * Atualiza um membro da equipe (nome, e-mail, cargo, status, permissões,
@@ -31,6 +42,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!name || !email) {
       return NextResponse.json({ error: 'Nome e e-mail são obrigatórios.' }, { status: 400 });
     }
+    if (!EMAIL.test(email) || name.length > 120) {
+      return NextResponse.json({ error: 'Confira o nome e o e-mail.' }, { status: 400 });
+    }
     if (!ALLOWED_ROLES.has(role)) {
       return NextResponse.json({ error: 'Cargo inválido.' }, { status: 400 });
     }
@@ -42,9 +56,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (id === auth.profile.id && role !== auth.profile.role) {
       return NextResponse.json({ error: 'Você não pode alterar seu próprio cargo.' }, { status: 400 });
     }
+    if (id === auth.profile.id && status !== 'ACTIVE') {
+      return NextResponse.json({ error: 'Você não pode desativar o seu próprio acesso.' }, { status: 400 });
+    }
 
-    const permissions = body.permissions && typeof body.permissions === 'object' ? body.permissions : {};
-    const allowed_templates = Array.isArray(body.allowed_templates) ? body.allowed_templates : [];
+    const permissions = sanitizePermissions(body.permissions);
+    const allowed_templates = Array.isArray(body.allowed_templates)
+      ? body.allowed_templates.filter((item: unknown): item is string => typeof item === 'string').slice(0, 500)
+      : [];
 
     const result = await updateTeamMember(auth.tenantId, id, { name, email, role, status, permissions, allowed_templates });
     if (!result.success) {
@@ -87,7 +106,11 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Você não pode remover sua própria conta.' }, { status: 400 });
     }
 
-    const result = await deleteTeamMember(auth.tenantId, id);
+    // Quem recebe os leads da pessoa removida (vazio = ficam sem responsável).
+    const transferParam = new URL(request.url).searchParams.get('transferTo');
+    const transferTo = transferParam && transferParam !== 'none' ? transferParam : null;
+
+    const result = await deleteTeamMember(auth.tenantId, id, transferTo);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -95,7 +118,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     await logAudit(
       { id: auth.profile.id, name: auth.profile.name },
       'SETTINGS_UPDATE',
-      `Removeu o membro ${id} da equipe.`,
+      `Removeu o membro ${id} da equipe${transferTo ? ` e passou os leads para ${transferTo}` : ''}.`,
       'profile',
       id,
       supabaseAdmin,

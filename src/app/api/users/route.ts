@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { fetchProfiles, createUserWithProfile } from '@/services/users.service';
+import { fetchProfiles, createUserWithProfile, fetchTenantTemplates } from '@/services/users.service';
+import { ROLE_DEFAULT_PERMISSIONS, sanitizePermissions, type TeamRole } from '@/lib/permissions.constants';
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 import { requireActiveProfile, requireAdminProfile, requireAdminOrManagerProfile } from '@/lib/session';
 
 const ALLOWED_ROLES = new Set(['ADMIN', 'MANAGER', 'SELLER']);
@@ -28,7 +31,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
-    return NextResponse.json({ data: result.data }, { status: 200 });
+    // Equipe: junto vão os modelos de mensagem da empresa (liberados por pessoa).
+    const templates = scope === 'team' && auth.modules.includes('crm') ? await fetchTenantTemplates(auth.tenantId) : [];
+    return NextResponse.json({ data: result.data, templates }, { status: 200 });
   } catch (error: unknown) {
     console.error('List profiles error:', error);
     return NextResponse.json(
@@ -72,10 +77,14 @@ export async function POST(request: Request) {
     if (!ALLOWED_ROLES.has(role)) {
       return NextResponse.json({ error: 'Cargo inválido.' }, { status: 400 });
     }
+    if (!EMAIL.test(email) || name.length > 120) {
+      return NextResponse.json({ error: 'Confira o nome e o e-mail.' }, { status: 400 });
+    }
 
+    // Só as permissões que o sistema conhece; sem nada, vale o padrão do cargo.
     const permissions = body.permissions && typeof body.permissions === 'object'
-      ? body.permissions
-      : {};
+      ? sanitizePermissions(body.permissions)
+      : ROLE_DEFAULT_PERMISSIONS[role as TeamRole];
 
     // O usuário novo entra sempre na empresa de quem está criando.
     const result = await createUserWithProfile({ tenantId: auth.tenantId, name, email, password, role, permissions });

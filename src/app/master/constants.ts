@@ -8,6 +8,7 @@ import {
   LifeBuoy,
   MessageCircle,
   MessageSquare,
+  MessageSquareText,
   Palette,
   RotateCcw,
   Settings,
@@ -15,11 +16,13 @@ import {
   ShieldCheck,
   Share2,
   Calculator,
+  UserPlus,
   Users as UsersIcon,
   Workflow,
   Zap,
 } from 'lucide-react';
 import { BANNER_ICONS } from '@/components/home/bannerIcons';
+import { PERMISSION_ITEMS, ROLE_DEFAULT_PERMISSIONS } from '@/lib/permissions.constants';
 import type { MasterSettings, RolePermissions, TabId } from './types';
 
 export const DEFAULT_SETTINGS: MasterSettings = {
@@ -31,11 +34,8 @@ export const DEFAULT_SETTINGS: MasterSettings = {
   sidebarBg: '',
 };
 
-export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = {
-  ADMIN: { dashboard: { view: true, kpis: true }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: true }, team: { view: true }, automations: { view: true }, integrations: { view: true }, admin: { projects: true, settings: true }, planejamentos: { view: true }, social: { view: true }, financeiro: { view: true } },
-  MANAGER: { dashboard: { view: true, kpis: true }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: true }, team: { view: true }, automations: { view: false }, integrations: { view: true }, admin: { projects: true, settings: false }, planejamentos: { view: true }, social: { view: true }, financeiro: { view: true } },
-  SELLER: { dashboard: { view: true, kpis: false }, pipeline: { view: true }, leads: { view: true }, messages: { view: true, send: false }, team: { view: false }, automations: { view: false }, integrations: { view: false }, admin: { projects: false, settings: false }, planejamentos: { view: true }, social: { view: true }, financeiro: { view: false } },
-};
+/** Padrões por cargo: os mesmos da tela Equipe (catálogo em permissions.constants). */
+export const DEFAULT_ROLE_PERMISSIONS: RolePermissions = ROLE_DEFAULT_PERMISSIONS;
 
 export const SIDEBAR_PRESETS = [
   { label: 'Padrão (Sistema)', value: '' },
@@ -158,22 +158,29 @@ export const MASTER_MODULES: { id: string; title: string; desc: string; icon: ty
   },
 ];
 
-/** Cada item corresponde a uma permissão; o rótulo lista as telas que ela libera. */
-export const MENU_PERMISSION_ITEMS = [
-  { id: 'dashboard.view', label: 'Início e Metas', icon: Layout, cat: 'dashboard', field: 'view' },
-  { id: 'dashboard.kpis', label: 'Relatórios e KPIs', icon: BarChart3, cat: 'dashboard', field: 'kpis' },
-  { id: 'admin.projects', label: 'Projetos', icon: ClipboardList, cat: 'admin', field: 'projects' },
-  { id: 'planejamentos.view', label: 'Planejamentos (Funis)', icon: Workflow, cat: 'planejamentos', field: 'view' },
-  { id: 'social.view', label: 'Redes Sociais', icon: Share2, cat: 'social', field: 'view' },
-  { id: 'financeiro.view', label: 'Custos e Precificação', icon: Calculator, cat: 'financeiro', field: 'view' },
-  { id: 'messages.view', label: 'Mensagens (WhatsApp)', icon: MessageSquare, cat: 'messages', field: 'view' },
-  { id: 'messages.send', label: 'Chat Interno e Disparos', icon: MessageCircle, cat: 'messages', field: 'send' },
-  { id: 'pipeline.view', label: 'Pipeline (Kanban)', icon: RotateCcw, cat: 'pipeline', field: 'view' },
-  { id: 'leads.view', label: 'Leads e Discador', icon: UsersIcon, cat: 'leads', field: 'view' },
-  { id: 'integrations.view', label: 'Integrações, Agendamento, Senhas e Notas Fiscais', icon: Blocks, cat: 'integrations', field: 'view' },
-  { id: 'team.view', label: 'Equipe', icon: Settings, cat: 'team', field: 'view' },
-  { id: 'automations.view', label: 'Automações', icon: Zap, cat: 'automations', field: 'view' },
-];
+const PERMISSION_ICONS: Record<string, typeof Layout> = {
+  'dashboard.view': Layout,
+  'dashboard.kpis': BarChart3,
+  'admin.projects': ClipboardList,
+  'planejamentos.view': Workflow,
+  'social.view': Share2,
+  'financeiro.view': Calculator,
+  'messages.view': MessageSquare,
+  'messages.send': MessageCircle,
+  'pipeline.view': RotateCcw,
+  'leads.view': UsersIcon,
+  'integrations.view': Blocks,
+  'team.view': Settings,
+  'automations.view': Zap,
+  'leads.create': UserPlus,
+  'messages.templates': MessageSquareText,
+};
+
+/** Cada item corresponde a uma permissão do catálogo único (o mesmo da tela Equipe). */
+export const MENU_PERMISSION_ITEMS = PERMISSION_ITEMS.map((permission) => ({
+  ...permission,
+  icon: PERMISSION_ICONS[permission.id] || Settings,
+}));
 
 export const ROLE_TABS: { value: 'ADMIN' | 'MANAGER' | 'SELLER'; icon: typeof ShieldCheck }[] = [
   { value: 'ADMIN', icon: ShieldCheck },
