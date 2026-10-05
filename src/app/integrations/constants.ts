@@ -112,7 +112,7 @@ export interface PlatformService {
 
 export interface Overview {
   integrations: IntegrationView[];
-  whatsappWeb: { status: string; connected: boolean; qrCode: string | null; phone?: string | null } | null;
+  whatsappWeb: { status: string; connected: boolean; qrCode: string | null; phone?: string | null; lastError?: string | null } | null;
   socialAccounts: number | null;
   platform: PlatformService[] | null;
 }

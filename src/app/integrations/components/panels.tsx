@@ -65,7 +65,7 @@ export function WhatsAppWebPanel({ overview, onChanged }: PanelProps) {
     setFeedback(null);
     setWaiting(true);
     attempts.current = 0;
-    const response = await fetch('/api/whatsapp/web/connection', { cache: 'no-store' });
+    const response = await fetch('/api/whatsapp/web/connection', { method: 'POST', cache: 'no-store' });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) {
       setWaiting(false);
@@ -86,9 +86,13 @@ export function WhatsAppWebPanel({ overview, onChanged }: PanelProps) {
         setWaiting(false);
         setFeedback({ type: 'success', text: 'WhatsApp conectado. As mensagens já chegam em Mensagens.' });
         onChanged();
-      } else if (attempts.current >= 60) {
+      } else if (json?.status === 'disconnected' && json.lastError) {
+        // O servidor desistiu e disse por quê (QR expirou, número aberto em outro lugar...).
         setWaiting(false);
-        setFeedback({ type: 'error', text: 'O QR Code expirou. Clique em Gerar QR Code de novo.' });
+        setFeedback({ type: 'error', text: json.lastError });
+      } else if (attempts.current >= 90) {
+        setWaiting(false);
+        setFeedback({ type: 'error', text: json?.qrCode ? 'O QR Code expirou. Clique em Gerar QR Code de novo.' : 'O WhatsApp não respondeu a tempo. Clique em Gerar QR Code de novo.' });
       }
     }, 2000);
     return () => window.clearInterval(timer);
@@ -113,7 +117,7 @@ export function WhatsAppWebPanel({ overview, onChanged }: PanelProps) {
         <PlugZap size={20} />
         <div>
           <strong>{connected ? 'Conectado' : waiting ? 'Aguardando a leitura do QR Code' : 'Desconectado'}</strong>
-          <span>{connected ? `Número ${status?.phone || 'conectado'}` : 'Gere o QR Code e leia com o WhatsApp do celular da empresa.'}</span>
+          <span>{connected ? `Número ${status?.phone || 'conectado'}` : !waiting && !feedback && status?.lastError ? status.lastError : 'Gere o QR Code e leia com o WhatsApp do celular da empresa.'}</span>
         </div>
       </div>
 
