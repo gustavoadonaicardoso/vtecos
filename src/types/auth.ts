@@ -48,4 +48,17 @@ export interface UserProfile {
   allowed_templates?: string[]; // empty = vê todos; com IDs = apenas os listados
   phone?: string | null;
   avatar_url?: string | null;
+  /** Admin da Vórtice dentro de uma empresa cliente (modo suporte). */
+  support_access?: SupportAccessInfo | null;
+}
+
+export interface SupportAccessInfo {
+  session_id: string;
+  tenant_id: string;
+  tenant_name: string;
+  reason: string;
+  started_at: string;
+  expires_at: string;
+  /** Empresa de verdade da pessoa (a Vórtice). */
+  home_tenant_id: string;
 }

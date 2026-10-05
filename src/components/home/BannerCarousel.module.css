@@ -317,3 +317,37 @@
     border-radius: var(--glass-radius);
   }
 }
+
+/* ── Destino, fechar e imagem (banners personalizados) ── */
+.card { cursor: default; }
+.clickable { cursor: pointer; }
+.single { flex: 1 1 100%; max-width: 100%; }
+.dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  cursor: pointer;
+}
+.dismiss:hover { background: rgba(0, 0, 0, 0.45); }
+.cardDate { display: inline-flex; align-items: center; gap: 6px; }
+.cardFooter { justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 10px; opacity: 1; }
+.cardFooter .actionBtn {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+}
+.cardContent { padding-right: 18px; }

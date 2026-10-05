@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Building2, Check, ChevronDown, ChevronUp, KeyRound, Layers, Pencil, Plus, Trash2, UserPlus, X,
+  Building2, Check, ChevronDown, ChevronUp, KeyRound, Layers, LogIn, Pencil, Plus, Trash2, UserPlus, X,
 } from 'lucide-react';
 import styles from './TenantsTab.module.css';
 import { PLAN_MODULES, moduleByKey } from '@/lib/plans';
@@ -65,6 +65,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export default function TenantsTab() {
+  const [supportTarget, setSupportTarget] = useState<Tenant | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -305,6 +306,16 @@ export default function TenantsTab() {
                   <button className={styles.secondary} onClick={() => setExpanded(expanded === tenant.id ? null : tenant.id)}>
                     <KeyRound size={15} /> Acessos {expanded === tenant.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                   </button>
+                  {!tenant.is_platform && (
+                    <button
+                      className={styles.secondary}
+                      title="Entrar nesta empresa como administrador (modo suporte)"
+                      disabled={tenant.status !== 'ACTIVE'}
+                      onClick={() => setSupportTarget(tenant)}
+                    >
+                      <LogIn size={15} /> Entrar como admin
+                    </button>
+                  )}
                 </div>
               </div>
               {(tenant.document || tenant.contact_email) && (
@@ -320,6 +331,8 @@ export default function TenantsTab() {
           {!loading && tenants.length === 0 && <p className={styles.muted}>Nenhuma empresa cadastrada.</p>}
         </div>
       </section>
+
+      {supportTarget && <SupportAccessModal tenant={supportTarget} onClose={() => setSupportTarget(null)} />}
 
       {tenantForm && (
         <div className={styles.overlay} onClick={() => setTenantForm(null)}>
@@ -509,6 +522,61 @@ function TenantUsers({ tenant, onChanged }: { tenant: Tenant; onChanged: () => v
           {Object.entries(ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <button type="submit" className={styles.primary} disabled={saving}><UserPlus size={16} /> {saving ? 'Criando…' : 'Criar acesso'}</button>
+      </form>
+    </div>
+  );
+}
+
+/**
+ * Modo suporte: o admin da Vórtice entra na empresa do cliente como
+ * administrador por até 2 h. O motivo fica na auditoria do cliente.
+ */
+function SupportAccessModal({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const enter = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    const response = await fetch('/api/support-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId: tenant.id, reason }),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setBusy(false);
+      setError(json.error || 'Não foi possível entrar na empresa.');
+      return;
+    }
+    // Recarrega tudo já "dentro" da empresa do cliente.
+    window.location.href = '/';
+  };
+
+  return (
+    <div className={styles.overlay} onClick={() => !busy && onClose()}>
+      <form className={styles.modal} onClick={(event) => event.stopPropagation()} onSubmit={enter} role="dialog" aria-modal="true" aria-label="Entrar como administrador">
+        <div className={styles.modalHead}>
+          <h3>Entrar em {tenant.name}</h3>
+          <button type="button" className={styles.icon} onClick={onClose} aria-label="Fechar"><X size={16} /></button>
+        </div>
+        <p className={styles.muted} style={{ margin: 0 }}>
+          Você vai usar o sistema como <strong>administrador desta empresa</strong> por até 2 horas: vê e altera os dados dela como o cliente vê.
+          Uma faixa amarela no topo mostra que você está no modo suporte, com o botão para sair. O Painel Master fica indisponível até você sair.
+        </p>
+        <label className={styles.inlineField} style={{ alignItems: 'stretch' }}>
+          <span>Motivo (fica registrado na auditoria do cliente)</span>
+          <textarea className={styles.input} rows={3} maxLength={300} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ex.: Chamado #1012 — conferir a conexão do WhatsApp" autoFocus />
+        </label>
+        {error && <p className={styles.warn} style={{ margin: 0 }}>{error}</p>}
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.secondary} onClick={onClose} disabled={busy}>Cancelar</button>
+          <button type="submit" className={styles.primary} disabled={busy || reason.trim().length < 5}>
+            <LogIn size={16} /> {busy ? 'Entrando…' : 'Entrar como admin'}
+          </button>
+        </div>
       </form>
     </div>
   );

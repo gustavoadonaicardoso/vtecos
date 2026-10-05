@@ -13,16 +13,7 @@ export type Role = 'ADMIN' | 'MANAGER' | 'SELLER';
 
 export type RolePermissions = Record<string, Record<string, Record<string, boolean>>>;
 
-export interface BannerItem {
-  id?: string;
-  title: string;
-  description: string;
-  date: string;
-  type: string;
-  color: string;
-  iconName?: string;
-  target_roles: string[];
-}
+export type { BannerItem } from '@/lib/banners';
 
 export interface Tenant {
   id: string;
