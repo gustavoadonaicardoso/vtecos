@@ -1,525 +1,348 @@
 "use client";
 
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Users, 
-  UserCheck, 
-  UserMinus, 
-  Search, 
-  Plus, 
-  MoreHorizontal, 
-  MessageSquare, 
-  Edit3, 
-  Eye, 
-  Trash2, 
-  Ban,
-  Filter,
-  Globe,
-  MoreVertical,
-  X,
-  Check,
-  Tag as TagIcon,
-  MessageCircle
-} from 'lucide-react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { AlertTriangle, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, Loader2, MessageSquare, Plus, Search, Tag as TagIcon, Trash2, UserX, Users, X } from 'lucide-react';
 
 import styles from './leads.module.css';
-import { useLeads } from '@/context/LeadContext';
+import { useLeads, type BulkAction } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
-import ThemeToggle from '@/components/ThemeToggle';
-import NotificationDropdown from '@/components/NotificationDropdown';
-import { Bell, HelpCircle } from 'lucide-react';
-import Link from 'next/link';
+import type { Lead } from '@/types';
+import { TagBadge } from '@/components/leads/TagPicker';
+import { useTeam } from '@/components/leads/useTeam';
+import LeadPanel from './components/LeadPanel';
+import TagsManager from './components/TagsManager';
+import { digits, exportCsv, initials } from './format';
 
-const ChannelIcon = ({ type }: { type: string }) => {
-  switch (type.toLowerCase()) {
-    case 'whatsapp': return <MessageCircle size={16} style={{ color: '#25D366' }} />;
-    case 'instagram': return <Globe size={16} style={{ color: '#E4405F' }} />;
-    case 'facebook': return <Globe size={16} style={{ color: '#1877F2' }} />;
-    case 'site': return <Globe size={16} style={{ color: '#3498db' }} />;
-    default: return <Globe size={16} />;
-  }
-};
+const PAGE_SIZE = 50;
+type Quick = 'all' | 'new' | 'unassigned' | 'blocked';
+type Sort = 'recent' | 'oldest' | 'name' | 'value';
 
-export default function LeadsPage() {
-  const { leads, openModal, tags, addTag, deleteTag, updateLead, deleteLead } = useLeads();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedLead, setSelectedLead] = useState<any>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<any>(null);
-  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
-  const [newTag, setNewTag] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('Todos');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
+function LeadsContent() {
+  const { leads, pipelineStages, loaded, openModal, tags, refreshTags, updateLead, deleteLead, bulkUpdate } = useLeads();
   const { user } = useAuth();
+  const canAssign = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const team = useTeam(Boolean(user));
+  const router = useRouter();
+  const pathname = usePathname();
+  const openId = useSearchParams().get('lead');
 
-  React.useEffect(() => {
-    const fetchProfiles = async () => {
-      if (!supabase) return;
-      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').order('name');
-      if (data) setProfiles(data);
-    };
-    fetchProfiles();
-  }, []);
+  const [query, setQuery] = useState('');
+  const [quick, setQuick] = useState<Quick>('all');
+  const [stage, setStage] = useState('');
+  const [owner, setOwner] = useState('');
+  const [tag, setTag] = useState('');
+  const [source, setSource] = useState('');
+  const [sort, setSort] = useState<Sort>('recent');
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showTags, setShowTags] = useState(false);
+  const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = 
-      lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.phone.includes(searchTerm) ||
-      lead.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = filterStatus === 'Todos' || lead.status === filterStatus;
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
 
-    return matchesSearch && matchesStatus;
+  const stageName = (id: string) => pipelineStages.find((item) => item.id === id)?.name || 'Sem etapa';
+  const stageColor = (id: string) => pipelineStages.find((item) => item.id === id)?.color || '#64748b';
+  const ownerName = (id?: string | null) => (id ? team.find((member) => member.id === id)?.name || '—' : 'Sem responsável');
+  const tagColor = (name: string) => tags.find((item) => item.name.toLowerCase() === name.toLowerCase())?.color;
+  const [weekAgo] = useState(() => Date.now() - 7 * 86400_000);
+
+  const sources = useMemo(() => Array.from(new Set(leads.map((lead) => lead.source || '').filter(Boolean))).sort(), [leads]);
+
+  const counts = useMemo(() => ({
+    all: leads.length,
+    new: leads.filter((lead) => lead.createdAt && new Date(lead.createdAt).getTime() >= weekAgo).length,
+    unassigned: leads.filter((lead) => !lead.assignedTo).length,
+    blocked: leads.filter((lead) => lead.status === 'Bloqueado').length,
+  }), [leads, weekAgo]);
+
+  const filtered = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    const phoneText = digits(query);
+    const list = leads.filter((lead) => {
+      if (quick === 'new' && !(lead.createdAt && new Date(lead.createdAt).getTime() >= weekAgo)) return false;
+      if (quick === 'unassigned' && lead.assignedTo) return false;
+      if (quick === 'blocked' ? lead.status !== 'Bloqueado' : false) return false;
+      if (stage && lead.pipelineStage !== stage) return false;
+      if (owner && (owner === 'none' ? lead.assignedTo : lead.assignedTo !== owner)) return false;
+      if (tag && !lead.tags.some((item) => item.toLowerCase() === tag.toLowerCase())) return false;
+      if (source && lead.source !== source) return false;
+      if (!text) return true;
+      return lead.name.toLowerCase().includes(text)
+        || lead.email.toLowerCase().includes(text)
+        || (phoneText.length >= 3 && digits(lead.phone).includes(phoneText))
+        || lead.tags.some((item) => item.toLowerCase().includes(text));
+    });
+    const time = (lead: Lead) => (lead.createdAt ? new Date(lead.createdAt).getTime() : 0);
+    return list.sort((a, b) =>
+      sort === 'name' ? a.name.localeCompare(b.name, 'pt-BR')
+        : sort === 'value' ? (b.valueNumber ?? 0) - (a.valueNumber ?? 0)
+          : sort === 'oldest' ? time(a) - time(b)
+            : time(b) - time(a));
+  }, [leads, query, quick, stage, owner, tag, source, sort, weekAgo]);
+
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(page, pages - 1);
+  const visible = filtered.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+  const hasFilters = Boolean(query || quick !== 'all' || stage || owner || tag || source);
+  const allVisibleSelected = visible.length > 0 && visible.every((lead) => selected.has(lead.id));
+  const openLead = leads.find((lead) => lead.id === openId) || null;
+
+  const resetPage = <T,>(setter: (value: T) => void) => (value: T) => {
+    setter(value);
+    setPage(0);
+  };
+
+  const clearFilters = () => {
+    setQuery('');
+    setQuick('all');
+    setStage('');
+    setOwner('');
+    setTag('');
+    setSource('');
+    setPage(0);
+  };
+
+  const toggle = (id: string) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
   });
 
-  const kpis = [
-    { label: 'Total de Leads', value: leads.length.toString(), icon: Users, color: '#3b82f6' },
-    { label: 'Leads Ativos', value: leads.filter(l => l.status === 'Ativo').length.toString(), icon: UserCheck, color: '#10b981' },
-    { label: 'Leads Bloqueados', value: leads.filter(l => l.status === 'Bloqueado').length.toString(), icon: UserMinus, color: '#ef4444' },
-  ];
+  const toggleVisible = () => setSelected((prev) => {
+    const next = new Set(prev);
+    visible.forEach((lead) => (allVisibleSelected ? next.delete(lead.id) : next.add(lead.id)));
+    return next;
+  });
 
-  // Notificações não lidas -- a leitura passa pela API autenticada
-  // (/api/notifications), então atualiza por polling.
-  React.useEffect(() => {
-    if (!user) return;
+  const runBulk = async (action: BulkAction, value: string | null = null) => {
+    const ids = Array.from(selected);
+    if (action === 'delete' && !confirm(`Excluir ${ids.length} lead(s)? Não dá para desfazer.`)) return;
+    setBusy(true);
+    const result = await bulkUpdate(ids, action, value);
+    setBusy(false);
+    if (!result.ok) {
+      setNotice({ type: 'error', text: result.error });
+      return;
+    }
+    setNotice({ type: 'ok', text: `${result.count ?? 0} lead(s) atualizado(s).` });
+    if (action === 'delete') setSelected(new Set());
+  };
 
-    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
-
-    fetchCount();
-    const interval = setInterval(fetchCount, 20_000);
-
-    return () => clearInterval(interval);
-  }, [user]);
+  const openPanel = (id: string | null) => router.replace(id ? `${pathname}?lead=${id}` : pathname, { scroll: false });
 
   return (
     <div className={styles.container}>
       <header className={styles.header}>
         <div>
-          <h1>{user?.role === 'SELLER' ? 'Meus Leads' : 'Gestão de Leads'}</h1>
-          <p>
-            {user?.role === 'SELLER' 
-              ? 'Visualize e gerencie seus contatos e leads atribuídos.' 
-              : 'Visualize e gerencie todos os contatos da sua base em um só lugar.'}
-          </p>
+          <h1>{canAssign ? 'Leads' : 'Meus leads'}</h1>
+          <p>{canAssign ? 'Todos os contatos da empresa. Clique em um lead para ver e editar.' : 'Os contatos que estão com você. Clique em um lead para ver e editar.'}</p>
         </div>
         <div className={styles.headerActions}>
-
-          <button className={styles.tagBtn} onClick={() => setIsTagModalOpen(true)}>
-            <TagIcon size={18} /> Configurar Tags
+          {canAssign && (
+            <button type="button" className={styles.secondaryBtn} onClick={() => setShowTags(true)}>
+              <TagIcon size={16} /> Etiquetas
+            </button>
+          )}
+          <button type="button" className={styles.secondaryBtn} onClick={() => exportCsv(filtered, stageName, ownerName)} disabled={filtered.length === 0}>
+            <Download size={16} /> Exportar {hasFilters ? 'filtrados' : ''}
           </button>
-          <button className={styles.primaryBtn} onClick={openModal}>
-            <Plus size={18} /> Novo Lead
+          <button type="button" className={styles.primaryBtn} onClick={openModal}>
+            <Plus size={16} /> Novo lead
           </button>
         </div>
       </header>
 
-      <section className={styles.kpiGrid}>
-        {kpis.map((kpi, i) => (
-          <motion.div 
-            key={kpi.label}
-            className={styles.kpiCard}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-          >
-            <div className={styles.kpiIcon} style={{ backgroundColor: `${kpi.color}15`, color: kpi.color }}>
-              <kpi.icon size={24} />
-            </div>
-            <div className={styles.kpiInfo}>
-              <span className={styles.kpiLabel}>{kpi.label}</span>
-              <span className={styles.kpiValue}>{kpi.value}</span>
-            </div>
-          </motion.div>
+      <div className={styles.quick} role="tablist" aria-label="Atalhos">
+        {([
+          ['all', 'Todos', Users],
+          ['new', 'Novos em 7 dias', Plus],
+          ...(canAssign ? [['unassigned', 'Sem responsável', UserX]] : []),
+          ['blocked', 'Bloqueados', Ban],
+        ] as [Quick, string, typeof Users][]).map(([value, label, Icon]) => (
+          <button key={value} type="button" role="tab" aria-selected={quick === value} className={`${styles.quickCard} ${quick === value ? styles.quickOn : ''}`} onClick={() => resetPage(setQuick)(quick === value && value !== 'all' ? 'all' : value)}>
+            <Icon size={18} />
+            <span>{label}</span>
+            <strong>{counts[value]}</strong>
+          </button>
         ))}
-      </section>
-
-      <div className={styles.listContainer}>
-        <div className={styles.listHeader}>
-          <div className={styles.searchBar}>
-            <Search size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar por nome, telefone ou tag..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className={styles.filterContainer}>
-            <button className={`${styles.filterBtn} ${filterStatus !== 'Todos' ? styles.filterActive : ''}`} onClick={() => setIsFilterOpen(!isFilterOpen)}>
-              <Filter size={18} /> {filterStatus === 'Todos' ? 'Filtrar' : filterStatus}
-            </button>
-            <AnimatePresence>
-              {isFilterOpen && (
-                <motion.div 
-                  className={styles.filterDropdown}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                >
-                  <div className={styles.filterOption} onClick={() => { setFilterStatus('Todos'); setIsFilterOpen(false); }}>Todos</div>
-                  <div className={styles.filterOption} onClick={() => { setFilterStatus('Ativo'); setIsFilterOpen(false); }}>Ativos</div>
-                  <div className={styles.filterOption} onClick={() => { setFilterStatus('Bloqueado'); setIsFilterOpen(false); }}>Bloqueados</div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Nome do Lead</th>
-                <th>Telefone</th>
-                <th>Tags</th>
-                <th>Canais</th>
-                <th>Entrada</th>
-                <th>Última Msg</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLeads.map((lead) => (
-                <tr key={lead.id}>
-                  <td>
-                    <div className={styles.leadCell}>
-                      <div className={styles.avatar} style={{ background: `linear-gradient(135deg, ${lead.color}, #000)` }}>
-                        {lead.name[0]}
-                      </div>
-                      <span className={styles.leadName}>{lead.name}</span>
-                    </div>
-                  </td>
-                  <td>{lead.phone}</td>
-                  <td>
-                    <div className={styles.tagList}>
-                      {lead.tags.map(tag => (
-                        <span key={tag} className={styles.tagBadge}>{tag}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td>
-                    <div className={styles.channelList}>
-                      {lead.channels.map(ch => (
-                        <div key={ch} className={styles.channelIcon}>
-                          <ChannelIcon type={ch} />
-                        </div>
-                      ))}
-                    </div>
-                  </td>
-                  <td>{lead.entryDate}</td>
-                  <td>{lead.lastMsg}</td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${lead.status === 'Ativo' ? styles.statusActive : styles.statusBlocked}`}>
-                      {lead.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div className={styles.actions}>
-                      <button className={styles.actionBtn} title="Mensagem" onClick={() => window.location.href = `/messages?chatId=${lead.id}`}><MessageSquare size={16} /></button>
-                      <button className={styles.actionBtn} title="Ver Detalhes" onClick={() => setSelectedLead(lead)}><Eye size={16} /></button>
-                      <button className={styles.actionBtn} title="Editar" onClick={() => { setSelectedLead(lead); setIsEditing(true); setEditForm({...lead}); }}><Edit3 size={16} /></button>
-                      <button className={styles.actionBtn} title="Excluir" onClick={() => { if(window.confirm('Excluir este lead?')) deleteLead(lead.id); }}><Trash2 size={16} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
-      {/* Modal de Detalhes Completo */}
-      {selectedLead && (
-        <div className={styles.modalOverlay} onClick={() => { setSelectedLead(null); setIsEditing(false); }}>
-          <motion.div 
-            className={styles.modal}
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className={styles.modalHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className={styles.tagIconWrapper}>
-                  <Users size={20} color="#3b82f6" />
-                </div>
-                <div>
-                  <h2 style={{ margin: 0 }}>{isEditing ? 'Editar Lead' : 'Detalhes do Lead'}</h2>
-                  <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.5 }}>
-                    {isEditing ? 'Atualize as informações do contato' : 'Visualize todas as informações do lead'}
-                  </p>
-                </div>
-              </div>
-              <button className={styles.closeBtn} onClick={() => { setSelectedLead(null); setIsEditing(false); }}><X size={20} /></button>
-            </header>
-
-            <div className={styles.modalContent}>
-              <div className={styles.modalProfile}>
-                <div className={styles.largeAvatar} style={{ background: `linear-gradient(135deg, ${selectedLead.color || '#3b82f6'}, #000)` }}>
-                  {selectedLead.name[0]}
-                </div>
-                {!isEditing ? (
-                  <>
-                    <h3 style={{ margin: '0.5rem 0 0.2rem' }}>{selectedLead.name}</h3>
-                    <p style={{ opacity: 0.6, fontSize: '0.9rem' }}>{selectedLead.phone}</p>
-                  </>
-                ) : (
-                  <div style={{ marginTop: '1rem', width: '100%' }}>
-                    <div className={styles.editInputGroup}>
-                      <label>Nome Completo</label>
-                      <input 
-                        className={styles.editInput}
-                        value={editForm?.name || ''} 
-                        onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className={styles.modalInfoGrid}>
-                {isEditing ? (
-                  <>
-                    <div className={styles.editInputGroup}>
-                      <label>E-mail</label>
-                      <input 
-                        className={styles.editInput}
-                        value={editForm?.email || ''} 
-                        onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                      />
-                    </div>
-                    <div className={styles.editInputGroup}>
-                      <label>Telefone</label>
-                      <input 
-                        className={styles.editInput}
-                        value={editForm?.phone || ''} 
-                        onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                      />
-                    </div>
-                    <div className={styles.editInputGroup}>
-                      <label>CPF/CNPJ</label>
-                      <input 
-                        className={styles.editInput}
-                        value={editForm?.cpf_cnpj || ''} 
-                        onChange={(e) => setEditForm({...editForm, cpf_cnpj: e.target.value})}
-                      />
-                    </div>
-                    <div className={styles.editInputGroup}>
-                      <label>Valor (R$)</label>
-                      <input 
-                        className={styles.editInput}
-                        type="number"
-                        value={editForm?.value || 0} 
-                        onChange={(e) => setEditForm({...editForm, value: parseFloat(e.target.value)})}
-                      />
-                    </div>
-                    {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
-                      <div className={styles.editInputGroup}>
-                        <label>Responsável</label>
-                        <select 
-                          className={styles.editInput}
-                          value={editForm?.assignedTo || ''}
-                          onChange={(e) => setEditForm({...editForm, assignedTo: e.target.value || null})}
-                          style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px', color: 'var(--text-primary)' }}
-                        >
-                          <option value="">Sem responsável</option>
-                          {profiles.map(p => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className={styles.infoItem}>
-                      <label>E-mail</label>
-                      <span>{selectedLead.email || 'Não informado'}</span>
-                    </div>
-                    <div className={styles.infoItem}>
-                      <label>Telefone</label>
-                      <span>{selectedLead.phone}</span>
-                    </div>
-                    <div className={styles.infoItem}>
-                      <label>CPF/CNPJ</label>
-                      <span>{selectedLead.cpf_cnpj || 'Não informado'}</span>
-                    </div>
-                    <div className={styles.infoItem}>
-                      <label>Valor</label>
-                      <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedLead.value || 0)}</span>
-                    </div>
-                    <div className={styles.infoItem}>
-                      <label>Responsável</label>
-                      <span>
-                        {selectedLead.assignedTo 
-                          ? (profiles.find(p => p.id === selectedLead.assignedTo)?.name || 'Carregando...') 
-                          : 'Sem responsável'}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className={styles.tagSection} style={{ marginTop: '1.5rem' }}>
-                <label style={{ fontSize: '0.75rem', opacity: 0.4, textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>Tags do Lead</label>
-                <div className={styles.tagListFull}>
-                  {(isEditing ? (editForm?.tags || []) : (selectedLead.tags || [])).map((tag: string) => (
-                    <span key={tag} className={styles.tagBadgeLarge}>
-                      {tag}
-                      {isEditing && (
-                        <button 
-                          onClick={() => setEditForm({...editForm, tags: editForm.tags.filter((t: string) => t !== tag)})}
-                          style={{ background: 'none', border: 'none', marginLeft: '6px', cursor: 'pointer', display: 'flex' }}
-                        >
-                          <X size={12} />
-                        </button>
-                      )}
-                    </span>
-                  ))}
-                  {isEditing && (
-                    <div className={styles.addTagSmall}>
-                      <Plus size={14} />
-                      <select 
-                        onChange={(e) => {
-                          if (e.target.value && !editForm.tags.includes(e.target.value)) {
-                            setEditForm({...editForm, tags: [...editForm.tags, e.target.value]});
-                          }
-                          e.target.value = '';
-                        }}
-                        style={{ background: 'none', border: 'none', color: 'inherit', outline: 'none', cursor: 'pointer' }}
-                      >
-                        <option value="">Add Tag</option>
-                        {tags.filter(t => !editForm.tags.includes(t)).map(t => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <footer className={styles.modalFooter}>
-              {isEditing ? (
-                <>
-                  <button className={styles.cancelBtn} onClick={() => setIsEditing(false)}>Cancelar</button>
-                  <button 
-                    className={styles.saveBtn}
-                    onClick={() => {
-                      updateLead(selectedLead.id, editForm);
-                      setSelectedLead({...editForm});
-                      setIsEditing(false);
-                    }}
-                  >
-                    Salvar Alterações <Check size={18} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button 
-                    className={styles.editBtn} 
-                    onClick={() => { 
-                      setIsEditing(true); 
-                      setEditForm({...selectedLead}); 
-                    }}
-                  >
-                    <Edit3 size={18} /> Editar Lead
-                  </button>
-                  <button 
-                    className={styles.primaryBtn}
-                    onClick={() => window.location.href = `/messages?chatId=${selectedLead.id}`}
-                  >
-                    Abrir Conversa <MessageSquare size={18} />
-                  </button>
-                </>
-              )}
-            </footer>
-          </motion.div>
+      <section className={styles.listCard}>
+        <div className={styles.toolbar}>
+          <label className={styles.search}>
+            <Search size={16} />
+            <input type="search" placeholder="Buscar por nome, telefone, e-mail ou etiqueta" value={query} onChange={(e) => resetPage(setQuery)(e.target.value)} />
+          </label>
+          <select className={styles.select} value={stage} onChange={(e) => resetPage(setStage)(e.target.value)} aria-label="Etapa">
+            <option value="">Todas as etapas</option>
+            {pipelineStages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          {canAssign && (
+            <select className={styles.select} value={owner} onChange={(e) => resetPage(setOwner)(e.target.value)} aria-label="Responsável">
+              <option value="">Todos os responsáveis</option>
+              <option value="none">Sem responsável</option>
+              {team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+            </select>
+          )}
+          <select className={styles.select} value={tag} onChange={(e) => resetPage(setTag)(e.target.value)} aria-label="Etiqueta">
+            <option value="">Todas as etiquetas</option>
+            {tags.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+          </select>
+          {sources.length > 1 && (
+            <select className={styles.select} value={source} onChange={(e) => resetPage(setSource)(e.target.value)} aria-label="Origem">
+              <option value="">Todas as origens</option>
+              {sources.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          )}
+          <select className={styles.select} value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Ordenar">
+            <option value="recent">Mais recentes</option>
+            <option value="oldest">Mais antigos</option>
+            <option value="name">Nome (A–Z)</option>
+            <option value="value">Maior valor</option>
+          </select>
+          {hasFilters && <button type="button" className={styles.linkBtn} onClick={clearFilters}><X size={14} /> Limpar filtros</button>}
         </div>
+
+        {selected.size > 0 && (
+          <div className={styles.bulkBar} role="toolbar" aria-label="Ações nos selecionados">
+            <strong>{selected.size} selecionado(s)</strong>
+            <select className={styles.select} value="" onChange={(e) => e.target.value && runBulk('stage', e.target.value)} disabled={busy} aria-label="Mudar etapa">
+              <option value="">Mudar etapa…</option>
+              {pipelineStages.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            {canAssign && (
+              <select className={styles.select} value="" onChange={(e) => e.target.value && runBulk('assign', e.target.value === 'none' ? null : e.target.value)} disabled={busy} aria-label="Trocar responsável">
+                <option value="">Responsável…</option>
+                <option value="none">Sem responsável</option>
+                {team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+              </select>
+            )}
+            <select className={styles.select} value="" onChange={(e) => e.target.value && runBulk('addTag', e.target.value)} disabled={busy || tags.length === 0} aria-label="Adicionar etiqueta">
+              <option value="">+ Etiqueta…</option>
+              {tags.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+            </select>
+            <select className={styles.select} value="" onChange={(e) => e.target.value && runBulk('removeTag', e.target.value)} disabled={busy || tags.length === 0} aria-label="Tirar etiqueta">
+              <option value="">− Etiqueta…</option>
+              {tags.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
+            </select>
+            <button type="button" className={styles.secondaryBtn} onClick={() => runBulk('block')} disabled={busy}><Ban size={14} /> Bloquear</button>
+            <button type="button" className={styles.secondaryBtn} onClick={() => runBulk('unblock')} disabled={busy}>Desbloquear</button>
+            <button type="button" className={styles.dangerBtn} onClick={() => runBulk('delete')} disabled={busy}><Trash2 size={14} /> Excluir</button>
+            <button type="button" className={styles.linkBtn} onClick={() => setSelected(new Set())}>Limpar seleção</button>
+            {busy && <Loader2 size={16} className={styles.spin} />}
+          </div>
+        )}
+
+        <div className={styles.table} role="table" aria-label="Leads">
+          <div className={`${styles.row} ${styles.headRow}`} role="row">
+            <span role="columnheader"><input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} aria-label="Selecionar todos desta página" /></span>
+            <span role="columnheader">Lead</span>
+            <span role="columnheader">Telefone</span>
+            <span role="columnheader">Etapa</span>
+            {canAssign && <span role="columnheader">Responsável</span>}
+            <span role="columnheader">Etiquetas</span>
+            <span role="columnheader">Entrada</span>
+            <span role="columnheader" aria-label="Ações" />
+          </div>
+
+          {!loaded && <p className={styles.empty}><Loader2 size={16} className={styles.spin} /> Carregando leads...</p>}
+          {loaded && leads.length === 0 && (
+            <div className={styles.empty}>
+              <Users size={30} />
+              <strong>Nenhum lead ainda</strong>
+              <span>Leads chegam pelo WhatsApp, pelo formulário do site, pelo totem ou pelo botão Novo lead.</span>
+            </div>
+          )}
+          {loaded && leads.length > 0 && filtered.length === 0 && <p className={styles.empty}>Nenhum lead com esses filtros.</p>}
+
+          {visible.map((lead) => (
+            <div key={lead.id} role="row" className={`${styles.row} ${selected.has(lead.id) ? styles.rowSelected : ''} ${lead.status === 'Bloqueado' ? styles.rowBlocked : ''}`} onClick={() => openPanel(lead.id)}>
+              <span role="cell" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" checked={selected.has(lead.id)} onChange={() => toggle(lead.id)} aria-label={`Selecionar ${lead.name}`} />
+              </span>
+              <span role="cell" className={styles.leadCell}>
+                <span className={styles.avatar}>{initials(lead.name)}</span>
+                <span className={styles.leadText}>
+                  <strong>{lead.name}{lead.status === 'Bloqueado' && <Ban size={12} className={styles.blockedIcon} aria-label="Bloqueado" />}</strong>
+                  <small>{lead.email || lead.source || ' '}</small>
+                </span>
+              </span>
+              <span role="cell" className={styles.phone}>{lead.phone || '—'}</span>
+              <span role="cell"><span className={styles.stage} style={{ ['--stage' as string]: stageColor(lead.pipelineStage) }}>{stageName(lead.pipelineStage)}</span></span>
+              {canAssign && <span role="cell" className={lead.assignedTo ? '' : styles.mutedCell}>{ownerName(lead.assignedTo)}</span>}
+              <span role="cell" className={styles.tagsCell}>
+                {lead.tags.slice(0, 3).map((item) => <TagBadge key={item} name={item} color={tagColor(item)} />)}
+                {lead.tags.length > 3 && <span className={styles.more}>+{lead.tags.length - 3}</span>}
+              </span>
+              <span role="cell" className={styles.dateCell}>{lead.entryDate}</span>
+              <span role="cell" className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
+                <Link href={`/messages?chatId=${lead.id}`} className={styles.iconBtn} aria-label={`Conversa com ${lead.name}`} title="Abrir conversa"><MessageSquare size={16} /></Link>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {filtered.length > PAGE_SIZE && (
+          <div className={styles.pager}>
+            <span>{current * PAGE_SIZE + 1}–{Math.min(filtered.length, (current + 1) * PAGE_SIZE)} de {filtered.length}</span>
+            <button type="button" className={styles.iconBtn} onClick={() => setPage(current - 1)} disabled={current === 0} aria-label="Página anterior"><ChevronLeft size={16} /></button>
+            <button type="button" className={styles.iconBtn} onClick={() => setPage(current + 1)} disabled={current >= pages - 1} aria-label="Próxima página"><ChevronRight size={16} /></button>
+          </div>
+        )}
+        {filtered.length > 0 && filtered.length <= PAGE_SIZE && <p className={styles.countLine}>{filtered.length} lead(s)</p>}
+      </section>
+
+      {openLead && (
+        <LeadPanel
+          key={openLead.id}
+          lead={openLead}
+          stages={pipelineStages}
+          team={team}
+          tagOptions={tags}
+          canAssign={canAssign}
+          onSave={async (changes) => {
+            const result = await updateLead(openLead.id, changes);
+            if (!result.ok) return result.error;
+            setNotice({ type: 'ok', text: 'Lead salvo.' });
+            return null;
+          }}
+          onDelete={async () => {
+            const result = await deleteLead(openLead.id);
+            if (!result.ok) return result.error;
+            openPanel(null);
+            setNotice({ type: 'ok', text: 'Lead excluído.' });
+            return null;
+          }}
+          onClose={() => openPanel(null)}
+        />
+      )}
+      {openId && loaded && !openLead && (
+        <div className={styles.toast} role="status"><AlertTriangle size={16} /> Esse lead não existe mais ou não está com você. <button type="button" className={styles.linkBtn} onClick={() => openPanel(null)}>Fechar</button></div>
       )}
 
-      {/* Modal de Gestão de Tags */}
-      {isTagModalOpen && (
-        <div className={styles.modalOverlayCentered} onClick={() => setIsTagModalOpen(false)}>
-          <motion.div 
-            className={styles.tagModal}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <header className={styles.modalHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div className={styles.tagIconWrapper}>
-                  <TagIcon size={20} color="#3b82f6" />
-                </div>
-                <div>
-                  <h2 style={{ margin: 0 }}>Gerenciar Tags</h2>
-                  <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.5 }}>Crie e organize as etiquetas dos seus leads</p>
-                </div>
-              </div>
-              <button className={styles.closeBtn} onClick={() => setIsTagModalOpen(false)}><X size={20} /></button>
-            </header>
+      {showTags && <TagsManager tags={tags} onChanged={refreshTags} onClose={() => setShowTags(false)} />}
 
-            <div className={styles.tagModalContent}>
-              <div className={styles.newTagArea}>
-                <div className={styles.inputWrapper}>
-                  <TagIcon size={16} className={styles.inputIcon} />
-                  <input 
-                    type="text" 
-                    placeholder="Nome da nova tag..." 
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newTag.trim()) {
-                        addTag(newTag.trim());
-                        setNewTag('');
-                      }
-                    }}
-                  />
-                </div>
-                <button 
-                  className={styles.addTagFinalBtn} 
-                  disabled={!newTag.trim()}
-                  onClick={() => {
-                    addTag(newTag.trim());
-                    setNewTag('');
-                  }}
-                >
-                  <Plus size={18} /> Criar
-                </button>
-              </div>
-
-              <div className={styles.tagGrid}>
-                {tags.map(tag => (
-                  <div key={tag} className={styles.tagItem}>
-                    <span>{tag}</span>
-                    <button className={styles.deleteTagBtn} onClick={() => deleteTag(tag)}>
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                {tags.length === 0 && (
-                  <div className={styles.emptyTags}>Nenhuma tag criada ainda.</div>
-                )}
-              </div>
-            </div>
-
-            <footer className={styles.tagModalFooter}>
-              <button className={styles.finishBtn} onClick={() => setIsTagModalOpen(false)}>
-                Concluir <Check size={18} />
-              </button>
-            </footer>
-          </motion.div>
+      {notice && (
+        <div className={`${styles.toast} ${notice.type === 'error' ? styles.toastError : ''}`} role="status">
+          {notice.type === 'error' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {notice.text}
         </div>
       )}
     </div>
+  );
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense fallback={null}>
+      <LeadsContent />
+    </Suspense>
   );
 }

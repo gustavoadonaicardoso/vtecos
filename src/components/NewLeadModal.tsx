@@ -1,237 +1,172 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { AlertTriangle, Loader2, Plus, X } from 'lucide-react';
 import { useLeads } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
 import styles from './NewLeadModal.module.css';
-import { X, Plus, Terminal } from 'lucide-react';
+import TagPicker from './leads/TagPicker';
+import { useTeam } from './leads/useTeam';
+
+const EMPTY = { name: '', phone: '', email: '', cpfCnpj: '', value: '', pipelineStage: '', assignedTo: '', notes: '' };
+
+/** Telefone enquanto digita: (11) 98888-7777. Números de fora ficam como estão. */
+function formatPhone(input: string) {
+  const d = input.replace(/\D/g, '');
+  if (input.trim().startsWith('+') || d.length > 11) return input;
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
 
 const NewLeadModal = () => {
-  const { isModalOpen, closeModal, addLead, pipelineStages } = useLeads();
+  const { isModalOpen, closeModal, addLead, pipelineStages, tags: tagOptions } = useLeads();
   const { user } = useAuth();
-  const [profiles, setProfiles] = useState<{ id: string; name: string }[]>([]);
+  const canAssign = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const team = useTeam(isModalOpen && canAssign);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    cpfCnpj: '',
-    email: '',
-    phone: '',
-    pipelineStage: pipelineStages[0]?.id || 'new',
-    assignedTo: ''
-  });
-
-  const [currentTag, setCurrentTag] = useState('');
+  const [form, setForm] = useState(EMPTY);
   const [tags, setTags] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (user?.role === 'SELLER') {
-      setFormData(prev => ({ ...prev, assignedTo: user.id }));
-    }
-  }, [user]);
-
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      if (!supabase) return;
-      const { data } = await supabase.from('profiles').select('id, name').eq('status', 'ACTIVE').order('name');
-      if (data) setProfiles(data);
-    };
-
-    if (user?.role === 'ADMIN' || user?.role === 'MANAGER') {
-      fetchProfiles();
-    }
-  }, [user]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [duplicate, setDuplicate] = useState<{ id: string | null; name: string | null } | null>(null);
 
   if (!isModalOpen) return null;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const set = (field: keyof typeof EMPTY, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    if (field === 'phone') setDuplicate(null);
   };
 
-  const handleAddTag = () => {
-    if (currentTag.trim() && !tags.includes(currentTag.trim())) {
-      setTags([...tags, currentTag.trim()]);
-      setCurrentTag('');
-    }
-  };
-
-  const handleKeyDownTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAddTag();
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.phone) {
-      alert("Nome e Telefone são obrigatórios.");
-      return;
-    }
-
-    addLead({
-      name: formData.name,
-      cpfCnpj: formData.cpfCnpj,
-      email: formData.email,
-      phone: formData.phone,
-      pipelineStage: formData.pipelineStage,
-      tags: tags,
-      assignedTo: formData.assignedTo || null
-    });
-
-    // Reset Form
-    setFormData({
-      name: '',
-      cpfCnpj: '',
-      email: '',
-      phone: '',
-      pipelineStage: pipelineStages[0]?.id || 'new',
-      assignedTo: user?.role === 'SELLER' ? user?.id : ''
-    });
+  const close = () => {
+    setForm(EMPTY);
     setTags([]);
+    setError('');
+    setDuplicate(null);
     closeModal();
   };
 
+  const submit = async (force = false) => {
+    setError('');
+    setBusy(true);
+    const result = await addLead(
+      {
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        cpfCnpj: form.cpfCnpj.trim(),
+        value: form.value,
+        pipelineStage: form.pipelineStage || pipelineStages[0]?.id,
+        assignedTo: canAssign ? form.assignedTo || null : user?.id ?? null,
+        tags,
+        notes: form.notes.trim(),
+      },
+      { force }
+    );
+    setBusy(false);
+    if (result.ok) {
+      close();
+      return;
+    }
+    if (result.duplicate) setDuplicate(result.duplicate);
+    else setError(result.error);
+  };
+
   return (
-    <div className={styles.modalOverlay} onClick={closeModal}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.overlay} onClick={close}>
+      <form
+        className={styles.modal}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit(false);
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-lead-title"
+      >
         <div className={styles.header}>
-          <h2>Adicionar Novo Lead</h2>
-          <button className={styles.closeButton} onClick={closeModal}>
-            <X size={20} />
-          </button>
+          <div>
+            <h2 id="new-lead-title">Novo lead</h2>
+            <p>{canAssign ? 'Cadastre o contato e escolha quem vai atender.' : 'O lead fica com você.'}</p>
+          </div>
+          <button type="button" className={styles.iconBtn} onClick={close} aria-label="Fechar"><X size={18} /></button>
         </div>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
-          <div className={styles.formGroup}>
-            <label>Nome Completo *</label>
-            <input 
-              type="text" 
-              name="name"
-              className={styles.input} 
-              placeholder="Digite o nome do lead"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div className={styles.formGroup}>
-              <label>CPF/CNPJ</label>
-              <input 
-                type="text" 
-                name="cpfCnpj"
-                className={styles.input} 
-                placeholder="000.000.000-00"
-                value={formData.cpfCnpj}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label>Telefone Completo *</label>
-              <input 
-                type="text" 
-                name="phone"
-                className={styles.input} 
-                placeholder="(00) 00000-0000"
-                value={formData.phone}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Email</label>
-            <input 
-              type="email" 
-              name="email"
-              className={styles.input} 
-              placeholder="exemplo@email.com"
-              value={formData.email}
-              onChange={handleInputChange}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Área de Tags</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input 
-                type="text" 
-                className={styles.input} 
-                placeholder="Digite a tag e aperte Enter"
-                value={currentTag}
-                onChange={(e) => setCurrentTag(e.target.value)}
-                onKeyDown={handleKeyDownTag}
-                style={{ flex: 1 }}
-              />
-              <button 
-                type="button" 
-                className={styles.cancelBtn} 
-                onClick={handleAddTag}
-              >
-                Adicionar
-              </button>
-            </div>
-            <div className={styles.tagArea}>
-              {tags.map(tag => (
-                <span key={tag} className={styles.tag}>
-                  {tag}
-                  <X size={12} className={styles.tagRemove} onClick={() => removeTag(tag)} />
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Posição no Pipeline</label>
-            <select 
-              name="pipelineStage"
-              className={styles.select}
-              value={formData.pipelineStage}
-              onChange={handleInputChange}
-            >
-              {pipelineStages.map(stage => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
-            <div className={styles.formGroup}>
-              <label>Responsável pelo Lead</label>
-              <select 
-                name="assignedTo"
-                className={styles.select}
-                value={formData.assignedTo}
-                onChange={handleInputChange}
-              >
-                <option value="">Sem responsável</option>
-                {profiles.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
+        <div className={styles.body}>
+          <div className={styles.grid}>
+            <label className={`${styles.field} ${styles.full}`}>
+              <span>Nome *</span>
+              <input className={styles.input} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Nome do contato ou empresa" maxLength={120} required autoFocus />
+            </label>
+            <label className={styles.field}>
+              <span>WhatsApp / telefone *</span>
+              <input className={styles.input} value={form.phone} onChange={(e) => set('phone', formatPhone(e.target.value))} placeholder="(11) 98888-7777" inputMode="tel" required />
+            </label>
+            <label className={styles.field}>
+              <span>E-mail</span>
+              <input className={styles.input} type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="contato@email.com" />
+            </label>
+            <label className={styles.field}>
+              <span>CPF / CNPJ</span>
+              <input className={styles.input} value={form.cpfCnpj} onChange={(e) => set('cpfCnpj', e.target.value)} placeholder="Somente se precisar" inputMode="numeric" />
+            </label>
+            <label className={styles.field}>
+              <span>Valor estimado (R$)</span>
+              <input className={styles.input} value={form.value} onChange={(e) => set('value', e.target.value.replace(/[^0-9.,]/g, ''))} placeholder="0,00" inputMode="decimal" />
+            </label>
+            <label className={styles.field}>
+              <span>Etapa do funil</span>
+              <select className={styles.input} value={form.pipelineStage || pipelineStages[0]?.id || ''} onChange={(e) => set('pipelineStage', e.target.value)}>
+                {pipelineStages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
               </select>
+            </label>
+            {canAssign && (
+              <label className={styles.field}>
+                <span>Responsável</span>
+                <select className={styles.input} value={form.assignedTo} onChange={(e) => set('assignedTo', e.target.value)}>
+                  <option value="">Sem responsável</option>
+                  {team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
+
+          <div className={styles.field}>
+            <span>Etiquetas</span>
+            <TagPicker value={tags} options={tagOptions} onChange={setTags} />
+          </div>
+
+          <label className={styles.field}>
+            <span>Observações</span>
+            <textarea className={styles.input} rows={3} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Como chegou, o que procura..." maxLength={4000} />
+          </label>
+
+          {duplicate && (
+            <div className={styles.warn}>
+              <AlertTriangle size={16} />
+              <div>
+                <strong>Este telefone já está cadastrado{duplicate.name ? `: ${duplicate.name}` : ' (lead de outro vendedor)'}.</strong>
+                <p>Abra o lead que já existe ou cadastre mesmo assim (ficam dois leads com o mesmo número).</p>
+                <div className={styles.warnActions}>
+                  {duplicate.id && <Link href={`/leads?lead=${duplicate.id}`} className={styles.secondaryBtn} onClick={close}>Abrir o existente</Link>}
+                  <button type="button" className={styles.secondaryBtn} onClick={() => submit(true)} disabled={busy}>Cadastrar mesmo assim</button>
+                </div>
+              </div>
             </div>
           )}
+          {error && <div className={styles.error}><AlertTriangle size={16} /> {error}</div>}
+        </div>
 
-          <div className={styles.footer}>
-            <button type="button" className={styles.cancelBtn} onClick={closeModal}>Cancelar</button>
-            <button type="submit" className={styles.submitBtn}>
-              <Plus size={18} /> Cadastrar Lead
-            </button>
-          </div>
-        </form>
-      </div>
+        <div className={styles.footer}>
+          <button type="button" className={styles.secondaryBtn} onClick={close}>Cancelar</button>
+          <button type="submit" className={styles.primaryBtn} disabled={busy}>
+            {busy ? <Loader2 size={16} className={styles.spin} /> : <Plus size={16} />} Cadastrar lead
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

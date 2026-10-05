@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { fetchLeadsAndStages, createLead } from '@/services/leads.service';
+import { fetchLeadsAndStages, createLead, findLeadByPhone, parseMoney } from '@/services/leads.service';
 import { requireActiveProfile } from '@/lib/session';
+import { logAudit } from '@/lib/audit';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
 import { fireAutomation, onLeadCreated } from '@/lib/automations/engine';
 
@@ -32,9 +34,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
 
-    const leadData = await request.json();
-    const result = await createLead(auth.tenantId, leadData);
+    const body = await request.json().catch(() => ({}));
+    // Vendedor só cadastra leads para si mesmo.
+    const isSeller = !['ADMIN', 'MANAGER'].includes(auth.profile.role);
+    const input = { ...body, assignedTo: isSeller ? auth.profile.id : body.assignedTo };
 
+    // Mesmo telefone já cadastrado: avisa (a pessoa pode cadastrar mesmo assim).
+    if (!body.force && typeof body.phone === 'string') {
+      const existing = await findLeadByPhone(auth.tenantId, body.phone);
+      if (existing) {
+        const visible = !isSeller || existing.assigned_to === auth.profile.id;
+        return NextResponse.json(
+          { error: `Já existe um lead com este telefone${visible ? `: ${existing.name}` : ' (de outro vendedor)'}.`, duplicate: visible ? { id: existing.id, name: existing.name } : { id: null, name: null } },
+          { status: 409 }
+        );
+      }
+    }
+
+    const result = await createLead(auth.tenantId, input);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -45,13 +62,14 @@ export async function POST(request: Request) {
       name: lead.name,
       phone: lead.phone,
       email: lead.email,
-      value: parseFloat(String(lead.value || '0').replace(/[^0-9,-]+/g, '').replace(',', '.')) || 0,
+      value: lead.valueNumber ?? parseMoney(lead.value),
       stage_id: lead.pipelineStage,
       created_at: lead.createdAt,
     }, 'manual'));
     fireAutomation(onLeadCreated, auth.tenantId, lead.id, 'manual');
+    logAudit({ id: auth.profile.id, name: auth.profile.name }, 'LEAD_CREATE', `Lead ${lead.name} cadastrado manualmente.`, 'lead', lead.id, supabaseAdmin, auth.tenantId).catch(() => {});
 
-    return NextResponse.json({ data: result.data }, { status: 201 });
+    return NextResponse.json({ data: lead }, { status: 201 });
   } catch (error: unknown) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Erro interno.' }, { status: 500 });
   }

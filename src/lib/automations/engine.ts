@@ -367,6 +367,10 @@ async function startRun(flow: FlowRow & { graphParsed: FlowGraph }, leadId: stri
   if (last && ['running', 'waiting'].includes(last.status)) return;
   if (last && reentryHours > 0 && Date.now() - new Date(last.started_at).getTime() < reentryHours * 3600_000) return;
 
+  // Contato bloqueado na tela de Leads não recebe automações.
+  const { data: leadRow } = await supabaseAdmin.from('leads').select('blocked').eq('tenant_id', flow.tenant_id).eq('id', leadId).maybeSingle();
+  if ((leadRow as { blocked?: boolean } | null)?.blocked) return;
+
   if (!canStart(flow.tenant_id)) {
     log('limite de inícios por minuto atingido para a empresa', flow.tenant_id);
     return;

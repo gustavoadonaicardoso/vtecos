@@ -90,8 +90,13 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     sections: [
       { title: 'De onde vêm os leads', text: '- Cadastro manual pelo botão de novo lead.\n- Mensagem nova no WhatsApp de um número desconhecido.\n- Formulário do site ou outro sistema (Integrações > Captura de leads).\n- Retirada de senha no totem com telefone informado.\n\nTodo lead novo entra na primeira etapa do funil.' },
       { title: 'Pipeline (funil)', text: 'Em **Pipeline**, arraste o card do lead entre as etapas. O valor do lead soma no total da etapa e alimenta os **Relatórios** (receita ganha, conversão e ticket médio).' },
-      { title: 'Detalhes do lead', text: 'Em **Leads**, clique no lead para ver telefone, e-mail, valor, etiquetas e o responsável. Vendedores veem os próprios leads; gerentes e administradores veem todos.' },
-      { title: 'Etiquetas', text: 'Use **Gerenciar Tags** para criar etiquetas (ex.: origem, interesse) e filtrar a lista.' },
+      { title: 'Detalhes do lead', text: 'Em **Leads**, clique no lead para abrir o painel: dá para editar telefone, e-mail, CPF/CNPJ, valor, etapa, responsável, etiquetas e observações, ver a origem e a última mensagem e abrir a conversa. Vendedores veem e editam só os próprios leads; gerentes e administradores veem todos.' },
+      { title: 'Novo lead', text: 'O botão **Novo lead** pede nome e telefone (o resto é opcional). Se o telefone já estiver cadastrado, o sistema avisa e oferece abrir o lead existente, para não duplicar.' },
+      { title: 'Filtros e busca', text: 'Busque por nome, telefone (com ou sem pontuação), e-mail ou etiqueta. Os atalhos do topo mostram os novos em 7 dias, os sem responsável e os bloqueados; os filtros separam por etapa, responsável, etiqueta e origem.' },
+      { title: 'Ações em vários leads', text: 'Marque os leads na lista para mudar a etapa, trocar o responsável, pôr ou tirar etiqueta, bloquear ou excluir de uma vez.' },
+      { title: 'Etiquetas', text: 'Em **Etiquetas** (administradores e gerentes), crie etiquetas com cor para organizar por interesse, temperatura ou campanha. Renomear ou apagar uma etiqueta vale para todos os leads que a usam. Etiquetas digitadas no lead entram no cadastro automaticamente.' },
+      { title: 'Bloquear contato', text: 'Marque **Bloquear contato** no painel do lead para spam ou quem pediu para não receber mensagens: as automações deixam de rodar para ele.' },
+      { title: 'Exportar', text: 'O botão **Exportar** baixa os leads da lista (com os filtros aplicados) em uma planilha CSV que abre no Excel.' },
     ],
   },
   {
