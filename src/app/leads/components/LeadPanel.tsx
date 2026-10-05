@@ -18,6 +18,8 @@ interface LeadPanelProps {
   onSave: (changes: Record<string, unknown>) => Promise<string | null>;
   onDelete: () => Promise<string | null>;
   onClose: () => void;
+  /** Em Mensagens o painel abre ao lado da própria conversa. */
+  hideConversation?: boolean;
 }
 
 type Draft = { name: string; phone: string; email: string; cpfCnpj: string; value: string; pipelineStage: string; assignedTo: string; tags: string[]; notes: string; blocked: boolean };
@@ -35,7 +37,7 @@ const toDraft = (lead: Lead): Draft => ({
   blocked: lead.status === 'Bloqueado',
 });
 
-export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, onSave, onDelete, onClose }: LeadPanelProps) {
+export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, onSave, onDelete, onClose, hideConversation }: LeadPanelProps) {
   const router = useRouter();
   const original = toDraft(lead);
   const [draft, setDraft] = useState<Draft>(original);
@@ -92,11 +94,13 @@ export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, o
           <button type="button" className={styles.iconBtn} onClick={close} aria-label="Fechar"><X size={18} /></button>
         </header>
 
-        <div className={styles.panelActions}>
-          <button type="button" className={styles.primaryBtn} onClick={() => router.push(`/messages?chatId=${lead.id}`)}>
-            <MessageSquare size={15} /> Abrir conversa
-          </button>
-        </div>
+        {!hideConversation && (
+          <div className={styles.panelActions}>
+            <button type="button" className={styles.primaryBtn} onClick={() => router.push(`/messages?chatId=${lead.id}`)}>
+              <MessageSquare size={15} /> Abrir conversa
+            </button>
+          </div>
+        )}
 
         <div className={styles.panelBody}>
           <dl className={styles.facts}>

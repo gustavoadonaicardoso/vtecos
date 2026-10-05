@@ -28,6 +28,8 @@ export type Lead = {
   lastActivityAt?: string | null;
   /** Quando o lead entrou na etapa atual (dias na etapa no funil). */
   stageChangedAt?: string | null;
+  /** Mensagens do cliente que a equipe ainda não viu. */
+  unreadCount?: number;
 };
 
 /** Etiqueta cadastrada pela empresa. */

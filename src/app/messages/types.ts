@@ -1,49 +1,22 @@
+export type MessageKind = 'text' | 'audio' | 'image' | 'document';
+export type MessageStatus = 'sending' | 'sent' | 'received' | 'failed' | 'read' | 'delivered';
+
 export interface ChatMessage {
-  id: string | number;
-  type: 'text' | 'audio' | 'image' | 'document';
-  text?: string;
-  // Reaproveitado como URL genérica de mídia (imagem/documento/áudio) --
-  // é o mesmo campo audio_url que já existia no banco.
-  audioUrl?: string;
-  sent: boolean;
-  status?: 'sending' | 'sent' | 'received' | 'failed';
-  time: string;
-}
-
-export interface ChatListItem {
   id: string;
-  name: string;
+  type: MessageKind;
   text: string;
-  time: string;
-  unread: number;
-  type: string;
-  color: string;
-  avatar: string;
+  /** URL da mídia (imagem, documento ou áudio) -- coluna audio_url. */
+  mediaUrl: string | null;
+  sent: boolean;
+  status: MessageStatus | null;
+  createdAt: string;
+  provider: string | null;
 }
 
-export interface QuickTemplate {
+export interface QuickReply {
   id: string;
   name: string;
   content: string;
 }
 
-export interface MetaTemplate {
-  id: string;
-  name: string;
-  text: string;
-}
-
-export interface NewContactForm {
-  name: string;
-  phone: string;
-  email: string;
-  stage: string;
-}
-
-export interface LeadEditForm {
-  name: string;
-  email: string;
-  phone: string;
-  value: string;
-  stage: string;
-}
+export type InboxTab = 'all' | 'unread' | 'mine' | 'unassigned';

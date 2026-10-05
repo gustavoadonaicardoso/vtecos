@@ -108,8 +108,11 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     summary: 'Atender clientes pelo WhatsApp dentro do sistema.',
     sections: [
       { title: 'Antes de começar', text: 'Conecte um WhatsApp em **Integrações** (WhatsApp Web ou WhatsApp Business API).' },
-      { title: 'Caixa de entrada', text: 'Em **Mensagens**, cada conversa é um lead. Mensagens novas tocam um som e aparecem como aviso (dá para desligar em Configurações > Notificações).' },
-      { title: 'Responder', text: 'Escreva no campo de mensagem e envie. Também é possível enviar áudio, imagem e arquivo. A resposta sai pelo número conectado.' },
+      { title: 'Caixa de entrada', text: 'Em **Mensagens**, cada conversa é um lead e a lista fica na ordem da última mensagem. O número verde mostra quantas mensagens do cliente ainda não foram vistas -- zera quando alguém da equipe abre a conversa ou responde. As abas separam **Não lidas**, **Minhas** e (para gerentes) **Sem responsável**. Vendedores veem só as conversas deles.' },
+      { title: 'Responder', text: 'Escreva e aperte Enter (Shift+Enter quebra linha). Dá para mandar emoji, arquivo, imagem e áudio (botão do microfone). A mensagem sai pelo WhatsApp conectado -- WhatsApp Web, se estiver conectado; senão, a API oficial. Se não sair, ela fica marcada em vermelho com **Tentar de novo**.' },
+      { title: 'Respostas rápidas', text: 'O botão de documento abre as respostas rápidas. Use `{{primeiro_nome}}`, `{{nome}}` e `{{atendente}}` no texto para personalizar. Administradores e gerentes criam e editam em **Gerenciar**; quem pode usar cada uma é definido em **Equipe > Acessos**.' },
+      { title: 'Assinatura', text: 'O botão de caneta coloca seu nome em negrito no topo de cada mensagem, para o cliente saber quem está atendendo. A escolha fica salva no seu navegador.' },
+      { title: 'Transferir atendimento', text: 'O botão **Transferir** passa a conversa para outra pessoa da equipe, com um recado opcional. Ela recebe um aviso no sino com o link da conversa.' },
       { title: 'Janela de 24 horas (API oficial)', text: 'Na WhatsApp Business API, a Meta só deixa enviar mensagem livre até 24 horas depois da última mensagem do cliente. Fora disso, use um **template aprovado** (em Disparos).' },
     ],
   },

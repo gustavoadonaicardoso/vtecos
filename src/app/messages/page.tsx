@@ -1,586 +1,364 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Suspense, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { AlertTriangle, CheckCircle2, MessageSquare, X } from 'lucide-react';
+import styles from './messages.module.css';
 import { useLeads } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/lib/permissions';
-import styles from './messages.module.css';
-import { AnimatePresence } from 'framer-motion';
-import { sendWhatsApp, saveChatMessage } from '@/lib/messaging';
+import { useSidebar } from '@/components/SidebarProvider';
 import { supabase } from '@/lib/supabase';
 import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
-import type { ChatMessage, LeadEditForm, MetaTemplate, NewContactForm, QuickTemplate } from './types';
-import ChatSidebar from './components/ChatSidebar';
-import ChatHeaderMain from './components/ChatHeaderMain';
-import MessageBubbleList from './components/MessageBubbleList';
-import SendErrorBanner from './components/SendErrorBanner';
-import MessageInputBar from './components/MessageInputBar';
-import LeadInfoDrawer from './components/LeadInfoDrawer';
-import EmptyChatState from './components/EmptyChatState';
-import NewContactModal from './components/NewContactModal';
+import { useTeam } from '@/components/leads/useTeam';
+import LeadPanel from '@/app/leads/components/LeadPanel';
+import type { Lead } from '@/types';
+import type { ChatMessage, InboxTab, QuickReply } from './types';
+import { fillTemplate, mapMessage } from './format';
+import ConversationList from './components/ConversationList';
+import ChatHeader from './components/ChatHeader';
+import MessageList from './components/MessageList';
+import Composer from './components/Composer';
+import TransferModal from './components/TransferModal';
+import QuickRepliesModal from './components/QuickRepliesModal';
+import SystemToolsBar from './components/SystemToolsBar';
+
+const HISTORY_LIMIT = 300;
 
 function MessagesContent() {
-  const { leads, updateLead, pipelineStages, refreshDatabase } = useLeads();
+  const { leads, loaded, pipelineStages, tags, updateLead, deleteLead, openModal, lastCreatedLeadId } = useLeads();
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
-  const searchParams = useSearchParams();
-  const initialChatId = searchParams.get('chatId');
+  const { toggleMobileMenu } = useSidebar();
+  const canAssign = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const team = useTeam(Boolean(user));
+  const router = useRouter();
+  const pathname = usePathname();
+  const selectedId = useSearchParams().get('chatId');
 
-  const [activeTab, setActiveTab] = useState('Todos');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Templates dinâmicos do banco
-  const [quickTemplates, setQuickTemplates] = useState<QuickTemplate[]>([]);
-
-  // Modal Novo Contato
-  const [showNewContact, setShowNewContact] = useState(false);
-  const [newContact, setNewContact] = useState<NewContactForm>({ name: '', phone: '', email: '', stage: '' });
-  const [savingContact, setSavingContact] = useState(false);
-  const [contactError, setContactError] = useState('');
-
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(initialChatId);
-  const [inputText, setInputText] = useState('');
-
-  const [activeMessages, setActiveMessages] = useState<ChatMessage[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Popover States
-  const [showEmoji, setShowEmoji] = useState(false);
-  const [showQuickMsgs, setShowQuickMsgs] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [useSignature, setUseSignature] = useState(false);
+  const [tab, setTab] = useState<InboxTab>('all');
+  const [query, setQuery] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
+  const [channels, setChannels] = useState<{ web: boolean; api: boolean } | null>(null);
+  const [sending, setSending] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const [showInfo, setShowInfo] = useState(false);
-  const [selectedChannel, setSelectedChannel] = useState('WhatsApp');
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<LeadEditForm>({
-    name: '', email: '', phone: '', value: '0.00', stage: ''
-  });
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [showQuick, setShowQuick] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const endRef = useRef<HTMLDivElement>(null);
+  const seenCreated = useRef(lastCreatedLeadId);
 
-  // Audio States
-  const [isRecording, setIsRecording] = useState(false);
-  const [isSendingAttachment, setIsSendingAttachment] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const selectChat = useCallback((id: string | null) => {
+    setShowInfo(false);
+    router.replace(id ? `${pathname}?chatId=${id}` : pathname, { scroll: false });
+  }, [pathname, router]);
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const ownerName = useCallback((id?: string | null) => (id ? team.find((member) => member.id === id)?.name || 'Membro inativo' : null), [team]);
+  const lead = leads.find((item) => item.id === selectedId) || null;
 
-  // Carrega templates do banco filtrados pela permissão do usuário
+  // ── Lista ──
+  const counts = useMemo(() => ({
+    all: leads.length,
+    unread: leads.filter((item) => (item.unreadCount ?? 0) > 0).length,
+    mine: leads.filter((item) => item.assignedTo === user?.id).length,
+    unassigned: leads.filter((item) => !item.assignedTo).length,
+  }), [leads, user?.id]);
+
+  const conversations = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    const digits = query.replace(/\D/g, '');
+    const time = (item: Lead) => new Date(item.lastActivityAt || item.createdAt || 0).getTime();
+    return leads
+      .filter((item) => {
+        if (item.id === selectedId) return true;
+        if (tab === 'unread' && !(item.unreadCount ?? 0)) return false;
+        if (tab === 'mine' && item.assignedTo !== user?.id) return false;
+        if (tab === 'unassigned' && item.assignedTo) return false;
+        if (!text) return true;
+        return item.name.toLowerCase().includes(text) || (digits.length >= 3 && item.phone.replace(/\D/g, '').includes(digits));
+      })
+      .sort((a, b) => time(b) - time(a));
+  }, [leads, query, tab, selectedId, user?.id]);
+
+  // ── Dados auxiliares ──
+  const loadQuickReplies = useCallback(async () => {
+    const response = await fetch('/api/messages/templates', { cache: 'no-store' });
+    const json = await response.json().catch(() => ({}));
+    if (response.ok) setQuickReplies(json.templates || []);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
-    fetch('/api/messages/templates')
-      .then(r => r.json())
-      .then(d => { if (d.templates) setQuickTemplates(d.templates); })
-      .catch(() => {});
-  }, [user]);
+    const timer = window.setTimeout(() => {
+      loadQuickReplies();
+      fetch('/api/messages/channel', { cache: 'no-store' }).then((r) => r.json()).then((json) => setChannels(json.data || null)).catch(() => {});
+    }, 0);
+    const clock = window.setInterval(() => setNow(Date.now()), 60_000);
+    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((count) => setUnreadNotifications(count ?? 0));
+    fetchCount();
+    const poll = window.setInterval(fetchCount, 30_000);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(clock);
+      window.clearInterval(poll);
+    };
+  }, [user, loadQuickReplies]);
 
-  const handleCreateContact = async () => {
-    if (!newContact.name.trim() || !newContact.phone.trim()) {
-      setContactError('Nome e telefone são obrigatórios.');
-      return;
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  // Lead cadastrado pelo "Novo": abre a conversa dele.
+  useEffect(() => {
+    if (lastCreatedLeadId && lastCreatedLeadId !== seenCreated.current) {
+      seenCreated.current = lastCreatedLeadId;
+      router.replace(`${pathname}?chatId=${lastCreatedLeadId}`, { scroll: false });
     }
-    setSavingContact(true);
-    setContactError('');
+  }, [lastCreatedLeadId, pathname, router]);
 
-    const stageId = newContact.stage || pipelineStages[0]?.id || null;
-    const response = await fetch('/api/leads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newContact.name.trim(),
-        phone: newContact.phone.trim(),
-        email: newContact.email.trim() || null,
-        pipelineStage: stageId,
-      }),
-    });
-    const result = await response.json();
-
-    setSavingContact(false);
-    if (!response.ok) { setContactError(result.error || 'Erro ao criar contato.'); return; }
-    setShowNewContact(false);
-    setNewContact({ name: '', phone: '', email: '', stage: '' });
-    await refreshDatabase();
-    if (result.data) setSelectedChatId(result.data.id);
-  };
-
-  const MOCK_CHATS = useMemo(() => {
-    return leads.map((lead, i) => {
-      const assignedTab = i % 3 === 0 ? 'Aguardando' : (i % 5 === 0 ? 'Grupos' : 'Minhas Conversas');
-      return {
-        id: lead.id,
-        name: lead.name,
-        text: lead.lastMsg || 'Iniciar conversa...',
-        time: lead.entryDate,
-        unread: i % 4 === 0 ? 1 : 0,
-        type: assignedTab,
-        color: lead.color || '#3b82f6',
-        avatar: lead.name.slice(0, 2).toUpperCase()
-      };
-    });
-  }, [leads]);
-
-  const filteredChats = useMemo(() => {
-    return MOCK_CHATS.filter(chat =>
-      (activeTab === 'Todos' || chat.type === activeTab || selectedChatId === chat.id) &&
-      chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [MOCK_CHATS, activeTab, selectedChatId, searchQuery]);
-
-  const selectedChat = useMemo(() => {
-    return MOCK_CHATS.find(c => c.id === selectedChatId);
-  }, [MOCK_CHATS, selectedChatId]);
-
-  // Update edit form when chat changes or info opens
+  // ── Conversa aberta: histórico + tempo real ──
   useEffect(() => {
-    const leadData = leads.find(l => l.id === selectedChatId);
-    if (leadData) {
-      setEditForm({
-        name: leadData.name,
-        email: leadData.email,
-        phone: leadData.phone,
-        value: leadData.value?.replace('R$ ', '') || '0,00',
-        stage: leadData.pipelineStage
-      });
-    }
-  }, [selectedChatId, leads, showInfo]);
+    if (!selectedId || !supabase) return;
+    const client = supabase;
+    let alive = true;
 
-  const currentStageName = pipelineStages.find(s => s.id === editForm.stage)?.name || 'Sem Estágio';
-
-  useEffect(() => {
-    if (initialChatId) {
-      setSelectedChatId(initialChatId);
-      const chatTarget = MOCK_CHATS.find(c => c.id === initialChatId);
-      if (chatTarget && chatTarget.type !== activeTab) {
-        setActiveTab(chatTarget.type);
-      }
-    }
-  }, [initialChatId]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeMessages, selectedChatId, isRecording]);
-
-  // Real-time Messages Fetching
-  useEffect(() => {
-    if (!selectedChatId || !supabase) return;
-    const client = supabase; // Type-safe reference
-
-    const fetchHistory = async () => {
-      const { data, error } = await client
+    const load = async () => {
+      setMessages(null);
+      const { data } = await client
         .from('chat_messages')
         .select('*')
-        .eq('lead_id', selectedChatId)
-        .order('created_at', { ascending: true });
-
-      if (!error && data) {
-        setActiveMessages(data.map(m => ({
-          id: m.id,
-          type: m.type,
-          text: m.text,
-          audioUrl: m.audio_url,
-          sent: m.sent_by_me,
-          status: m.status || 'sent',
-          time: new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        })));
-      } else if (error) {
-        console.error('Error fetching chat history:', error);
-      }
+        .eq('lead_id', selectedId)
+        .order('created_at', { ascending: false })
+        .limit(HISTORY_LIMIT);
+      if (alive) setMessages((data || []).map((row) => mapMessage(row as Record<string, unknown>)).reverse());
     };
+    const markRead = () => fetch('/api/messages/read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: selectedId }) }).catch(() => {});
 
-    fetchHistory();
-
-    const mapMessage = (m: any) => ({
-      id: m.id,
-      type: m.type,
-      text: m.text,
-      audioUrl: m.audio_url,
-      sent: m.sent_by_me,
-      status: m.status || 'sent',
-      time: new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    });
+    const timer = window.setTimeout(() => {
+      load();
+      markRead();
+    }, 0);
 
     const channel = client
-      .channel(`chat-${selectedChatId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages'
-      }, (payload) => {
-        const m = payload.new;
-        if (m.lead_id === selectedChatId) {
-          setActiveMessages(prev => {
-            if (prev.some(msg => msg.id === m.id)) return prev;
-            return [...prev, mapMessage(m)];
-          });
-        }
+      .channel(`chat-${selectedId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `lead_id=eq.${selectedId}` }, (payload) => {
+        const message = mapMessage(payload.new as Record<string, unknown>);
+        setMessages((prev) => (prev && !prev.some((item) => item.id === message.id) ? [...prev, message] : prev));
+        if (!message.sent) markRead();
       })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'chat_messages'
-      }, (payload) => {
-        const m = payload.new;
-        if (m.lead_id === selectedChatId) {
-          setActiveMessages(prev =>
-            prev.map(msg => msg.id === m.id ? { ...msg, status: m.status } : msg)
-          );
-        }
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chat_messages', filter: `lead_id=eq.${selectedId}` }, (payload) => {
+        const message = mapMessage(payload.new as Record<string, unknown>);
+        setMessages((prev) => prev?.map((item) => (item.id === message.id ? message : item)) ?? prev);
       })
       .subscribe();
 
     return () => {
+      alive = false;
+      window.clearTimeout(timer);
       client.removeChannel(channel);
     };
-  }, [selectedChatId]);
+  }, [selectedId]);
 
-  // Notificações não lidas -- a leitura passa pela API autenticada
-  // (/api/notifications), então atualiza por polling.
   useEffect(() => {
-    if (!user) return;
+    endRef.current?.scrollIntoView({ block: 'end' });
+  }, [messages, selectedId]);
 
-    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
+  // ── Envio ──
+  const upsertMessage = (row: Record<string, unknown> | null | undefined) => {
+    if (!row?.id) return;
+    const message = mapMessage(row);
+    setMessages((prev) => {
+      if (!prev) return prev;
+      return prev.some((item) => item.id === message.id) ? prev.map((item) => (item.id === message.id ? { ...item, ...message } : item)) : [...prev, message];
+    });
+  };
 
-    fetchCount();
-    const interval = setInterval(fetchCount, 20_000);
-
-    return () => clearInterval(interval);
-  }, [user]);
-
-  const [sendError, setSendError] = useState<string | null>(null);
-
-  const handleSendMessage = async (textToOverride?: string) => {
-    let finalMsg = textToOverride || inputText;
-    if (!finalMsg.trim() || !selectedChatId) return;
-
-    // Append Signature if enabled and not already present
-    if (useSignature && user) {
-      const signature = `\n- ${user.name}`;
-      if (!finalMsg.includes(signature)) {
-        finalMsg = finalMsg.trim() + signature;
-      }
+  const sendText = async (text: string) => {
+    if (!lead) return false;
+    setSending(true);
+    const response = await fetch('/api/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: lead.id, text }) });
+    const json = await response.json().catch(() => ({}));
+    setSending(false);
+    upsertMessage(json.data);
+    if (!response.ok) {
+      setNotice({ type: 'error', text: json.error || 'Não foi possível enviar.' });
+      return Boolean(json.data);
     }
-
-    setInputText('');
-    setShowEmoji(false);
-    setShowQuickMsgs(false);
-    setShowTemplates(false);
-    setSendError(null);
-
-    const targetLead = leads.find(l => l.id === selectedChatId);
-
-    if (!targetLead?.phone || selectedChannel !== 'WhatsApp') {
-      // Se não for WhatsApp ou não tiver telefone, salva como mensagem interna/email
-      await saveChatMessage({
-        leadId: selectedChatId,
-        text: selectedChannel === 'WhatsApp' ? finalMsg : `[Via ${selectedChannel}] ${finalMsg}`,
-        sentByMe: true,
-        type: 'text',
-        status: 'sent',
-      });
-      return;
-    }
-
-    // DB-first: save with status 'sending' → realtime will render it
-    // then call Z-API and update the status
-    const result = await sendWhatsApp(targetLead.phone, finalMsg, selectedChatId);
-    if (!result?.success) {
-      setSendError(result?.error || 'Falha ao enviar mensagem via WhatsApp.');
-      // Message was already saved to DB with status 'failed' by sendWhatsApp
-    }
+    return true;
   };
 
-  const sendAttachment = async (file: File, caption = '') => {
-    if (!selectedChatId) return;
-    const targetLead = leads.find(l => l.id === selectedChatId);
-    if (!targetLead?.phone) {
-      setSendError('Este contato não tem telefone cadastrado para enviar anexos.');
-      return;
-    }
-
-    setSendError(null);
-    setIsSendingAttachment(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('phone', targetLead.phone);
-      formData.append('leadId', selectedChatId);
-      formData.append('caption', caption);
-
-      const response = await fetch('/api/whatsapp/web/send-media', { method: 'POST', body: formData });
-      const result = await response.json();
-      if (!response.ok) {
-        setSendError(result.error || 'Falha ao enviar anexo.');
-      }
-    } catch (err) {
-      setSendError(err instanceof Error ? err.message : 'Falha ao enviar anexo.');
-    } finally {
-      setIsSendingAttachment(false);
-    }
+  const retry = async (message: ChatMessage) => {
+    if (!lead) return;
+    setRetrying(message.id);
+    const response = await fetch('/api/messages/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ leadId: lead.id, retryId: message.id }) });
+    const json = await response.json().catch(() => ({}));
+    setRetrying(null);
+    upsertMessage(json.data);
+    if (!response.ok) setNotice({ type: 'error', text: json.error || 'Não foi possível reenviar.' });
   };
 
-  const handleFileSelected = (file: File) => {
-    void sendAttachment(file);
+  const sendFile = async (file: File, caption?: string) => {
+    if (!lead) return;
+    const form = new FormData();
+    form.append('file', file);
+    form.append('leadId', lead.id);
+    if (caption) form.append('caption', caption);
+    const response = await fetch('/api/messages/media', { method: 'POST', body: form });
+    const json = await response.json().catch(() => ({}));
+    upsertMessage(json.data);
+    if (!response.ok) setNotice({ type: 'error', text: json.error || 'Não foi possível enviar o arquivo.' });
   };
 
-  const toggleSignature = () => {
-    setUseSignature(!useSignature);
+  const transfer = async (memberId: string, note: string) => {
+    if (!lead) return null;
+    const response = await fetch(`/api/leads/${lead.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assignedTo: memberId, note }) });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) return json.error || 'Não foi possível transferir.';
+    setShowTransfer(false);
+    setNotice({ type: 'ok', text: `Conversa transferida para ${ownerName(memberId)}.` });
+    // Vendedor deixa de ver o lead que passou adiante.
+    if (!canAssign) selectChat(null);
+    return null;
   };
 
-  const insertEmoji = (emoji: string) => {
-    setInputText(prev => prev + emoji);
-  };
+  const channelLabel = channels ? (channels.web ? 'WhatsApp Web' : channels.api ? 'API oficial' : null) : null;
+  const disabledReason = !lead
+    ? null
+    : !lead.phone
+      ? 'Este contato não tem telefone. Abra os dados do lead (ícone ⓘ) e cadastre o WhatsApp para conversar.'
+      : channels && !channels.web && !channels.api
+        ? 'Nenhum WhatsApp conectado. Conecte o WhatsApp Web ou a API oficial em Integrações para responder por aqui.'
+        : null;
 
-  const useQuickMsg = (msg: string) => {
-    setInputText(msg);
-    setShowQuickMsgs(false);
-  };
-
-  const useTemplate = (tpl: MetaTemplate) => {
-    // Basic placeholder replacement for demo
-    const parsedText = tpl.text.replace('{{1}}', selectedChat?.name || 'Cliente');
-    setInputText(parsedText);
-    setShowTemplates(false);
-  };
-
-  const startRecording = async () => {
-    if (!selectedChatId) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const analyser = audioContext.createAnalyser();
-      const source = audioContext.createMediaStreamSource(stream);
-      source.connect(analyser);
-      analyser.fftSize = 64;
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        if (!(mediaRecorderRef.current as any)?.hasCanceled && audioChunksRef.current.length > 0) {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
-          void sendAttachment(audioFile);
-        }
-        stream.getTracks().forEach(track => track.stop());
-      };
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingTime(0);
-      setTimeout(() => drawWaveform(), 50);
-      timerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
-    } catch (err) {
-      const name = err instanceof DOMException ? err.name : '';
-      if (name === 'NotAllowedError' || name === 'SecurityError') {
-        alert('O acesso ao microfone foi bloqueado. Clique no cadeado ao lado do endereço do site, permita o Microfone e tente de novo.');
-      } else if (name === 'NotFoundError') {
-        alert('Nenhum microfone encontrado. Conecte um microfone e tente de novo.');
-      } else if (name === 'NotReadableError') {
-        alert('O microfone está sendo usado por outro programa. Feche-o e tente de novo.');
-      } else {
-        alert('Não foi possível acessar o microfone.');
-      }
-    }
-  };
-
-  const drawWaveform = () => {
-    if (!canvasRef.current || !analyserRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const analyser = analyserRef.current;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-    const draw = () => {
-      animationFrameRef.current = requestAnimationFrame(draw);
-      analyser.getByteFrequencyData(dataArray);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const barWidth = Math.ceil((canvas.width / bufferLength) * 2.5);
-      let barHeight;
-      let x = 0;
-      for (let i = 0; i < bufferLength; i++) {
-        barHeight = (dataArray[i] / 255) * (canvas.height - 4) + 3;
-        ctx.fillStyle = i < (bufferLength / 2) ? '#ef4444' : '#f87171';
-        const y = (canvas.height - barHeight) / 2;
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(x, y, barWidth - 2, barHeight, 2);
-        else ctx.rect(x, y, barWidth - 2, barHeight);
-        ctx.fill();
-        x += barWidth;
-      }
-    };
-    draw();
-  };
-
-  const stopRecording = (cancel = false) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
-    if (mediaRecorderRef.current && isRecording) {
-      if (cancel) (mediaRecorderRef.current as any).hasCanceled = true;
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-    setRecordingTime(0);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  const tools = {
+    userName: user?.name,
+    showNotifications,
+    onToggleNotifications: () => setShowNotifications((value) => !value),
+    onCloseNotifications: () => setShowNotifications(false),
+    unreadCount: unreadNotifications,
   };
 
   return (
     <div className={styles.container}>
-      <ChatSidebar
-        hiddenOnMobile={!!selectedChatId}
-        canCreateContact={hasPermission('leads.create')}
-        onNewContact={() => { setShowNewContact(true); setContactError(''); }}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        filteredChats={filteredChats}
-        selectedChatId={selectedChatId}
-        onSelectChat={setSelectedChatId}
+      <ConversationList
+        hidden={Boolean(selectedId)}
+        conversations={conversations}
+        counts={counts}
+        tab={tab}
+        onTab={setTab}
+        query={query}
+        onQuery={setQuery}
+        selectedId={selectedId}
+        onSelect={(id) => selectChat(id)}
+        canAssign={canAssign}
+        ownerName={ownerName}
+        canCreate={hasPermission('leads.create')}
+        onNewContact={() => openModal()}
+        now={now}
+        loaded={loaded}
+        onMenu={toggleMobileMenu}
       />
 
-      {/* CHAT PANEL */}
-      <div className={`${styles.mainChat} ${!selectedChatId ? styles.hiddenOnMobile : ''}`}>
-        {selectedChatId && selectedChat ? (
+      <section className={`${styles.chat} ${selectedId ? '' : styles.hideMobile}`} aria-label="Conversa">
+        {lead ? (
           <>
-            <ChatHeaderMain
-              selectedChat={selectedChat}
-              onBack={() => setSelectedChatId(null)}
-              userName={user?.name}
-              showNotifications={showNotifications}
-              onToggleNotifications={() => setShowNotifications(!showNotifications)}
-              onCloseNotifications={() => setShowNotifications(false)}
-              unreadCount={unreadCount}
-              onToggleInfo={() => setShowInfo(!showInfo)}
+            <ChatHeader
+              lead={lead}
+              ownerName={ownerName(lead.assignedTo)}
+              canTransfer={canAssign || lead.assignedTo === user?.id}
+              channelLabel={channelLabel}
+              onBack={() => selectChat(null)}
+              onTransfer={() => setShowTransfer(true)}
+              onInfo={() => setShowInfo(true)}
+              tools={tools}
             />
-
-            <MessageBubbleList
-              activeMessages={activeMessages}
-              selectedChatName={selectedChat.name}
-              selectedChannel={selectedChannel}
-              onSelectChannel={setSelectedChannel}
-              messagesEndRef={messagesEndRef}
+            {channels && !channels.web && !channels.api && (
+              <div className={styles.banner}>
+                <AlertTriangle size={15} /> Nenhum WhatsApp conectado: as mensagens não saem. <Link href="/integrations">Conectar em Integrações</Link>
+              </div>
+            )}
+            {lead.status === 'Bloqueado' && <div className={styles.banner}><AlertTriangle size={15} /> Contato bloqueado: as automações não rodam para ele. Você ainda pode responder.</div>}
+            <MessageList messages={messages} leadName={lead.name} now={now} retrying={retrying} onRetry={retry} endRef={endRef} />
+            <Composer
+              disabledReason={disabledReason}
+              canUseQuickReplies={hasPermission('messages.templates')}
+              canManageQuickReplies={canAssign}
+              quickReplies={quickReplies}
+              fill={(text) => fillTemplate(text, { name: lead.name, agent: user?.name?.split(' ')[0] || '' })}
+              agentName={user?.name?.split(' ')[0] || ''}
+              sending={sending}
+              onSend={sendText}
+              onSendFile={sendFile}
+              onManageQuickReplies={() => setShowQuick(true)}
             />
-
-            {/* SEND ERROR BANNER */}
-            <AnimatePresence>
-              {sendError && (
-                <SendErrorBanner message={sendError} onDismiss={() => setSendError(null)} />
-              )}
-            </AnimatePresence>
-
-            <MessageInputBar
-              isRecording={isRecording}
-              recordingTime={recordingTime}
-              canvasRef={canvasRef}
-              onCancelRecording={() => stopRecording(true)}
-              onConfirmRecording={() => stopRecording(false)}
-              inputText={inputText}
-              onInputTextChange={setInputText}
-              onKeyDown={handleKeyDown}
-              showEmoji={showEmoji}
-              onToggleEmoji={() => setShowEmoji(!showEmoji)}
-              onInsertEmoji={insertEmoji}
-              useSignature={useSignature}
-              onToggleSignature={toggleSignature}
-              canUseQuickMessages={hasPermission('messages.templates')}
-              showQuickMsgs={showQuickMsgs}
-              onToggleQuickMsgs={() => setShowQuickMsgs(!showQuickMsgs)}
-              quickTemplates={quickTemplates}
-              onUseQuickMsg={useQuickMsg}
-              showTemplates={showTemplates}
-              onToggleTemplates={() => setShowTemplates(!showTemplates)}
-              onUseTemplate={useTemplate}
-              onSendMessage={() => handleSendMessage()}
-              onStartRecording={startRecording}
-              onSelectFile={handleFileSelected}
-              isSendingAttachment={isSendingAttachment}
-            />
-
-            {/* INFO DRAWER */}
-            <AnimatePresence>
-              {showInfo && (
-                <LeadInfoDrawer
-                  selectedChat={selectedChat}
-                  isEditing={isEditing}
-                  onStartEdit={() => setIsEditing(true)}
-                  onClose={() => { setShowInfo(false); setIsEditing(false); }}
-                  editForm={editForm}
-                  onEditFormChange={setEditForm}
-                  currentStageName={currentStageName}
-                  pipelineStages={pipelineStages}
-                  selectedChannel={selectedChannel}
-                  onSelectChannel={setSelectedChannel}
-                  onSaveEdit={() => {
-                    if (selectedChatId) {
-                      updateLead(selectedChatId, {
-                        name: editForm.name,
-                        email: editForm.email,
-                        phone: editForm.phone,
-                        value: editForm.value,
-                        pipelineStage: editForm.stage
-                      });
-                    }
-                    setIsEditing(false);
-                  }}
-                  onCancelEdit={() => setIsEditing(false)}
-                  onTransfer={() => alert('Abrindo lista de atendentes...')}
-                />
-              )}
-            </AnimatePresence>
           </>
         ) : (
-          <EmptyChatState
-            userName={user?.name}
-            showNotifications={showNotifications}
-            onToggleNotifications={() => setShowNotifications(!showNotifications)}
-            onCloseNotifications={() => setShowNotifications(false)}
-            unreadCount={unreadCount}
-          />
+          <div className={styles.empty}>
+            <div className={styles.emptyTools}><SystemToolsBar {...tools} /></div>
+            <MessageSquare size={48} />
+            <h2>{selectedId && loaded ? 'Conversa não encontrada' : 'Escolha uma conversa'}</h2>
+            <p>
+              {selectedId && loaded
+                ? 'Esse contato não existe mais ou está com outra pessoa da equipe.'
+                : 'As mensagens do WhatsApp da empresa chegam aqui. As não lidas ficam em destaque e as mais recentes no topo.'}
+            </p>
+            {channels && !channels.web && !channels.api && <Link href="/integrations" className={styles.primaryBtn}>Conectar o WhatsApp</Link>}
+          </div>
         )}
-      </div>
+      </section>
 
-      {/* MODAL NOVO CONTATO */}
-      <AnimatePresence>
-        {showNewContact && (
-          <NewContactModal
-            newContact={newContact}
-            onChange={setNewContact}
-            pipelineStages={pipelineStages}
-            contactError={contactError}
-            savingContact={savingContact}
-            onClose={() => setShowNewContact(false)}
-            onCreate={handleCreateContact}
-          />
-        )}
-      </AnimatePresence>
+      {showInfo && lead && (
+        <LeadPanel
+          key={lead.id}
+          lead={lead}
+          stages={pipelineStages}
+          team={team}
+          tagOptions={tags}
+          canAssign={canAssign}
+          hideConversation
+          onSave={async (changes) => {
+            const result = await updateLead(lead.id, changes);
+            if (!result.ok) return result.error;
+            setNotice({ type: 'ok', text: 'Lead salvo.' });
+            return null;
+          }}
+          onDelete={async () => {
+            const result = await deleteLead(lead.id);
+            if (!result.ok) return result.error;
+            selectChat(null);
+            return null;
+          }}
+          onClose={() => setShowInfo(false)}
+        />
+      )}
+
+      {showTransfer && lead && user && (
+        <TransferModal leadName={lead.name} currentOwner={lead.assignedTo || null} team={team} selfId={user.id} onClose={() => setShowTransfer(false)} onTransfer={transfer} />
+      )}
+
+      {showQuick && <QuickRepliesModal replies={quickReplies} onChanged={loadQuickReplies} onClose={() => setShowQuick(false)} />}
+
+      {notice && (
+        <div className={`${styles.toast} ${notice.type === 'error' ? styles.toastError : ''}`} role="status">
+          {notice.type === 'error' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {notice.text}
+          <button type="button" className={styles.toastClose} onClick={() => setNotice(null)} aria-label="Fechar aviso"><X size={14} /></button>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function MessagesPage() {
   return (
-    <Suspense fallback={<div style={{ padding: '24px' }}>Carregando mensagens...</div>}>
+    <Suspense fallback={null}>
       <MessagesContent />
     </Suspense>
   );
