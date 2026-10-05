@@ -67,7 +67,7 @@ async function touchPreview(tenantId: string, leadId: string, preview: string) {
 }
 
 /** Texto da equipe para o cliente. `retryId`: reenvia uma mensagem que falhou. */
-export async function sendTextToLead(tenantId: string, senderId: string, lead: ChatLead, text: string, retryId?: string | null): Promise<SendResult> {
+export async function sendTextToLead(tenantId: string, senderId: string | null, lead: ChatLead, text: string, retryId?: string | null): Promise<SendResult> {
   if (!lead.phone) return { ok: false, error: 'Este contato não tem telefone.' };
   const channels = await whatsappChannels(tenantId);
   if (!channels.web && !channels.api) return { ok: false, error: 'Nenhum WhatsApp conectado. Conecte o WhatsApp Web ou a API oficial em Integrações.' };

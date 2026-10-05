@@ -273,7 +273,8 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
       { title: 'Metas', text: 'Em **Metas**, crie objetivos com prazo e passos práticos. O painel separa metas cumpridas, em andamento, próximas e as que precisam de atenção.' },
       { title: 'Projetos', text: 'Em **Projetos**, acompanhe planos de ação por cliente, com metas semanais e foco comercial.' },
       { title: 'Planejamentos', text: 'Em **Planejamentos**, desenhe funis e mapas de estratégia em um quadro visual para testar ideias antes de colocar em prática.' },
-      { title: 'Agendamento', text: 'Em **Agendamento**, organize compromissos e tarefas no calendário e programe envios para leads.' },
+      { title: 'Agendamento: agenda e tarefas', text: 'Em **Agendamento**, marque **compromissos** (com horário) e **tarefas** (com prazo). Cada item pode ter um lead e um responsável. Escolha um **lembrete** (na hora, 10 min, 30 min, 1 h ou 1 dia antes) e o aviso chega no sino de quem é o responsável. Em **Tarefas**, arraste os cartões entre Para fazer, Em andamento e Concluído; tarefas com prazo vencido ficam em vermelho.' },
+      { title: 'Agendamento: envios agendados', text: 'Na aba **Envios agendados**, escolha o lead, o dia, o horário e a mensagem (pode usar uma resposta rápida). No horário, a mensagem sai pelo WhatsApp da empresa e aparece na conversa em Mensagens. Dá para alterar ou cancelar enquanto não saiu, e reagendar o que falhou. O envio e os lembretes dependem do agendador do servidor (CONTENT_SCHEDULER_ENABLED=true) e de um WhatsApp conectado em Integrações.' },
     ],
   },
 
