@@ -289,9 +289,9 @@ export default function HomePage() {
       key: 'agenda', title: 'Agendamento', href: '/scheduling', icon: Calendar, color: '#06b6d4',
       value: number(agenda.tasksToday), caption: 'compromissos hoje',
       stats: [
-        { label: 'Tarefas em aberto', value: String(agenda.openTasks), tone: agenda.openTasks ? 'warn' : undefined },
-        { label: 'Mensagens hoje', value: String(agenda.messagesToday) },
-        { label: 'Mensagens pendentes', value: String(agenda.messagesPending) },
+        { label: 'Tarefas atrasadas', value: String(agenda.openTasks), tone: agenda.openTasks ? 'warn' : undefined },
+        { label: 'Envios hoje', value: String(agenda.messagesToday) },
+        { label: 'Envios agendados', value: String(agenda.messagesPending) },
       ],
     });
   }

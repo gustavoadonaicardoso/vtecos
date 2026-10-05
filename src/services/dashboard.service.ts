@@ -116,9 +116,9 @@ export async function buildDashboardSummary(profile: UserProfile, tenantId: stri
           const today = todayKey();
           const [tasksToday, openTasks, messagesPending, messagesToday] = await Promise.all([
             count('scheduling_items', (q) => q.eq('date', today)),
-            count('scheduling_items', (q) => q.neq('status', 'done').lte('date', today)),
+            count('scheduling_items', (q) => q.eq('type', 'task').neq('status', 'done').lt('date', today)),
             count('scheduled_messages', (q) => q.eq('status', 'pending')),
-            count('scheduled_messages', (q) => q.eq('scheduled_date', today)),
+            count('scheduled_messages', (q) => q.eq('scheduled_date', today).neq('status', 'canceled')),
           ]);
           return { tasksToday, openTasks, messagesPending, messagesToday };
         })
