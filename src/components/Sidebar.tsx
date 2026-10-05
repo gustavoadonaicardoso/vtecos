@@ -14,6 +14,7 @@ import {
   Zap,
   Blocks,
   LifeBuoy,
+  Headset,
   ShieldCheck,
   UserCog,
   BarChart3,
@@ -78,6 +79,7 @@ const Sidebar = () => {
     { name: 'Integrações', icon: Blocks, path: '/integrations', permission: 'integrations.view' },
     { name: 'Notificações', icon: Bell, path: '/notificacoes' }, // Sempre visível — histórico é por usuário
     { name: 'Central de Ajuda', icon: LifeBuoy, path: '/help' }, // Public or always visible
+    { name: 'Chamados', icon: Headset, path: '/suporte' }, // Cliente abre; a Vórtice atende
     { name: 'Configurações', icon: Settings, path: '/settings' },
   ], []);
 

@@ -12,6 +12,7 @@ import {
   MessageCircle,
   Search,
   Send,
+  Ticket,
   X,
 } from 'lucide-react';
 import styles from './help.module.css';
@@ -24,7 +25,6 @@ export default function HelpCenter() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [openFaq, setOpenFaq] = useState<string | null>(null);
-  const [ticketOpen, setTicketOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -159,12 +159,15 @@ export default function HelpCenter() {
         <section className={styles.supportCard}>
           <div>
             <h3>Ainda precisa de ajuda?</h3>
-            <p>Fale com a equipe da Vórtice. Pelo chamado, sua mensagem chega direto para quem pode resolver.</p>
+            <p>Fale com a equipe da Vórtice. Pelo chamado, você acompanha cada resposta e a situação do seu pedido.</p>
           </div>
           <div className={styles.supportActions}>
-            <button type="button" className={styles.primaryBtn} onClick={() => setTicketOpen(true)}>
+            <Link className={styles.primaryBtn} href="/suporte?novo=1">
               <Send size={16} /> Abrir chamado
-            </button>
+            </Link>
+            <Link className={styles.secondaryBtn} href="/suporte">
+              <Ticket size={16} /> Meus chamados
+            </Link>
             {whatsappLink && (
               <a className={styles.secondaryBtn} href={whatsappLink} target="_blank" rel="noopener noreferrer">
                 <MessageCircle size={16} /> WhatsApp
@@ -183,78 +186,6 @@ export default function HelpCenter() {
         <Link href="/politica-de-privacidade">Política de Privacidade</Link>
       </footer>
 
-      {ticketOpen && <TicketModal onClose={() => setTicketOpen(false)} />}
-    </div>
-  );
-}
-
-function TicketModal({ onClose }: { onClose: () => void }) {
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [sent, setSent] = useState(false);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError('');
-    try {
-      const response = await fetch('/api/help/support', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, message }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(json.error || 'Não foi possível abrir o chamado.');
-      setSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível abrir o chamado.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className={styles.overlay} onClick={onClose}>
-      <form className={styles.modal} onClick={(event) => event.stopPropagation()} onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="ticket-title">
-        <div className={styles.modalHead}>
-          <h3 id="ticket-title">Abrir chamado</h3>
-          <button type="button" className={styles.iconBtn} onClick={onClose} aria-label="Fechar"><X size={18} /></button>
-        </div>
-        {sent ? (
-          <>
-            <div className={styles.successBox}>Chamado enviado. A equipe da Vórtice recebeu o aviso e vai retornar pelo seu e-mail ou WhatsApp.</div>
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.primaryBtn} onClick={onClose}>Fechar</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <label className={styles.field}>
-              <span>Assunto</span>
-              <input value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={120} placeholder="Ex.: WhatsApp desconectou" required autoFocus />
-            </label>
-            <label className={styles.field}>
-              <span>Descreva o que aconteceu</span>
-              <textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} rows={6} placeholder="O que você estava fazendo, o que esperava e o que apareceu na tela." required />
-            </label>
-            {error && <div className={styles.errorBox}><AlertTriangle size={16} /> {error}</div>}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.secondaryBtn} onClick={onClose}>Cancelar</button>
-              <button type="submit" className={styles.primaryBtn} disabled={busy}>
-                {busy ? <Loader2 size={16} className={styles.spin} /> : <Send size={16} />} Enviar chamado
-              </button>
-            </div>
-          </>
-        )}
-      </form>
     </div>
   );
 }

@@ -264,6 +264,20 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     ],
   },
 
+  // ── Chamados ───────────────────────────────────────────────
+  {
+    slug: 'chamados-suporte',
+    category: 'conta',
+    title: 'Chamados: falar com a Vórtice',
+    summary: 'Abrir um chamado, acompanhar as respostas e confirmar quando resolveu.',
+    sections: [
+      { title: 'Abrir um chamado', text: 'Em **Chamados** (menu lateral) ou na **Central de Ajuda**, clique em **Abrir chamado**. Dê um título, escolha o assunto, diga o quanto isso atrapalha (de "Posso esperar" a "Sistema parado"), descreva o que aconteceu e, se puder, anexe um print (até 3 arquivos de 10 MB).' },
+      { title: 'Acompanhar', text: 'Cada resposta da equipe e cada mudança de situação chega no **sino**. Marque **Avisar pelo WhatsApp** para receber também no celular. As situações são: **Aberto**, **Em andamento**, **Aguardando você** (a equipe precisa de uma resposta sua), **Resolvido** e **Encerrado**.' },
+      { title: 'Confirmar que resolveu', text: 'Quando a equipe marcar como **Resolvido**, confirme em **Sim, resolveu** e avalie o atendimento. Se ainda não resolveu, é só responder: o chamado volta para a equipe.' },
+      { title: 'Quem vê os chamados', text: 'Administradores e gerentes da sua empresa veem todos os chamados dela. Os demais usuários veem só os que abriram.' },
+    ],
+  },
+
   // ── Gestão ─────────────────────────────────────────────────
   {
     slug: 'metas-relatorios-projetos',
