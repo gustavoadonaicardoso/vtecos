@@ -367,3 +367,41 @@
     animation: none;
   }
 }
+
+/* Quantas pessoas ainda aguardam (abaixo do guichê). */
+.waitingInfo {
+  margin-top: clamp(12px, 2vh, 22px);
+  color: #6b6487;
+  font-size: clamp(1rem, 1.8vw, 1.4rem);
+  font-weight: 650;
+}
+
+/* O navegador só libera áudio depois de um toque: aviso discreto no canto. */
+.soundHint {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(79, 0, 203, 0.25);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #4f00cb;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(22, 10, 51, 0.15);
+  cursor: pointer;
+}
+
+.soundOn {
+  padding: 10px;
+  opacity: 0.35;
+}
+
+.soundOn:hover {
+  opacity: 1;
+}
