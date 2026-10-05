@@ -61,7 +61,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (!(await fetchTenantUser(id, userId))) {
     return NextResponse.json({ error: 'Usuário não pertence a esta empresa.' }, { status: 404 });
   }
-  const result = await deleteTeamMember(id, userId);
+  const result = await deleteTeamMember(id, userId, null);
   if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
   return NextResponse.json({ success: true });
 }

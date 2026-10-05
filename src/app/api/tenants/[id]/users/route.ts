@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/session';
+import { ROLE_DEFAULT_PERMISSIONS, type TeamRole } from '@/lib/permissions.constants';
 import { fetchTenantById, fetchTenantUsers } from '@/services/tenants.service';
 import { createUserWithProfile } from '@/services/users.service';
 
@@ -40,7 +41,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     if (!CLIENT_ROLES.has(role)) return NextResponse.json({ error: 'Perfil inválido.' }, { status: 400 });
 
-    const result = await createUserWithProfile({ tenantId: id, name, email, password, role, permissions: {} });
+    const result = await createUserWithProfile({ tenantId: id, name, email, password, role, permissions: ROLE_DEFAULT_PERMISSIONS[role as TeamRole] ?? {} });
     if (!result.success) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (err: unknown) {

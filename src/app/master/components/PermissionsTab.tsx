@@ -77,7 +77,7 @@ export default function PermissionsTab({ selectedRole, onSelectRole, rolePermiss
               </div>
               <div className={styles.menuText}>
                 <h4>{item.label}</h4>
-                <span>{isAdminRole ? 'Acesso total' : isEnabled ? 'Visível no menu' : 'Oculto para esta função'}</span>
+                <span>{isAdminRole ? 'Acesso total' : item.kind === 'action' ? (isEnabled ? 'Liberado' : 'Bloqueado para esta função') : isEnabled ? 'Visível no menu' : 'Oculto para esta função'}</span>
               </div>
               {isAdminRole ? (
                 <Lock size={16} style={{ color: 'var(--accent)', flex: 'none' }} />

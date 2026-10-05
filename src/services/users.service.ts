@@ -42,6 +42,26 @@ export async function fetchProfiles(tenantId: string, scope: 'chat' | 'team'): P
   return { success: true, data: (data || []) as unknown as Row[] };
 }
 
+/** Todos os modelos de mensagem ativos da empresa (para liberar por pessoa na Equipe). */
+export async function fetchTenantTemplates(tenantId: string) {
+  const { data } = await supabaseAdmin
+    .from('message_templates')
+    .select('id, name')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .order('name');
+  return (data || []) as { id: string; name: string }[];
+}
+
+/** O que está ligado ao membro: mostrado antes de remover. */
+export async function fetchMemberSummary(tenantId: string, userId: string) {
+  const [leads, goals] = await Promise.all([
+    supabaseAdmin.from('leads').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('assigned_to', userId),
+    supabaseAdmin.from('goals').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('owner_id', userId),
+  ]);
+  return { leads: leads.count ?? 0, goals: goals.error ? 0 : goals.count ?? 0 };
+}
+
 /** Perfil desta empresa (null se não existir ou for de outra empresa). */
 export async function fetchTenantProfile(tenantId: string, userId: string) {
   const { data } = await supabaseAdmin
@@ -172,6 +192,22 @@ export async function updateTeamMember(
     return { success: false, error: 'Não é possível remover o acesso do último administrador ativo da empresa.' };
   }
 
+  const current = await fetchTenantProfile(tenantId, userId);
+  if (!current) return { success: false, error: 'Membro não encontrado.' };
+
+  // O login é feito pelo e-mail do Supabase Auth: trocar só no perfil
+  // fazia a pessoa continuar entrando com o e-mail antigo.
+  if (String(current.email || '').toLowerCase() !== updates.email) {
+    // tenant-scope: ok (e-mail é único no login, entre todas as empresas)
+    const { data: taken } = await supabaseAdmin.from('profiles').select('id').eq('email', updates.email).neq('id', userId).limit(1);
+    if (taken && taken.length > 0) return { success: false, error: 'Este e-mail já é usado por outro acesso.' };
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, { email: updates.email, email_confirm: true });
+    if (authError) {
+      const duplicate = /already|exist|registered/i.test(authError.message);
+      return { success: false, error: duplicate ? 'Este e-mail já é usado por outro acesso.' : `Não foi possível trocar o e-mail de login: ${authError.message}` };
+    }
+  }
+
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update({
@@ -202,7 +238,7 @@ export async function applyRolePermissions(tenantId: string, role: string, permi
 /**
  * Remove um membro da equipe por completo: perfil e credencial de Auth.
  */
-export async function deleteTeamMember(tenantId: string, userId: string): Promise<ServiceResult> {
+export async function deleteTeamMember(tenantId: string, userId: string, transferTo: string | null): Promise<ServiceResult> {
   if (!(await fetchTenantProfile(tenantId, userId))) {
     return { success: false, error: 'Membro não encontrado.' };
   }
@@ -210,8 +246,28 @@ export async function deleteTeamMember(tenantId: string, userId: string): Promis
     return { success: false, error: 'Não é possível remover o último administrador ativo da empresa.' };
   }
 
+  // Leads da pessoa: passam para quem foi escolhido (ou ficam sem
+  // responsável). Antes ficavam presos a um usuário que não existe mais.
+  if (transferTo) {
+    const target = await fetchTenantProfile(tenantId, transferTo);
+    if (!target || transferTo === userId) return { success: false, error: 'Escolha um membro desta empresa para receber os leads.' };
+  }
+  const { error: leadsError } = await supabaseAdmin
+    .from('leads')
+    .update({ assigned_to: transferTo })
+    .eq('tenant_id', tenantId)
+    .eq('assigned_to', userId);
+  if (leadsError) return { success: false, error: `Não foi possível transferir os leads: ${leadsError.message}` };
+
   const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('tenant_id', tenantId).eq('id', userId);
-  if (profileError) return { success: false, error: profileError.message };
+  if (profileError) {
+    return {
+      success: false,
+      error: /foreign key|violates/i.test(profileError.message)
+        ? 'Este membro tem registros ligados a ele e não pode ser removido. Desative o acesso (Status: Inativo) em vez de remover.'
+        : profileError.message,
+    };
+  }
 
   const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
   if (authError) {

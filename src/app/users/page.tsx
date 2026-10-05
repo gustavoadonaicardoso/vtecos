@@ -1,506 +1,303 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
-import { ChevronLeft, Plus } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Copy, Loader2, Plus, Search, UserCog, X } from 'lucide-react';
 import styles from './users.module.css';
-
-import { supabase } from '@/lib/supabase';
-import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/context/AuthContext';
-
-import {
-  type Role,
-  type Status,
-  type Permissions,
-  DEFAULT_PERMISSIONS,
-  SELLER_PERMISSIONS,
-} from './constants';
-import UserListSidebar from './components/UserListSidebar';
-import UserInfoTab from './components/UserInfoTab';
-import UserPermissionsTab from './components/UserPermissionsTab';
-import UserUpdatesTab from './components/UserUpdatesTab';
-import UserPersonalizationTab from './components/UserPersonalizationTab';
+import { usePresence } from '@/context/PresenceContext';
+import { editablePermissions, ROLE_LABEL, type Member, type Role, type Template } from './constants';
+import Avatar from './components/Avatar';
+import MemberDetail, { type Draft } from './components/MemberDetail';
 import NewMemberModal from './components/NewMemberModal';
+import RemoveMemberModal from './components/RemoveMemberModal';
+
+type Notice = { type: 'ok' | 'error'; text: string };
+
+const toDraft = (member: Member): Draft => ({
+  name: member.name,
+  email: member.email,
+  role: member.role,
+  status: member.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
+  permissions: editablePermissions(member.permissions),
+  allowed_templates: member.allowed_templates || [],
+});
+
+async function loadTeam() {
+  const response = await fetch('/api/users?scope=team', { cache: 'no-store' });
+  const json = await response.json().catch(() => ({}));
+  return response.ok
+    ? { members: (json.data || []) as Member[], templates: (json.templates || []) as Template[] }
+    : { error: json.error || 'Não foi possível carregar a equipe.' };
+}
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'permissions' | 'updates' | 'personalization'>('info');
-  const [isEditing, setIsEditing] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
-  const [systemUpdates, setSystemUpdates] = useState<any[]>([]);
-
-  const { config, refreshConfig } = useTheme();
   const { user } = useAuth();
-  const isPlatformAdmin = user?.role === 'ADMIN' && Boolean(user?.workspace?.is_platform);
+  const presence = usePresence();
+  const canEdit = user?.role === 'ADMIN';
+  // Empresa da plataforma tem todos os módulos: null = não filtra.
+  const modules = user?.workspace?.is_platform ? null : user?.workspace?.modules ?? null;
 
-  // Branding states
-  const [primaryColor, setPrimaryColor] = useState(config.primary_color);
-  const [secondaryColor, setSecondaryColor] = useState(config.secondary_color);
-  const [logoUrl, setLogoUrl] = useState(config.logo_url);
-  const [faviconUrl, setFaviconUrl] = useState(config.favicon_url);
-  const [appName, setAppName] = useState(config.app_name);
+  const [members, setMembers] = useState<Member[] | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | Role | 'INACTIVE'>('all');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mobileDetail, setMobileDetail] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [tab, setTab] = useState<'data' | 'access' | 'activity'>('data');
+  const [saving, setSaving] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [credentials, setCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
 
-  const handleFileSelect = (type: 'logo' | 'favicon', e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const selected = members?.find((member) => member.id === selectedId) || null;
+  const dirty = Boolean(selected && draft && JSON.stringify(draft) !== JSON.stringify(toDraft(selected)));
 
-    // Optional size/type check could go here
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const b64 = event.target?.result as string;
-      if (type === 'logo') setLogoUrl(b64);
-      else setFaviconUrl(b64);
-    };
-    reader.readAsDataURL(file);
+  const apply = useCallback((result: Awaited<ReturnType<typeof loadTeam>>, keepId?: string | null) => {
+    if ('error' in result) {
+      setLoadError(result.error || '');
+      return;
+    }
+    setLoadError('');
+    setMembers(result.members);
+    setTemplates(result.templates);
+    const nextId = keepId && result.members.some((member) => member.id === keepId) ? keepId : result.members[0]?.id ?? null;
+    setSelectedId(nextId);
+    const next = result.members.find((member) => member.id === nextId);
+    setDraft(next ? toDraft(next) : null);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    loadTeam().then((result) => apply(result, null));
+  }, [user, apply]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  // Avisa antes de sair da página com alterações sem salvar.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  const select = (member: Member) => {
+    if (member.id !== selectedId && dirty && !confirm('Descartar as alterações não salvas deste membro?')) return;
+    setSelectedId(member.id);
+    setDraft(toDraft(member));
+    setMobileDetail(true);
   };
 
-  // Update form
-  const [upAction, setUpAction] = useState('');
-  const [upTarget, setUpTarget] = useState('');
-
-  // New user form
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<Role>('SELLER');
-  const [newUserPermissions, setNewUserPermissions] = useState<Permissions>(SELLER_PERMISSIONS);
-
-  // Local form states
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<Role>('SELLER');
-  const [status, setStatus] = useState<Status>('ACTIVE');
-  const [userPermissions, setUserPermissions] = useState<any>(null);
-  const [allTemplates, setAllTemplates] = useState<{ id: string; name: string }[]>([]);
-  const [allowedTemplates, setAllowedTemplates] = useState<string[]>([]);
-
-  const fetchUsers = async () => {
-    if (!user) return;
-    setLoading(true);
-    const response = await fetch('/api/users?scope=team', {
-      headers: { 'x-user-id': user.id },
-      cache: 'no-store',
+  const save = async () => {
+    if (!selected || !draft) return;
+    if (!draft.name.trim() || !draft.email.trim()) {
+      setNotice({ type: 'error', text: 'Nome e e-mail são obrigatórios.' });
+      return;
+    }
+    setSaving(true);
+    const response = await fetch(`/api/users/${selected.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...draft, name: draft.name.trim(), email: draft.email.trim() }),
     });
-    const result = await response.json().catch(() => ({}));
-
+    const json = await response.json().catch(() => ({}));
+    setSaving(false);
     if (!response.ok) {
-      console.error('Erro ao carregar equipe:', result.error);
+      setNotice({ type: 'error', text: json.error || 'Não foi possível salvar.' });
+      return;
     }
-
-    const nextUsers = response.ok && Array.isArray(result.data)
-      ? [...result.data]
-      : [];
-
-    // Garante que o administrador/usuário atual também apareça na própria equipe,
-    // mesmo quando a lista retornar incompleta.
-    if (!nextUsers.some(profile => profile.id === user.id)) {
-      nextUsers.unshift(user);
-    }
-
-    setUsers(nextUsers);
-    if (nextUsers.length > 0 && !selectedUserId) {
-      setSelectedUserId(nextUsers[0].id);
-    }
-    setLoading(false);
+    setNotice({ type: 'ok', text: `${draft.name.split(' ')[0]} atualizado(a). As mudanças de acesso valem no próximo carregamento da página dele(a).` });
+    apply(await loadTeam(), selected.id);
   };
 
-  const fetchAllTemplates = async () => {
-    const res = await fetch('/api/messages/templates');
-    const json = await res.json();
-    setAllTemplates(json.templates ?? []);
+  const deactivate = async () => {
+    if (!selected || !draft) return;
+    setRemoving(false);
+    const response = await fetch(`/api/users/${selected.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...toDraft(selected), status: 'INACTIVE' }),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) setNotice({ type: 'error', text: json.error || 'Não foi possível desativar.' });
+    else setNotice({ type: 'ok', text: `${selected.name} foi desativado(a): não consegue mais entrar.` });
+    apply(await loadTeam(), selected.id);
   };
 
-  const fetchSystemUpdates = async () => {
-    if (!supabase) return;
-    const { data } = await supabase.from('system_updates').select('*').order('created_at', { ascending: false });
-    if (data) setSystemUpdates(data);
-  };
+  const filtered = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return (members || []).filter((member) => {
+      if (roleFilter === 'INACTIVE' ? member.status !== 'INACTIVE' : roleFilter !== 'all' && (member.role !== roleFilter || member.status === 'INACTIVE')) return false;
+      return !text || member.name.toLowerCase().includes(text) || member.email.toLowerCase().includes(text);
+    });
+  }, [members, query, roleFilter]);
 
-  React.useEffect(() => {
-    if (!user) return;
-    fetchUsers();
-    fetchSystemUpdates();
-    fetchAllTemplates();
-  }, [user]);
+  const counts = useMemo(() => {
+    const list = members || [];
+    return {
+      all: list.length,
+      ADMIN: list.filter((member) => member.role === 'ADMIN' && member.status !== 'INACTIVE').length,
+      MANAGER: list.filter((member) => member.role === 'MANAGER' && member.status !== 'INACTIVE').length,
+      SELLER: list.filter((member) => member.role === 'SELLER' && member.status !== 'INACTIVE').length,
+      INACTIVE: list.filter((member) => member.status === 'INACTIVE').length,
+      online: list.filter((member) => member.status !== 'INACTIVE' && presence.isOnline(member.id, member.last_seen_at)).length,
+    };
+  }, [members, presence]);
 
-  const selectedUser = users.find(u => u.id === selectedUserId);
-
-  React.useEffect(() => {
-    if (selectedUser) {
-      setName(selectedUser.name);
-      setEmail(selectedUser.email);
-      setRole(selectedUser.role as Role);
-      setStatus((selectedUser.status || 'ACTIVE') as Status);
-      setUserPermissions(selectedUser.permissions || SELLER_PERMISSIONS);
-      setAllowedTemplates(selectedUser.allowed_templates ?? []);
-      setIsEditing(false);
-    }
-  }, [selectedUserId, users]);
-
-  const togglePermission = (category: keyof Permissions, field: string) => {
-    setUserPermissions((prev: any) => ({
-      ...prev,
-      [category]: {
-         ...(prev[category] as any),
-        [field]: !(prev[category] as any)[field]
-      }
-    }));
-    setIsEditing(true);
-  };
-
-  const toggleNewUserPermission = (category: keyof Permissions, field: string) => {
-    setNewUserPermissions((prev: any) => ({
-      ...prev,
-      [category]: {
-        ...(prev[category] as any),
-        [field]: !(prev[category] as any)[field]
-      }
-    }));
-  };
-
-  const handleNameChange = (value: string) => { setName(value); setIsEditing(true); };
-  const handleEmailChange = (value: string) => { setEmail(value); setIsEditing(true); };
-  const handleStatusChange = (value: Status) => { setStatus(value); setIsEditing(true); };
-  const handleRoleChange = (newRole: Role) => {
-    setRole(newRole);
-    setIsEditing(true);
-    if (newRole === 'ADMIN') setUserPermissions(DEFAULT_PERMISSIONS);
-    else if (newRole === 'SELLER') setUserPermissions(SELLER_PERMISSIONS);
-  };
-  const handleAllowedTemplatesChange = (next: string[]) => {
-    setAllowedTemplates(next);
-    setIsEditing(true);
-  };
-
-  const saveChanges = async () => {
-    if (!name || !email || !selectedUserId || !user?.id) return;
-
-    setLoading(true);
+  const copyCredentials = async () => {
+    if (!credentials) return;
     try {
-      const response = await fetch(`/api/users/${selectedUserId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user.id,
-        },
-        body: JSON.stringify({
-          name,
-          email,
-          role,
-          status,
-          permissions: userPermissions,
-          allowed_templates: allowedTemplates,
-        }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Não foi possível salvar as alterações.');
-      }
-
-      await fetchUsers();
-      setIsEditing(false);
-    } catch (error: unknown) {
-      alert(`Erro ao salvar alterações: ${error instanceof Error ? error.message : 'Tente novamente.'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (newPassword: string) => {
-    if (!selectedUserId || !user?.id) return;
-
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/users/${selectedUserId}/password`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user.id,
-        },
-        body: JSON.stringify({ newPassword }),
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Não foi possível redefinir a senha.');
-      }
-
-      alert('Senha redefinida com sucesso.');
-    } catch (error: unknown) {
-      alert(`Erro ao redefinir senha: ${error instanceof Error ? error.message : 'Tente novamente.'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUserName || !newUserEmail || !newUserPassword || !user?.id) return;
-
-    setLoading(true);
-
-    try {
-      const response = await fetch('/api/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': user.id,
-        },
-        body: JSON.stringify({
-          name: newUserName,
-          email: newUserEmail,
-          password: newUserPassword,
-          role: newUserRole,
-          permissions: newUserPermissions,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Não foi possível criar o membro.');
-      }
-
-      await fetchUsers();
-      setIsAddModalOpen(false);
-      setNewUserName('');
-      setNewUserEmail('');
-      setNewUserPassword('');
-      setNewUserRole('SELLER');
-      setNewUserPermissions(SELLER_PERMISSIONS);
-    } catch (error: unknown) {
-      alert(`Erro ao criar membro: ${error instanceof Error ? error.message : 'Tente novamente.'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteMember = async () => {
-    if (!selectedUserId || !user?.id) return;
-
-    if (window.confirm(`Tem certeza que deseja remover o membro ${selectedUser?.name}? Esta ação não pode ser desfeita.`)) {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/users/${selectedUserId}`, {
-          method: 'DELETE',
-          headers: { 'x-user-id': user.id },
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error || 'Não foi possível remover o membro.');
-        }
-        setSelectedUserId(null);
-        await fetchUsers();
-      } catch (error: unknown) {
-        alert(`Erro ao remover membro: ${error instanceof Error ? error.message : 'Tente novamente.'}`);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const createNewMember = () => {
-     setIsAddModalOpen(true);
-  };
-
-  const handleCreateUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!upAction || !supabase || !selectedUser) return;
-
-    setLoading(true);
-    const { error } = await supabase.from('system_updates').insert([{
-      user_name: selectedUser.name,
-      action: upAction,
-      target: upTarget,
-      icon_name: 'TrendingUp'
-    }]);
-
-    if (!error) {
-      setUpAction('');
-      setUpTarget('');
-      await fetchSystemUpdates();
-    }
-    setLoading(false);
-  };
-
-  const handleDeleteUpdate = async (id: string) => {
-     if (!supabase) return;
-     await supabase.from('system_updates').delete().eq('id', id);
-     await fetchSystemUpdates();
-  };
-
-  const saveBrandingConfig = async () => {
-    if (!supabase) return;
-    setLoading(true);
-    const { error } = await supabase.from('system_config').update({
-       primary_color: primaryColor,
-       secondary_color: secondaryColor,
-       logo_url: logoUrl,
-       favicon_url: faviconUrl,
-       app_name: appName,
-       updated_at: new Date()
-    }).eq('id', 'branding');
-
-    if (!error) {
-       await refreshConfig();
-       alert("Identidade Visual atualizada com sucesso!");
-    } else {
-       alert(`Não foi possível salvar a identidade visual: ${error.message}`);
-    }
-    setLoading(false);
+      await navigator.clipboard.writeText(`Acesso ao sistema\nE-mail: ${credentials.email}\nSenha: ${credentials.password}\nEndereço: ${window.location.origin}/login`);
+      setNotice({ type: 'ok', text: 'Dados de acesso copiados.' });
+    } catch {}
   };
 
   return (
     <div className={styles.container}>
-      <header className={styles.headerRow}>
-        <div className={styles.titleSection}>
-          <h2>Equipe e Permissões</h2>
-          <p>Selecione um membro para gerenciar seus acessos e informações.</p>
+      <header className={styles.header}>
+        <div>
+          <h2>Equipe</h2>
+          <p>
+            {members ? `${counts.all} pessoa(s) · ${counts.online} online agora` : 'Carregando...'}
+            {counts.INACTIVE > 0 && ` · ${counts.INACTIVE} inativa(s)`}
+          </p>
         </div>
-
-        <button className={styles.addBtn} onClick={createNewMember}>
-          <Plus size={18} /> Novo Membro
-        </button>
+        {canEdit && (
+          <button type="button" className={styles.primaryBtn} onClick={() => setCreating(true)}>
+            <Plus size={16} /> Novo membro
+          </button>
+        )}
       </header>
 
-      <div className={styles.splitLayout}>
-        <UserListSidebar
-          users={users}
-          selectedUserId={selectedUserId}
-          onSelectUser={(id) => { setSelectedUserId(id); setMobileEditorOpen(true); }}
-        />
+      {!canEdit && user && (
+        <div className={styles.infoBanner}>
+          <UserCog size={16} /> Você pode ver a equipe e os acessos de cada pessoa. Só administradores cadastram e editam.
+        </div>
+      )}
 
-        <main className={`${styles.mainEditorSection} ${mobileEditorOpen ? styles.mobileEditorOpen : ''}`}>
-          {selectedUser && (
-            <div className={styles.editorContainer}>
-              <div className={styles.editorProfileHeader}>
-                <button className={styles.mobileBackBtn} onClick={() => setMobileEditorOpen(false)}>
-                  <ChevronLeft size={20} /> Voltar
-                </button>
-                <div className={styles.profileMain}>
-                  <div className={styles.profileAvatarLarge}>
-                    {selectedUser.name.charAt(0)}{selectedUser.name.split(' ')[1]?.charAt(0) || ''}
-                  </div>
-                  <div className={styles.profileTexts}>
-                    <h3>{selectedUser.name}</h3>
-                    <p>{selectedUser.email}</p>
-                  </div>
-                </div>
+      {credentials && (
+        <div className={styles.credentials}>
+          <CheckCircle2 size={18} />
+          <div>
+            <strong>{credentials.name} foi cadastrado(a).</strong>
+            <p>E-mail: <code>{credentials.email}</code> · Senha: <code>{credentials.password}</code></p>
+            <small>Esta é a única vez que a senha aparece. Envie para a pessoa por um canal seguro.</small>
+          </div>
+          <button type="button" className={styles.secondaryBtn} onClick={copyCredentials}><Copy size={14} /> Copiar</button>
+          <button type="button" className={styles.iconBtn} onClick={() => setCredentials(null)} aria-label="Fechar"><X size={16} /></button>
+        </div>
+      )}
 
-                {isEditing && (
-                  <button className={styles.saveAlertBtn} onClick={saveChanges}>
-                    <Plus size={16} /> Salvar Alterações
-                  </button>
-                )}
-              </div>
+      {loadError && <div className={styles.errorBox}><AlertTriangle size={16} /> {loadError}</div>}
 
-              <div className={styles.tabSwitcher}>
-                <button
-                  className={`${styles.tabBtn} ${activeTab === 'info' ? styles.tabActive : ''}`}
-                  onClick={() => setActiveTab('info')}
-                >
-                  Informações
+      <div className={`${styles.layout} ${mobileDetail ? styles.showDetail : ''}`}>
+        <aside className={styles.listPanel} aria-label="Membros">
+          <label className={styles.search}>
+            <Search size={15} />
+            <input type="search" placeholder="Buscar por nome ou e-mail" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </label>
+          <div className={styles.filters} role="tablist" aria-label="Filtrar">
+            {([['all', 'Todos'], ['ADMIN', 'Admins'], ['MANAGER', 'Gerentes'], ['SELLER', 'Vendedores'], ['INACTIVE', 'Inativos']] as const).map(([value, label]) => (
+              (value === 'all' || counts[value] > 0) && (
+                <button key={value} type="button" role="tab" aria-selected={roleFilter === value} className={roleFilter === value ? styles.filterOn : ''} onClick={() => setRoleFilter(value)}>
+                  {label} <span>{counts[value]}</span>
                 </button>
-                <button
-                  className={`${styles.tabBtn} ${activeTab === 'permissions' ? styles.tabActive : ''}`}
-                  onClick={() => setActiveTab('permissions')}
-                >
-                  Permissões de Acesso
-                </button>
-                <button
-                  className={`${styles.tabBtn} ${activeTab === 'updates' ? styles.tabActive : ''}`}
-                  onClick={() => setActiveTab('updates')}
-                >
-                  Emitir Atualização
-                </button>
-                {/* Identidade visual é da plataforma inteira: só o admin da Vórtice altera. */}
-                {isPlatformAdmin && (
-                  <button
-                    className={`${styles.tabBtn} ${activeTab === 'personalization' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('personalization')}
-                  >
-                    Personalização
-                  </button>
-                )}
-              </div>
+              )
+            ))}
+          </div>
 
-              <div className={styles.editorScroller}>
-                {activeTab === 'info' ? (
-                  <UserInfoTab
-                    name={name}
-                    email={email}
-                    role={role}
-                    status={status}
-                    loading={loading}
-                    onNameChange={handleNameChange}
-                    onEmailChange={handleEmailChange}
-                    onRoleChange={handleRoleChange}
-                    onStatusChange={handleStatusChange}
-                    onDeleteMember={handleDeleteMember}
-                    onResetPassword={handleResetPassword}
-                  />
-                ) : activeTab === 'permissions' ? (
-                  <UserPermissionsTab
-                    userPermissions={userPermissions}
-                    allTemplates={allTemplates}
-                    allowedTemplates={allowedTemplates}
-                    onTogglePermission={togglePermission}
-                    onAllowedTemplatesChange={handleAllowedTemplatesChange}
-                  />
-                ) : activeTab === 'updates' ? (
-                  <UserUpdatesTab
-                    upAction={upAction}
-                    upTarget={upTarget}
-                    loading={loading}
-                    systemUpdates={systemUpdates}
-                    onUpActionChange={setUpAction}
-                    onUpTargetChange={setUpTarget}
-                    onSubmit={handleCreateUpdate}
-                    onDeleteUpdate={handleDeleteUpdate}
-                  />
-                ) : isPlatformAdmin ? (
-                  <UserPersonalizationTab
-                    primaryColor={primaryColor}
-                    secondaryColor={secondaryColor}
-                    appName={appName}
-                    logoUrl={logoUrl}
-                    faviconUrl={faviconUrl}
-                    loading={loading}
-                    onPrimaryColorChange={setPrimaryColor}
-                    onSecondaryColorChange={setSecondaryColor}
-                    onAppNameChange={setAppName}
-                    onLogoUrlChange={setLogoUrl}
-                    onFaviconUrlChange={setFaviconUrl}
-                    onFileSelect={handleFileSelect}
-                    onSaveBranding={saveBrandingConfig}
-                  />
-                ) : null}
-              </div>
-            </div>
+          <div className={styles.memberList}>
+            {!members && !loadError && <p className={styles.muted}><Loader2 size={14} className={styles.spin} /> Carregando equipe...</p>}
+            {members && filtered.length === 0 && <p className={styles.muted}>Ninguém encontrado.</p>}
+            {filtered.map((member) => {
+              const active = member.status !== 'INACTIVE';
+              const online = active && presence.isOnline(member.id, member.last_seen_at);
+              return (
+                <button key={member.id} type="button" className={`${styles.memberItem} ${member.id === selectedId ? styles.memberOn : ''} ${active ? '' : styles.memberOff}`} onClick={() => select(member)}>
+                  <Avatar id={member.id} name={member.name} url={member.avatar_url} size={40} online={active ? online : undefined} />
+                  <span className={styles.memberText}>
+                    <strong>{member.name}{member.id === user?.id && <span className={styles.youTag}>você</span>}</strong>
+                    <small>{ROLE_LABEL[member.role] || member.role} · {active ? presence.statusLabel(member.id, member.last_seen_at) : 'Inativo'}</small>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <main className={styles.detailPanel}>
+          {selected && draft ? (
+            <MemberDetail
+              key={selected.id}
+              member={selected}
+              draft={draft}
+              dirty={dirty}
+              saving={saving}
+              canEdit={canEdit}
+              isSelf={selected.id === user?.id}
+              online={presence.isOnline(selected.id, selected.last_seen_at)}
+              presenceLabel={presence.statusLabel(selected.id, selected.last_seen_at)}
+              modules={modules}
+              templates={templates}
+              tab={tab}
+              onTab={setTab}
+              onDraft={(changes) => setDraft((current) => (current ? { ...current, ...changes } : current))}
+              onSave={save}
+              onDiscard={() => setDraft(toDraft(selected))}
+              onBack={() => {
+                if (dirty && !confirm('Descartar as alterações não salvas?')) return;
+                setDraft(toDraft(selected));
+                setMobileDetail(false);
+              }}
+              onRemove={() => setRemoving(true)}
+              onNotice={(type, text) => setNotice({ type, text })}
+            />
+          ) : (
+            members && <div className={styles.emptyDetail}><UserCog size={32} /><p>Escolha alguém da lista.</p></div>
           )}
         </main>
       </div>
 
-      <NewMemberModal
-        isOpen={isAddModalOpen}
-        loading={loading}
-        newUserName={newUserName}
-        newUserEmail={newUserEmail}
-        newUserRole={newUserRole}
-        newUserPassword={newUserPassword}
-        newUserPermissions={newUserPermissions}
-        onClose={() => setIsAddModalOpen(false)}
-        onNameChange={setNewUserName}
-        onEmailChange={setNewUserEmail}
-        onRoleChange={setNewUserRole}
-        onPasswordChange={setNewUserPassword}
-        onTogglePermission={toggleNewUserPermission}
-        onSubmit={handleCreateMember}
-      />
+      {creating && (
+        <NewMemberModal
+          modules={modules}
+          onClose={() => setCreating(false)}
+          onCreated={async (created) => {
+            setCreating(false);
+            setCredentials(created);
+            apply(await loadTeam(), created.id);
+            setTab('data');
+          }}
+        />
+      )}
+
+      {removing && selected && (
+        <RemoveMemberModal
+          member={selected}
+          candidates={(members || []).filter((member) => member.id !== selected.id && member.status !== 'INACTIVE')}
+          onClose={() => setRemoving(false)}
+          onDeactivate={deactivate}
+          onRemoved={async () => {
+            setRemoving(false);
+            setMobileDetail(false);
+            setNotice({ type: 'ok', text: `${selected.name} foi removido(a) da equipe.` });
+            apply(await loadTeam(), null);
+          }}
+        />
+      )}
+
+      {notice && (
+        <div className={`${styles.toast} ${notice.type === 'error' ? styles.toastError : ''}`} role="status">
+          {notice.type === 'error' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {notice.text}
+        </div>
+      )}
     </div>
   );
 }
