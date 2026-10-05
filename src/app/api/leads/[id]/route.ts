@@ -39,11 +39,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const body = await request.json().catch(() => ({}));
-    const { action, ...updates } = body;
+    const { action, note: _note, ...updates } = body;
+    void _note;
 
-    // Vendedor não passa o lead para outra pessoa.
-    if (!['ADMIN', 'MANAGER'].includes(auth.profile.role) && 'assignedTo' in updates && updates.assignedTo !== auth.profile.id) {
-      return NextResponse.json({ error: 'Só administradores e gerentes trocam o responsável do lead.' }, { status: 403 });
+    // Troca de responsável: o novo precisa ser alguém ativo da empresa.
+    // Vendedor pode transferir um lead dele (Mensagens > Transferir), mas
+    // não deixá-lo sem responsável.
+    const ownerBefore = 'assignedTo' in updates ? await fetchLeadOwner(auth.tenantId, leadId) : null;
+    if ('assignedTo' in updates && updates.assignedTo && updates.assignedTo !== ownerBefore) {
+      const { data: target } = await supabaseAdmin.from('profiles').select('id').eq('tenant_id', auth.tenantId).eq('id', updates.assignedTo).eq('status', 'ACTIVE').maybeSingle();
+      if (!target) return NextResponse.json({ error: 'Escolha alguém ativo da equipe.' }, { status: 400 });
+    }
+    if (!['ADMIN', 'MANAGER'].includes(auth.profile.role) && 'assignedTo' in updates && !updates.assignedTo) {
+      return NextResponse.json({ error: 'Para passar o lead, escolha alguém da equipe.' }, { status: 403 });
     }
 
     // Etapa antes da mudança: lead que entra numa etapa dispara as automações dela.
@@ -63,6 +71,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const result = await updateLeadInDb(auth.tenantId, leadId, updates);
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
     notifyStage();
+
+    // Quem recebeu o lead fica sabendo (sino de notificações).
+    if ('assignedTo' in updates && updates.assignedTo && updates.assignedTo !== ownerBefore && updates.assignedTo !== auth.profile.id && result.data) {
+      await supabaseAdmin.from('system_notifications').insert({
+        user_id: updates.assignedTo,
+        type: 'lead',
+        title: 'Lead transferido para você',
+        content: `${auth.profile.name} passou ${result.data.name} para você.${typeof body.note === 'string' && body.note.trim() ? ` Recado: ${body.note.trim().slice(0, 300)}` : ''}`,
+        is_read: false,
+        link: `/messages?chatId=${leadId}`,
+      });
+    }
 
     const fields = Object.keys(updates).map((key) => FIELD_LABEL[key]).filter(Boolean);
     if (fields.length > 0 && result.data) {

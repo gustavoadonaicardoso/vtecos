@@ -41,6 +41,8 @@ type LeadContextType = {
   /** Abre o "Novo lead"; `defaults.pipelineStage` já escolhe a etapa (botão da coluna do funil). */
   openModal: (defaults?: { pipelineStage?: string }) => void;
   modalDefaults: { pipelineStage?: string };
+  /** Último lead cadastrado pelo "Novo lead" (Mensagens abre a conversa dele). */
+  lastCreatedLeadId: string | null;
   closeModal: () => void;
   addLead: (input: LeadInput, options?: { force?: boolean }) => Promise<AddLeadResult>;
   updateLead: (leadId: string, updates: Partial<Lead> | LeadInput) => Promise<Result>;
@@ -92,6 +94,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDefaults, setModalDefaults] = useState<{ pipelineStage?: string }>({});
   const [structureError, setStructureError] = useState('');
+  const [lastCreatedLeadId, setLastCreatedLeadId] = useState<string | null>(null);
   const [dbStatus, setDbStatus] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const leadsRef = useRef<Lead[]>([]);
@@ -156,6 +159,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
     if (!ok || !json.data) return { ok: false, error: json.error || 'Não foi possível cadastrar o lead.', duplicate: json.duplicate };
     const lead = json.data as Lead;
     setLeads((prev) => [lead, ...prev.filter((item) => item.id !== lead.id)]);
+    setLastCreatedLeadId(lead.id);
     setPipelineStages((prev) => prev.map((s) => (s.id === lead.pipelineStage ? { ...s, leads: [lead.id, ...s.leads] } : s)));
     if (input.tags?.length) refreshTags();
     return { ok: true, lead };
@@ -265,7 +269,7 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
   return (
     <LeadContext.Provider value={{
       leads, pipelineStages, loaded, isModalOpen,
-      openModal, modalDefaults, closeModal,
+      openModal, modalDefaults, lastCreatedLeadId, closeModal,
       addLead, updateLead, deleteLead, bulkUpdate,
       tags, refreshTags,
       moveLead, structureError, clearStructureError: () => setStructureError(''),
