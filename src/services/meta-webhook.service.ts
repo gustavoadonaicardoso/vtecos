@@ -12,7 +12,7 @@
 
 import { WhatsAppService, resolveMetaTenant } from '@/lib/whatsapp';
 import { logAudit } from '@/lib/audit';
-import { applyBlastRouting } from '@/lib/messaging';
+import { handleCampaignReply } from '@/services/disparos.service';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import type { WhatsAppWebhookPayload, WhatsAppInboundMessage, WhatsAppMessageStatus } from '@/types';
 import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
@@ -198,12 +198,12 @@ async function handleInboundMessage(
       // Não critico — as env vars podem não estar configuradas ainda
     }
 
-    // 6. Aplica roteamento de campanha blast (se houver)
-    await applyBlastRouting(supabase, cleanPhone, searchSuffix, leadId, tenantId);
+    // 6. Resposta a uma campanha (Disparos): roteamento, etiqueta, automação e pedido para sair
+    await handleCampaignReply(tenantId, String(leadId), cleanPhone, messageText || '').catch((error) => console.error('[disparos] resposta', error));
 
     console.log(`[Webhook Meta] ✅ Mensagem de ${senderName} (${cleanPhone}) processada. Lead: ${leadId} | Novo: ${isNewLead}`);
-  } catch (err: any) {
-    console.error('[Webhook Meta] Erro ao processar mensagem:', err.message);
+  } catch (err: unknown) {
+    console.error('[Webhook Meta] Erro ao processar mensagem:', err instanceof Error ? err.message : err);
   }
 }
 
@@ -241,8 +241,8 @@ async function handleMessageStatus(
     } else {
       console.log(`[Webhook Meta] 📊 Status atualizado: ${status.id} → ${internalStatus}`);
     }
-  } catch (err: any) {
-    console.error('[Webhook Meta] Erro ao processar status:', err.message);
+  } catch (err: unknown) {
+    console.error('[Webhook Meta] Erro ao processar status:', err instanceof Error ? err.message : err);
   }
 }
 

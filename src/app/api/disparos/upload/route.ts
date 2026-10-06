@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import { requireActiveProfile } from '@/lib/session';
+import { requireCampaignUser } from '@/lib/disparos/auth';
 
 export async function POST(req: NextRequest) {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireCampaignUser();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   try {
@@ -12,6 +12,9 @@ export async function POST(req: NextRequest) {
 
     if (!file) {
       return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 });
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'A planilha pode ter no máximo 10 MB.' }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -23,6 +26,9 @@ export async function POST(req: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json({ error: 'Arquivo vazio ou sem dados' }, { status: 400 });
     }
+    if (rows.length > 20000) {
+      return NextResponse.json({ error: `A planilha tem ${rows.length} linhas. O limite por campanha é 20.000.` }, { status: 400 });
+    }
 
     const columns = Object.keys(rows[0]);
     const preview = rows.slice(0, 5).map(row =>
@@ -33,7 +39,7 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({ columns, preview, allRows, totalRows: rows.length });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Erro ao processar arquivo' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Erro ao processar arquivo' }, { status: 500 });
   }
 }

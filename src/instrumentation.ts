@@ -2,7 +2,7 @@
  * Executado uma vez quando o servidor Next.js sobe.
  *
  * Os agendadores (posts das Redes Sociais, esperas das Automações, envios e
- * lembretes do Agendamento) só ligam em produção E com a
+ * lembretes do Agendamento, campanhas dos Disparos) só ligam em produção E com a
  * flag explícita -- assim ele roda na VPS (que recebe o .env.local pelo
  * deploy.sh), mas nunca no `npm run dev` local nem nos previews da
  * Vercel, que publicariam posts de verdade.
@@ -29,4 +29,8 @@ export async function register() {
   // Agendamento: envia as mensagens agendadas e dispara os lembretes da agenda.
   const { startSchedulingWorker } = await import('./lib/scheduling/worker');
   startSchedulingWorker();
+
+  // Disparos: envia as campanhas (fila, horário de envio e limite por dia).
+  const { startBlastWorker } = await import('./lib/disparos/worker');
+  startBlastWorker();
 }

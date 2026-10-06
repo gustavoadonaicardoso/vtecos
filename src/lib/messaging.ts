@@ -4,64 +4,6 @@ import { logAudit } from './audit';
 // (src/services/conversations.service.ts, rotas /api/messages/*).
 
 /**
- * When a lead replies, check if their phone was part of a blast campaign that has
- * route_type configured. If so, assign the lead to the specified user or move to
- * the specified pipeline stage so the right person/team sees the conversation.
- *
- * Só campanhas DA MESMA EMPRESA do lead são consideradas.
- */
-export async function applyBlastRouting(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    db: any,
-    cleanPhone: string,
-    searchSuffix: string,
-    leadId: string,
-    tenantId: string
-) {
-    try {
-        const { data: contacts } = await db
-            .from('blast_contacts')
-            .select('campaign_id')
-            .eq('tenant_id', tenantId)
-            .or(`phone.eq.${cleanPhone},phone.ilike.%${searchSuffix}`)
-            .order('created_at', { ascending: false })
-            .limit(5);
-
-        if (!contacts?.length) return;
-
-        const campaignIds = contacts.map((c: { campaign_id: string }) => c.campaign_id);
-        const { data: campaigns } = await db
-            .from('blast_campaigns')
-            .select('id, route_type, route_to_id')
-            .eq('tenant_id', tenantId)
-            .in('id', campaignIds)
-            .neq('route_type', 'none')
-            .not('route_to_id', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-        const campaign = campaigns?.[0];
-        if (!campaign) return;
-
-        if (campaign.route_type === 'user') {
-            await db
-                .from('leads')
-                .update({ assigned_to: campaign.route_to_id })
-                .eq('tenant_id', tenantId)
-                .eq('id', leadId);
-        } else if (campaign.route_type === 'stage') {
-            await db
-                .from('leads')
-                .update({ stage_id: campaign.route_to_id })
-                .eq('tenant_id', tenantId)
-                .eq('id', leadId);
-        }
-    } catch (err) {
-        console.error('applyBlastRouting error:', err);
-    }
-}
-
-/**
  * Avisos para as integrações de saída (webhooks, Google Sheets). Quem chama
  * (servidor) passa o emissor -- este arquivo também é importado pela tela
  * de Mensagens, então não pode importar nada exclusivo do servidor.
@@ -73,7 +15,7 @@ export interface InboundEventSink {
 
 /**
  * Processa uma mensagem de WhatsApp recebida (cria/atualiza lead, salva a
- * mensagem, aplica roteamento de campanha). Usado pelo listener do WhatsApp
+ * mensagem, avisa integrações, automações e Disparos). Usado pelo listener do WhatsApp
  * Web (src/lib/whatsapp-web.ts) sempre que chega uma mensagem nova.
  *
  * Roda no servidor com o client administrativo, então TUDO filtra pela
@@ -151,10 +93,7 @@ export async function processInboundWhatsAppMessage(payload: any, db: any, tenan
                     last_msg: lastMsgPreview
                 }).eq('tenant_id', tenantId).eq('id', leadId);
 
-                // 5. Roteamento de campanha (disparos) da mesma empresa
-                await applyBlastRouting(db, cleanPhone, searchSuffix, leadId, tenantId);
-
-                // 6. Webhooks da empresa (Integrações)
+                // 5. Webhooks da empresa (Integrações)
                 events.messageReceived?.({
                     lead_id: String(leadId),
                     lead_name: targetLead?.name || senderName,

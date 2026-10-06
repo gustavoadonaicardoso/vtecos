@@ -16,7 +16,8 @@ import {
   PlusCircle,
   Edit,
   Trash2,
-  ChevronDown
+  ChevronDown,
+  Megaphone
 } from 'lucide-react';
 import styles from './logs.module.css';
 import { supabase } from '@/lib/supabase';
@@ -43,6 +44,7 @@ const ACTION_ICONS: Record<string, any> = {
   'TICKET_COMPLETE': Shield,
   'SETTINGS_UPDATE': Settings,
   'SUPPORT_ACCESS': Shield,
+  'CAMPAIGN': Megaphone,
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -56,6 +58,7 @@ const ACTION_COLORS: Record<string, string> = {
   'TICKET_COMPLETE': '#10b981',
   'SETTINGS_UPDATE': '#6366f1',
   'SUPPORT_ACCESS': '#f59e0b',
+  'CAMPAIGN': '#22c55e',
 };
 
 export default function AuditLogsPage() {
@@ -137,6 +140,7 @@ export default function AuditLogsPage() {
               <option value="TICKET_CREATE">Senhas Geradas</option>
               <option value="TICKET_CALL">Chamadas de Senha</option>
               <option value="SUPPORT_ACCESS">Acesso da equipe Vórtice</option>
+              <option value="CAMPAIGN">Disparos</option>
             </select>
           </div>
         </div>
