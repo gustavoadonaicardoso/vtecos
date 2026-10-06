@@ -376,8 +376,8 @@ function toWhatsAppJid(phone: string) {
 }
 
 /**
- * Avisos de lead novo / mensagem recebida: integrações de saída e
- * automações. O motor é importado sob demanda (ele também usa este arquivo).
+ * Avisos de lead novo / mensagem recebida: integrações de saída,
+ * automações e respostas de campanhas. O motor é importado sob demanda (ele também usa este arquivo).
  */
 function automationSink(tenantId: string) {
   let isNewContact = false;
@@ -391,6 +391,9 @@ function automationSink(tenantId: string) {
       emitIntegrationEvent(tenantId, 'message.received', data);
       import('@/lib/automations/engine').then(({ fireAutomation, onInboundMessage }) =>
         fireAutomation(onInboundMessage, tenantId, String(data.lead_id), String(data.text || ''), { isNewContact }));
+      // Resposta a uma campanha (Disparos): roteamento, etiqueta, automação e pedido para sair.
+      import('@/services/disparos.service').then(({ handleCampaignReply }) =>
+        handleCampaignReply(tenantId, String(data.lead_id), String(data.phone || ''), String(data.text || '')).catch((error) => console.error('[disparos] resposta', error)));
     },
   };
 }

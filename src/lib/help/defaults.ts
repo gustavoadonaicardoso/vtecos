@@ -119,14 +119,17 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
   {
     slug: 'disparos',
     category: 'atendimento',
-    title: 'Disparos em massa',
-    summary: 'Enviar mensagens para listas de contatos importadas de planilha.',
+    title: 'Disparos (campanhas de WhatsApp)',
+    summary: 'Campanhas para uma planilha ou para leads do CRM, enviadas pelo servidor no ritmo e no horário escolhidos.',
     sections: [
-      { title: 'Criar uma campanha', text: 'Em **Disparos**, crie uma campanha, importe a planilha (CSV ou Excel) com nome e telefone e escreva a mensagem. Use variáveis como o nome do contato para personalizar.' },
-      { title: 'Templates da Meta', text: 'Com a WhatsApp Business API, campanhas usam templates aprovados pela Meta. Eles são sincronizados da sua conta do WhatsApp Business.' },
-      { title: 'Cuidados', text: '- No **WhatsApp Web**, disparos grandes podem levar ao bloqueio do número. Prefira listas pequenas e contatos que conhecem sua empresa.\n- Na API oficial, a Meta cobra por conversa iniciada pela empresa.' },
-      { title: 'Respostas', text: 'Quem responde a uma campanha vira (ou atualiza) um lead e a conversa aparece em **Mensagens**.' },
+      { title: 'Criar uma campanha', text: 'Em **Disparos > Nova campanha**, siga os passos:\n\n1. **Público**: envie uma planilha (CSV ou Excel, a primeira linha com os nomes das colunas) e marque a coluna do telefone, ou escolha **Leads do CRM** filtrando por etapa, etiqueta, responsável e data de cadastro.\n2. **Mensagem**: escreva o texto com variáveis (cada coluna da planilha vira uma, ex.: `{{cupom}}`), adicione variações e um anexo, e envie um teste para o seu WhatsApp.\n3. **Envio**: comece agora, agende ou salve como rascunho; escolha o ritmo, o horário comercial e o limite por dia.\n4. **Revisar** e iniciar.' },
+      { title: 'O envio', text: 'O servidor manda uma mensagem por vez, com um intervalo sorteado, mesmo com o sistema fechado. Fora do horário de envio ou depois do limite do dia, a campanha espera e continua sozinha. Uma campanha por vez por empresa: as outras ficam na fila. Se o WhatsApp desconectar ou houver 5 falhas seguidas, a campanha pausa e quem criou é avisado no sino.' },
+      { title: 'Acompanhar', text: 'No painel da campanha você vê enviadas, fila, respostas, falhas, quem foi pulado (telefone inválido, repetido ou descadastrado) e a previsão de término. Dá para pausar, retomar, cancelar, reenviar as falhas e duplicar.' },
+      { title: 'Respostas e descadastro', text: 'Quem responde em até 7 dias pode ir para uma pessoa ou etapa, ganhar uma etiqueta e entrar numa automação. Quem responde **SAIR** (ou "parar", "não quero mais") entra em **Descadastrados** e nunca mais recebe campanhas. Deixe o rodapé de saída ligado.' },
+      { title: 'API oficial da Meta', text: 'Pela API oficial, campanhas usam um **template aprovado** pela Meta; preencha cada variável do template com o que quiser (ex.: `{{lead.first_name}}`). A Meta cobra por conversa iniciada pela empresa.' },
+      { title: 'Cuidados', text: '- No **WhatsApp Web**, use o ritmo **Segura**, horário comercial e um limite por dia, principalmente em números novos.\n- Envie só para quem conhece sua empresa: muitas denúncias de spam bloqueiam o número.' },
     ],
+    tip: 'O envio automático depende do agendador do servidor (CONTENT_SCHEDULER_ENABLED=true).',
   },
   {
     slug: 'automacoes',

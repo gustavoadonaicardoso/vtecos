@@ -1,707 +1,718 @@
-"use client";
+'use client';
 
-import React, { useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
-  Upload, ChevronRight, ChevronLeft, Phone, Variable,
-  CheckCircle2, Loader2, FileSpreadsheet, X, Plus, Eye,
-  Send, AlertTriangle, UserCheck, GitBranch, RefreshCw,
-  MessageSquare, Tag, Globe, ChevronDown, ChevronUp
-} from "lucide-react";
-import styles from "./nova.module.css";
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  FileSpreadsheet,
+  Loader2,
+  Megaphone,
+  Paperclip,
+  Plus,
+  RefreshCw,
+  Send,
+  Trash2,
+  Upload,
+  Users,
+  X,
+} from 'lucide-react';
+import styles from '../disparos.module.css';
+import { api, insertAt, PhonePreview, VariableBar } from '../components/Bits';
+import {
+  columnVariable,
+  contextFor,
+  DEFAULT_OPTOUT_TEXT,
+  DEFAULT_WINDOW,
+  estimateFinish,
+  formatDuration,
+  normalizePhone,
+  phoneSuffix,
+  renderForContact,
+  SPEEDS,
+  templateParamCount,
+  validWindow,
+  type MetaTemplateChoice,
+  type SendWindow,
+} from '@/lib/disparos';
+import { BUILTIN_VARIABLES, WEEKDAYS } from '@/lib/automations/flow';
 
-interface ColumnConfig {
-  key: string;
-  label: string;
-  isPhone: boolean;
-  isVariable: boolean;
+interface Options {
+  stages: { id: string; name: string }[];
+  team: { id: string; name: string }[];
+  tags: string[];
+  flows: { id: string; name: string; status: string }[];
+  channels: { web: boolean; api: boolean };
+  company: { name: string; phone: string; website: string; address: string };
+  worker: boolean;
 }
+interface ParsedFile { name: string; columns: string[]; rows: Record<string, string>[] }
+interface CrmPreview { total: number; valid: number; invalid: number; optout: number; duplicate: number; sample: { name: string; phone: string; data: Record<string, string> }[]; limited: boolean }
+interface MetaTemplate { id: string; name: string; language: string; category: string; components: { type: string; text?: string }[] }
+type Media = { url: string; kind: string; name: string } | null;
+type Field = 'template' | `variant-${number}` | `param-${number}`;
 
-interface ParsedFile {
-  columns: string[];
-  preview: Record<string, string>[];
-  allRows: Record<string, string>[];
-  totalRows: number;
-}
+const STEPS = ['Público', 'Mensagem', 'Envio', 'Revisar'];
+const PHONE_HINT = /^(tel|fone|celular|phone|whats|numero|número|contato)/i;
+const NAME_HINT = /^(nome|name|cliente)/i;
 
-interface MetaTemplateComponent {
-  type: "HEADER" | "BODY" | "FOOTER" | "BUTTONS";
-  format?: string;
-  text?: string;
-}
+/** "2026-10-08T09:00" (relógio do navegador) para ISO. */
+const localToIso = (value: string) => (value ? new Date(value).toISOString() : '');
 
-interface MetaTemplate {
-  id: string;
-  name: string;
-  status: string;
-  category: string;
-  language: string;
-  components: MetaTemplateComponent[];
-}
-
-const STEPS = ["Upload", "Colunas", "Template", "Confirmar"];
-
-const CATEGORY_LABEL: Record<string, string> = {
-  MARKETING: "Marketing",
-  UTILITY: "Utilidade",
-  AUTHENTICATION: "Autenticação",
-};
-
-function renderMessage(template: string, row: Record<string, string>) {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => row[key] ?? `{{${key}}}`);
-}
-
-function getBody(t: MetaTemplate): string {
-  return t.components.find(c => c.type === "BODY")?.text ?? "";
-}
-
-function getHeader(t: MetaTemplate): string | null {
-  const h = t.components.find(c => c.type === "HEADER");
-  return h?.format === "TEXT" ? (h.text ?? null) : null;
-}
-
-function extractVarNumbers(text: string): string[] {
-  const seen = new Set<string>();
-  const matches = text.matchAll(/\{\{(\d+)\}\}/g);
-  for (const m of matches) seen.add(m[1]);
-  return [...seen].sort((a, b) => Number(a) - Number(b));
-}
-
-function applyVarMapping(text: string, mapping: Record<string, string>): string {
-  return text.replace(/\{\{(\d+)\}\}/g, (_, n) =>
-    mapping[n] ? `{{${mapping[n]}}}` : `{{var${n}}}`
-  );
-}
-
-export default function NovaDisparoPage() {
+export default function NewCampaignPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [options, setOptions] = useState<Options | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  // Step 1
-  const [parsedFile, setParsedFile] = useState<ParsedFile | null>(null);
+  // Público
+  const [audienceType, setAudienceType] = useState<'file' | 'crm'>('file');
+  const [file, setFile] = useState<ParsedFile | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
   const [dragging, setDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [phoneColumn, setPhoneColumn] = useState('');
+  const [nameColumn, setNameColumn] = useState('');
+  const [crm, setCrm] = useState({ stageIds: [] as string[], tags: [] as string[], assignedTo: [] as string[], createdWithinDays: 0 });
+  const [crmPreview, setCrmPreview] = useState<CrmPreview | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  // Step 2
-  const [columnConfigs, setColumnConfigs] = useState<ColumnConfig[]>([]);
+  // Mensagem
+  const [name, setName] = useState('');
+  const [channel, setChannel] = useState<'web' | 'api'>('web');
+  const [template, setTemplate] = useState('{{saudacao}}, {{lead.first_name|tudo bem}}! ');
+  const [variants, setVariants] = useState<string[]>([]);
+  const [media, setMedia] = useState<Media>(null);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [optout, setOptout] = useState(true);
+  const [optoutText, setOptoutText] = useState(DEFAULT_OPTOUT_TEXT);
+  const [metaTemplates, setMetaTemplates] = useState<MetaTemplate[] | null>(null);
+  const [metaError, setMetaError] = useState('');
+  const [metaTemplate, setMetaTemplate] = useState<MetaTemplateChoice | null>(null);
+  const fields = useRef<Record<string, HTMLTextAreaElement | HTMLInputElement | null>>({});
+  const [activeField, setActiveField] = useState<Field>('template');
+  const [testPhone, setTestPhone] = useState('');
+  const [testState, setTestState] = useState<{ busy: boolean; message: string; ok: boolean } | null>(null);
 
-  // Step 3 — template
-  const [campaignName, setCampaignName] = useState("");
-  const [template, setTemplate] = useState("");
-  const [delayMin, setDelayMin] = useState(3);
-  const [delayMax, setDelayMax] = useState(8);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Envio
+  const [speed, setSpeed] = useState<string>('safe');
+  const [delay, setDelay] = useState({ min: 25, max: 60 });
+  const [useWindow, setUseWindow] = useState(true);
+  const [sendWindow, setSendWindow] = useState<SendWindow>(DEFAULT_WINDOW);
+  const [useLimit, setUseLimit] = useState(false);
+  const [dailyLimit, setDailyLimit] = useState(300);
+  const [when, setWhen] = useState<'now' | 'schedule' | 'draft'>('now');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [routeType, setRouteType] = useState<'none' | 'user' | 'stage'>('none');
+  const [routeToId, setRouteToId] = useState('');
+  const [tagOnReply, setTagOnReply] = useState('');
+  const [flowOnReply, setFlowOnReply] = useState('');
+  const [createLeads, setCreateLeads] = useState(false);
+  const [openedAt] = useState(() => Date.now());
+  // datetime-local usa o relógio local do navegador.
+  const [minDate] = useState(() => { const at = new Date(Date.now() + 5 * 60_000); return new Date(at.getTime() - at.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); });
 
-  // Step 3 — Meta templates panel
-  const [showMetaPanel, setShowMetaPanel] = useState(false);
-  const [metaTemplates, setMetaTemplates] = useState<MetaTemplate[]>([]);
-  const [metaLoading, setMetaLoading] = useState(false);
-  const [metaError, setMetaError] = useState("");
-  const [metaSearch, setMetaSearch] = useState("");
-  const [selectedMeta, setSelectedMeta] = useState<MetaTemplate | null>(null);
-  const [varMapping, setVarMapping] = useState<Record<string, string>>({});
-  const [metaSynced, setMetaSynced] = useState(false);
-
-  // Step 3 — routing
-  const [routeType, setRouteType] = useState<"none" | "user" | "stage">("none");
-  const [routeToId, setRouteToId] = useState("");
-  const [routeToLabel, setRouteToLabel] = useState("");
-  const [routeOptions, setRouteOptions] = useState<{ id: string; label: string }[]>([]);
-  const [routeOptionsLoading, setRouteOptionsLoading] = useState(false);
-
-  // Step 4
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
-
-  // ─── File upload ────────────────────────────────────────────────────────────
-
-  const handleFile = useCallback(async (file: File) => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    const allowed = ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel"];
-    if (!allowed.includes(file.type) && ext !== "csv" && ext !== "xlsx" && ext !== "xls") {
-      setUploadError("Apenas arquivos CSV ou Excel (.xlsx, .xls) são suportados.");
-      return;
-    }
-    setUploading(true);
-    setUploadError("");
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch("/api/disparos/upload", { method: "POST", body: form });
-    const data = await res.json();
-    setUploading(false);
-    if (!res.ok || data.error) { setUploadError(data.error ?? "Erro ao processar arquivo"); return; }
-    setParsedFile(data);
-    setColumnConfigs(data.columns.map((key: string) => ({
-      key,
-      label: key,
-      isPhone: /^(tel|fone|celular|phone|whatsapp|numero|número)/i.test(key),
-      isVariable: true,
-    })));
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      api<Options>('/api/disparos/options').then((result) => {
+        if (!result.data) { setError(result.error || ''); return; }
+        setOptions(result.data);
+        if (!result.data.channels.web && result.data.channels.api) setChannel('api');
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  }, [handleFile]);
-
-  // ─── Textarea variable insert ────────────────────────────────────────────────
-
-  const insertVariable = (key: string) => {
-    const ta = textareaRef.current;
-    if (!ta) { setTemplate(t => t + `{{${key}}}`); return; }
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const val = template.slice(0, start) + `{{${key}}}` + template.slice(end);
-    setTemplate(val);
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.setSelectionRange(start + key.length + 4, start + key.length + 4);
-    });
+  // ── Planilha ──
+  const handleFile = async (picked: File) => {
+    if (!/\.(csv|xlsx|xls)$/i.test(picked.name)) { setError('Use uma planilha CSV ou Excel (.xlsx, .xls).'); return; }
+    setUploading(true);
+    setError('');
+    const form = new FormData();
+    form.append('file', picked);
+    const response = await fetch('/api/disparos/upload', { method: 'POST', body: form });
+    const json = await response.json().catch(() => ({}));
+    setUploading(false);
+    if (!response.ok) { setError(json.error || 'Não foi possível ler a planilha.'); return; }
+    const columns: string[] = json.columns || [];
+    setFile({ name: picked.name, columns, rows: json.allRows || [] });
+    setPhoneColumn(columns.find((column) => PHONE_HINT.test(column)) || '');
+    setNameColumn(columns.find((column) => NAME_HINT.test(column)) || '');
+    if (!name) setName(picked.name.replace(/\.(csv|xlsx|xls)$/i, '').slice(0, 80));
   };
 
-  // ─── Meta templates ──────────────────────────────────────────────────────────
-
-  const syncMetaTemplates = async () => {
-    setMetaLoading(true);
-    setMetaError("");
-    const res = await fetch("/api/disparos/meta-templates");
-    const data = await res.json();
-    setMetaLoading(false);
-    if (!res.ok || data.error) {
-      setMetaError(data.error ?? "Erro ao buscar templates");
-      return;
+  const fileStats = useMemo(() => {
+    if (!file || !phoneColumn) return null;
+    const seen = new Set<string>();
+    let valid = 0;
+    let invalid = 0;
+    let duplicate = 0;
+    for (const row of file.rows) {
+      const phone = normalizePhone(row[phoneColumn] || '');
+      if (!phone) { invalid += 1; continue; }
+      if (seen.has(phoneSuffix(phone))) { duplicate += 1; continue; }
+      seen.add(phoneSuffix(phone));
+      valid += 1;
     }
-    setMetaTemplates(data.templates ?? []);
-    setMetaSynced(true);
-  };
+    return { total: file.rows.length, valid, invalid, duplicate };
+  }, [file, phoneColumn]);
 
-  const handleOpenMetaPanel = () => {
-    setShowMetaPanel(v => {
-      if (!v && !metaSynced) syncMetaTemplates();
-      return !v;
-    });
-    setSelectedMeta(null);
-    setVarMapping({});
-  };
+  // ── Leads do CRM (prévia com atraso) ──
+  useEffect(() => {
+    if (audienceType !== 'crm') return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const result = await api<CrmPreview>('/api/disparos/audience', { method: 'POST', body: JSON.stringify(crm) });
+      if (!cancelled) setCrmPreview(result.data || null);
+    }, 350);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [audienceType, crm]);
 
-  const handleSelectMetaTemplate = (t: MetaTemplate) => {
-    setSelectedMeta(t);
-    setVarMapping({});
-  };
+  const toggle = (list: string[], value: string) => (list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
 
-  const applyMetaTemplate = () => {
-    if (!selectedMeta) return;
-    const body = getBody(selectedMeta);
-    const header = getHeader(selectedMeta);
-    const varNums = extractVarNumbers(body);
+  // ── Contatos de exemplo para a prévia ──
+  const samples = useMemo(() => {
+    if (audienceType === 'crm') return (crmPreview?.sample || []).map((item) => ({ name: item.name, phone: item.phone, data: item.data }));
+    if (!file) return [];
+    return file.rows.filter((row) => normalizePhone(row[phoneColumn] || '')).slice(0, 3).map((row) => ({ name: nameColumn ? row[nameColumn] : '', phone: row[phoneColumn], data: row }));
+  }, [audienceType, crmPreview, file, phoneColumn, nameColumn]);
 
-    let finalText = body;
-    if (header) finalText = `*${header}*\n\n${body}`;
+  const renderInput = useMemo(() => ({ template, variants: variants.filter((item) => item.trim()), optoutText: channel === 'web' && optout ? optoutText : null, channel, metaTemplate }), [template, variants, optout, optoutText, channel, metaTemplate]);
+  const company = useMemo(() => options?.company || { name: 'Sua empresa', phone: '', website: '', address: '' }, [options]);
+  const previews = useMemo(() => {
+    const list = samples.length ? samples : [{ name: 'Maria Souza', phone: '5511999998888', data: {} }];
+    // A prévia mostra a mensagem principal (as variações são sorteadas no envio).
+    return list.slice(0, 1).map((sample) => renderForContact({ ...renderInput, variants: [] }, contextFor(sample, null, company)).text);
+  }, [samples, renderInput, company]);
 
-    if (varNums.length > 0) {
-      finalText = applyVarMapping(finalText, varMapping);
+  // ── Variáveis ──
+  const variableGroups = useMemo(() => {
+    const columns = audienceType === 'file' ? (file?.columns || []).map(columnVariable) : ['nome', 'telefone', 'email'];
+    return [
+      { label: audienceType === 'file' ? 'Planilha' : 'Lead', names: [...new Set(columns)] },
+      { label: 'Contato', names: ['lead.first_name', 'lead.name'] },
+      { label: 'Outros', names: ['saudacao', 'empresa', 'data.hoje', 'data.dia_semana'] },
+    ];
+  }, [audienceType, file]);
+
+  // {{variáveis}} usadas que este público não tem (sairiam vazias).
+  const unknownVariables = useMemo(() => {
+    const known = new Set([...BUILTIN_VARIABLES.flatMap((group) => group.items.map((item) => item.name)), ...variableGroups[0].names]);
+    const texts = channel === 'api' ? metaTemplate?.params || [] : [template, ...variants];
+    const used = texts.flatMap((text) => [...text.matchAll(/\{\{\s*([\w.]+)\s*(\|[^}]*)?\}\}/g)].filter((match) => !match[2]).map((match) => match[1]));
+    return [...new Set(used.filter((name) => !known.has(name)))];
+  }, [variableGroups, channel, metaTemplate, template, variants]);
+
+  const pickVariable = (variable: string) => {
+    const token = `{{${variable}}}`;
+    const element = fields.current[activeField] || null;
+    if (activeField === 'template') setTemplate((current) => insertAt(element, current, token));
+    else if (activeField.startsWith('variant-')) {
+      const index = Number(activeField.split('-')[1]);
+      setVariants((current) => current.map((item, i) => (i === index ? insertAt(element, item, token) : item)));
+    } else if (activeField.startsWith('param-') && metaTemplate) {
+      const index = Number(activeField.split('-')[1]);
+      setMetaTemplate({ ...metaTemplate, params: metaTemplate.params.map((item, i) => (i === index ? insertAt(element, item, token) : item)) });
     }
+  };
+  const bind = (field: Field) => ({ ref: (element: HTMLTextAreaElement | HTMLInputElement | null) => { fields.current[field] = element; }, onFocus: () => setActiveField(field) });
 
-    setTemplate(finalText);
-    setShowMetaPanel(false);
-    setSelectedMeta(null);
+  // ── Templates da Meta ──
+  const loadMetaTemplates = useCallback(async () => {
+    setMetaError('');
+    setMetaTemplates(null);
+    const response = await fetch('/api/disparos/meta-templates', { cache: 'no-store' });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) { setMetaError(json.error || 'Não foi possível buscar os templates.'); setMetaTemplates([]); return; }
+    setMetaTemplates(json.templates || []);
+  }, []);
+  useEffect(() => {
+    if (channel !== 'api' || metaTemplates !== null) return;
+    const timer = window.setTimeout(loadMetaTemplates, 0);
+    return () => window.clearTimeout(timer);
+  }, [channel, metaTemplates, loadMetaTemplates]);
+
+  const chooseMetaTemplate = (item: MetaTemplate) => {
+    const body = item.components.find((component) => component.type === 'BODY')?.text || '';
+    const count = templateParamCount(body);
+    setMetaTemplate({ name: item.name, language: item.language, body, params: Array.from({ length: count }, (_, index) => (index === 0 ? '{{lead.first_name|cliente}}' : '')) });
   };
 
-  const filteredTemplates = metaTemplates.filter(t =>
-    !metaSearch || t.name.toLowerCase().includes(metaSearch.toLowerCase())
-  );
-
-  // ─── Routing ─────────────────────────────────────────────────────────────────
-
-  const loadRouteOptions = async (type: "user" | "stage") => {
-    setRouteOptionsLoading(true);
-    setRouteToId("");
-    setRouteToLabel("");
-    const res = await fetch(`/api/disparos/route-options?type=${type}`);
-    const data = await res.json();
-    setRouteOptions(data.options ?? []);
-    setRouteOptionsLoading(false);
+  // ── Anexo ──
+  const uploadMedia = async (picked: File) => {
+    setMediaBusy(true);
+    const form = new FormData();
+    form.append('file', picked);
+    const result = await api<{ url: string; kind: string; fileName: string }>('/api/disparos/media', { method: 'POST', body: form });
+    setMediaBusy(false);
+    if (result.error) { setError(result.error); return; }
+    setMedia({ url: result.data!.url, kind: result.data!.kind, name: result.data!.fileName });
   };
 
-  const handleRouteTypeChange = (type: "none" | "user" | "stage") => {
-    setRouteType(type);
-    setRouteOptions([]);
-    setRouteToId("");
-    setRouteToLabel("");
-    if (type !== "none") loadRouteOptions(type);
+  // ── Envio ──
+  const chooseSpeed = (id: string) => {
+    setSpeed(id);
+    const preset = SPEEDS.find((item) => item.id === id);
+    if (preset) setDelay({ min: preset.min, max: preset.max });
+  };
+  const validCount = audienceType === 'crm' ? crmPreview?.valid || 0 : fileStats?.valid || 0;
+  const eta = useMemo(() => {
+    const finish = estimateFinish(validCount, { delayMin: delay.min, delayMax: delay.max, window: useWindow ? sendWindow : null, dailyLimit: useLimit ? dailyLimit : null, from: when === 'schedule' && scheduledAt ? new Date(scheduledAt) : undefined });
+    return finish;
+  }, [validCount, delay, useWindow, sendWindow, useLimit, dailyLimit, when, scheduledAt]);
+
+  // ── Validação por passo ──
+  const stepProblem = (index: number): string => {
+    if (index === 0) {
+      if (audienceType === 'file') {
+        if (!file) return 'Envie a planilha.';
+        if (!phoneColumn) return 'Marque a coluna do telefone.';
+        if (!fileStats?.valid) return 'Nenhum telefone válido na coluna escolhida.';
+      } else if (!crmPreview?.valid) return 'Nenhum lead com telefone nos filtros escolhidos.';
+    }
+    if (index === 1) {
+      if (!name.trim()) return 'Dê um nome para a campanha.';
+      if (channel === 'web' && !template.trim()) return 'Escreva a mensagem.';
+      if (channel === 'api' && !metaTemplate) return 'Escolha o template aprovado.';
+      if (channel === 'api' && metaTemplate?.params.some((param) => !param.trim())) return 'Preencha todas as variáveis do template.';
+    }
+    if (index === 2) {
+      if (!(delay.min >= 2 && delay.max >= delay.min && delay.max <= 600)) return 'Intervalo entre mensagens inválido.';
+      if (useWindow && !validWindow(sendWindow)) return 'Horário de envio inválido.';
+      if (when === 'schedule' && (!scheduledAt || scheduledAt < minDate)) return 'Escolha data e hora pelo menos 5 minutos no futuro.';
+      if (routeType !== 'none' && !routeToId) return routeType === 'user' ? 'Escolha a pessoa.' : 'Escolha a etapa.';
+    }
+    return '';
+  };
+  const problem = stepProblem(step);
+
+  const payload = () => ({
+    name,
+    channel,
+    template,
+    variants: variants.filter((item) => item.trim()),
+    metaTemplate: channel === 'api' ? metaTemplate : null,
+    media: channel === 'web' ? media : null,
+    optoutText: channel === 'web' && optout ? optoutText : null,
+    delayMin: delay.min,
+    delayMax: delay.max,
+    sendWindow: useWindow ? sendWindow : null,
+    dailyLimit: useLimit ? dailyLimit : null,
+    routeType,
+    routeToId,
+    tagOnReply,
+    flowOnReply: flowOnReply || null,
+    createLeads: audienceType === 'file' && createLeads,
+  });
+
+  const sendTest = async () => {
+    setTestState({ busy: true, message: '', ok: false });
+    const sample = samples[0]?.data || {};
+    const result = await api<{ text: string }>('/api/disparos/test', { method: 'POST', body: JSON.stringify({ ...payload(), phone: testPhone, sample: { ...sample, nome: samples[0]?.name || sample.nome } }) });
+    setTestState({ busy: false, ok: !result.error, message: result.error || 'Teste enviado. Confira no WhatsApp.' });
   };
 
-  // ─── Navigation ──────────────────────────────────────────────────────────────
-
-  const variables = columnConfigs.filter(c => c.isVariable && !c.isPhone);
-
-  const canProceed = () => {
-    if (step === 0) return !!parsedFile;
-    if (step === 1) return columnConfigs.some(c => c.isPhone);
-    if (step === 2) return campaignName.trim().length > 0 && template.trim().length > 0;
-    return true;
-  };
-
-  const handleCreate = async () => {
-    if (!parsedFile) return;
-    setCreating(true);
-    setCreateError("");
-    const res = await fetch("/api/disparos/campaigns", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: campaignName,
-        template,
-        columnsConfig: columnConfigs,
-        delayMin,
-        delayMax,
-        contacts: parsedFile.allRows,
-        routeType,
-        routeToId: routeToId || null,
-        routeToLabel: routeToLabel || null,
-      }),
+  const submit = async () => {
+    setBusy(true);
+    setError('');
+    const audience = audienceType === 'crm'
+      ? { type: 'crm', ...crm, createdWithinDays: crm.createdWithinDays || null }
+      : { type: 'file', fileName: file?.name, rows: file?.rows || [], columns: (file?.columns || []).map((key) => ({ key, isPhone: key === phoneColumn, isName: key === nameColumn })) };
+    const result = await api<{ id: string }>('/api/disparos/campaigns', {
+      method: 'POST',
+      body: JSON.stringify({ ...payload(), audience, action: when === 'now' ? 'start' : when, scheduledAt: when === 'schedule' ? localToIso(scheduledAt) : null }),
     });
-    const data = await res.json();
-    setCreating(false);
-    if (!res.ok || data.error) { setCreateError(data.error ?? "Erro ao criar campanha"); return; }
-    router.push(`/disparos/${data.campaign.id}`);
+    setBusy(false);
+    if (result.error) { setError(result.error); return; }
+    router.push(`/disparos/${result.data!.id}`);
   };
 
-  // ─── Step renders ─────────────────────────────────────────────────────────────
+  const canGo = (index: number) => [0, 1, 2].filter((i) => i < index).every((i) => !stepProblem(i));
+  const channelLabel = channel === 'api' ? 'API oficial (template)' : 'WhatsApp Web';
 
-  const renderStep0 = () => (
-    <div className={styles.stepContent}>
-      <h2>Importe sua planilha</h2>
-      <p>Faça upload de um arquivo CSV ou Excel com os contatos e dados da campanha.</p>
-
-      {parsedFile ? (
-        <div className={styles.fileSuccess}>
-          <FileSpreadsheet size={32} />
-          <div>
-            <strong>{parsedFile.totalRows} contatos carregados</strong>
-            <span>{parsedFile.columns.length} colunas detectadas: {parsedFile.columns.join(", ")}</span>
-          </div>
-          <button className={styles.removeFile} onClick={() => { setParsedFile(null); setColumnConfigs([]); }}>
-            <X size={16} />
+  // ── Telas de cada passo ──
+  const audienceStep = (
+    <>
+      <div className={styles.card}>
+        <div className={styles.cardHead}><h2>Quem vai receber</h2></div>
+        <div className={styles.choiceGrid}>
+          <button type="button" className={`${styles.choice} ${audienceType === 'file' ? styles.choiceOn : ''}`} onClick={() => setAudienceType('file')}>
+            <FileSpreadsheet size={22} /><span><strong>Planilha</strong><small>CSV ou Excel com telefone e outras colunas (viram variáveis).</small></span>
+          </button>
+          <button type="button" className={`${styles.choice} ${audienceType === 'crm' ? styles.choiceOn : ''}`} onClick={() => setAudienceType('crm')}>
+            <Users size={22} /><span><strong>Leads do CRM</strong><small>Filtre por etapa, etiqueta, responsável ou data de cadastro.</small></span>
           </button>
         </div>
-      ) : (
-        <div
-          className={`${styles.dropzone} ${dragging ? styles.dragging : ""}`}
-          onDragOver={e => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {uploading ? (
-            <Loader2 size={40} className={styles.spinner} />
+      </div>
+
+      {audienceType === 'file' ? (
+        <div className={styles.card}>
+          {!file ? (
+            <div
+              className={`${styles.dropzone} ${dragging ? styles.dropzoneOn : ''}`}
+              onClick={() => fileInput.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setDragging(false); const picked = e.dataTransfer.files[0]; if (picked) handleFile(picked); }}
+              role="button"
+              tabIndex={0}
+            >
+              {uploading ? <Loader2 size={30} className={styles.spin} /> : <Upload size={30} />}
+              <strong>{uploading ? 'Lendo a planilha...' : 'Arraste a planilha aqui ou clique para escolher'}</strong>
+              <span>CSV, XLSX ou XLS · até 10 MB e 20.000 linhas · a primeira linha são os nomes das colunas</span>
+              <input ref={fileInput} type="file" hidden accept=".csv,.xlsx,.xls" onChange={(e) => { const picked = e.target.files?.[0]; if (picked) handleFile(picked); e.target.value = ''; }} />
+            </div>
           ) : (
             <>
-              <Upload size={40} />
-              <strong>Arraste o arquivo aqui ou clique para selecionar</strong>
-              <span>CSV, XLSX, XLS — Tamanho máximo: 10MB</span>
+              <div className={styles.cardHead}>
+                <div>
+                  <h3><FileSpreadsheet size={16} /> {file.name}</h3>
+                  <span className={styles.hint}>{file.rows.length} linha(s) · {file.columns.length} coluna(s)</span>
+                </div>
+                <button type="button" className={styles.ghostBtn} onClick={() => { setFile(null); setPhoneColumn(''); setNameColumn(''); }}><X size={15} /> Trocar</button>
+              </div>
+              <div className={styles.tableWrap}>
+                <div className={`${styles.columnRow} ${styles.columnHead}`}><span>Coluna</span><span>Exemplo</span><span>Telefone</span><span>Nome</span></div>
+                {file.columns.map((column) => (
+                  <div key={column} className={styles.columnRow}>
+                    <span><strong>{column}</strong><br /><code>{`{{${columnVariable(column)}}}`}</code></span>
+                    <span className={styles.muted}>{file.rows.find((row) => row[column])?.[column] || '—'}</span>
+                    <label className={styles.radio}><input type="radio" name="phone" checked={phoneColumn === column} onChange={() => setPhoneColumn(column)} /> Telefone</label>
+                    <label className={styles.radio}><input type="checkbox" checked={nameColumn === column} onChange={(e) => setNameColumn(e.target.checked ? column : '')} /> Nome</label>
+                  </div>
+                ))}
+              </div>
+              {fileStats && (
+                <div className={fileStats.valid ? styles.okBox : styles.errorBox}>
+                  {fileStats.valid ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                  <span><strong>{fileStats.valid} contato(s) vão receber.</strong>{fileStats.invalid ? ` ${fileStats.invalid} sem telefone válido.` : ''}{fileStats.duplicate ? ` ${fileStats.duplicate} número(s) repetido(s).` : ''} Quem pediu para sair também é pulado.</span>
+                </div>
+              )}
             </>
           )}
-          <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className={styles.hiddenInput}
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
         </div>
-      )}
-
-      {uploadError && <div className={styles.errorMsg}><AlertTriangle size={16} />{uploadError}</div>}
-
-      {parsedFile && (
-        <div className={styles.previewTable}>
-          <h4>Prévia dos dados</h4>
-          <div className={styles.tableWrap}>
-            <table>
-              <thead><tr>{parsedFile.columns.map(col => <th key={col}>{col}</th>)}</tr></thead>
-              <tbody>
-                {parsedFile.preview.map((row, i) => (
-                  <tr key={i}>{parsedFile.columns.map(col => <td key={col}>{row[col] ?? ""}</td>)}</tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {parsedFile.totalRows > 5 && <p className={styles.moreRows}>+ {parsedFile.totalRows - 5} linhas não exibidas</p>}
-        </div>
-      )}
-    </div>
-  );
-
-  const renderStep1 = () => (
-    <div className={styles.stepContent}>
-      <h2>Configure as colunas</h2>
-      <p>Defina qual coluna é o telefone e quais serão usadas como variáveis na mensagem.</p>
-      <div className={styles.columnsTable}>
-        <div className={styles.colHeader}>
-          <span>Coluna original</span>
-          <span>Rótulo / Nome</span>
-          <span className={styles.center}>É o telefone?</span>
-          <span className={styles.center}>Usar como variável?</span>
-        </div>
-        {columnConfigs.map((col, i) => (
-          <div key={col.key} className={styles.colRow}>
-            <span className={styles.colKey}>{col.key}</span>
-            <input className={styles.colLabelInput} value={col.label}
-              onChange={e => { const arr = [...columnConfigs]; arr[i] = { ...arr[i], label: e.target.value }; setColumnConfigs(arr); }} />
-            <div className={styles.center}>
-              <button className={`${styles.toggleBtn} ${col.isPhone ? styles.toggleOn : ""}`}
-                onClick={() => setColumnConfigs(columnConfigs.map((c, j) => ({ ...c, isPhone: j === i })))}>
-                <Phone size={14} />{col.isPhone ? "Sim" : "Não"}
-              </button>
+      ) : (
+        <div className={styles.card}>
+          <div className={styles.field}>
+            <span>Etapas do funil</span>
+            <div className={styles.chips}>
+              {options?.stages.map((stage) => <button key={stage.id} type="button" className={`${styles.chip} ${crm.stageIds.includes(stage.id) ? styles.chipOn : ''}`} onClick={() => setCrm({ ...crm, stageIds: toggle(crm.stageIds, stage.id) })}>{stage.name}</button>)}
             </div>
-            <div className={styles.center}>
-              <button className={`${styles.toggleBtn} ${col.isVariable ? styles.toggleOn : ""}`}
-                onClick={() => { const arr = [...columnConfigs]; arr[i] = { ...arr[i], isVariable: !arr[i].isVariable }; setColumnConfigs(arr); }}>
-                <Variable size={14} />{col.isVariable ? "Sim" : "Não"}
-              </button>
-            </div>
+            <small>Nenhuma marcada = todas.</small>
           </div>
-        ))}
-      </div>
-      {!columnConfigs.some(c => c.isPhone) && (
-        <div className={styles.warnMsg}><AlertTriangle size={16} /> Marque uma coluna como telefone para continuar.</div>
-      )}
-      {variables.length > 0 && (
-        <div className={styles.variablesPreview}>
-          <strong>Variáveis disponíveis:</strong>
-          {variables.map(v => <span key={v.key} className={styles.varChip}>{`{{${v.key}}}`}</span>)}
-        </div>
-      )}
-    </div>
-  );
-
-  const renderMetaPanel = () => {
-    const bodyVars = selectedMeta ? extractVarNumbers(getBody(selectedMeta)) : [];
-    const allMapped = bodyVars.every(n => !!varMapping[n]);
-
-    return (
-      <AnimatePresence>
-        {showMetaPanel && (
-          <motion.div
-            className={styles.metaPanel}
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            <div className={styles.metaPanelHeader}>
-              <div className={styles.metaPanelTitle}>
-                <MessageSquare size={16} />
-                <strong>Templates aprovados da Meta</strong>
-                {metaSynced && <span className={styles.syncedBadge}>{metaTemplates.length} templates</span>}
-              </div>
-              <div className={styles.metaPanelActions}>
-                <button className={styles.metaSyncBtn} onClick={syncMetaTemplates} disabled={metaLoading}>
-                  {metaLoading ? <Loader2 size={14} className={styles.spinner} /> : <RefreshCw size={14} />}
-                  {metaSynced ? "Sincronizar" : "Buscar templates"}
-                </button>
-                <button className={styles.metaCloseBtn} onClick={() => { setShowMetaPanel(false); setSelectedMeta(null); }}>
-                  <X size={16} />
-                </button>
+          {Boolean(options?.tags.length) && (
+            <div className={styles.field}>
+              <span>Com alguma destas etiquetas</span>
+              <div className={styles.chips}>
+                {options?.tags.map((tag) => <button key={tag} type="button" className={`${styles.chip} ${crm.tags.includes(tag) ? styles.chipOn : ''}`} onClick={() => setCrm({ ...crm, tags: toggle(crm.tags, tag) })}>{tag}</button>)}
               </div>
             </div>
-
-            {metaError && <div className={styles.errorMsg} style={{ margin: "0 0 0.75rem" }}><AlertTriangle size={14} />{metaError}</div>}
-
-            {metaLoading && (
-              <div className={styles.metaLoadingRow}><Loader2 size={24} className={styles.spinner} /><span>Buscando templates...</span></div>
-            )}
-
-            {!metaLoading && metaSynced && (
-              <>
-                <input
-                  className={styles.metaSearch}
-                  placeholder="Buscar por nome..."
-                  value={metaSearch}
-                  onChange={e => setMetaSearch(e.target.value)}
-                />
-
-                {filteredTemplates.length === 0 ? (
-                  <p className={styles.metaEmpty}>Nenhum template encontrado.</p>
-                ) : (
-                  <div className={styles.metaTemplateGrid}>
-                    {filteredTemplates.map(t => {
-                      const body = getBody(t);
-                      const isSelected = selectedMeta?.id === t.id;
-                      return (
-                        <div
-                          key={t.id}
-                          className={`${styles.metaCard} ${isSelected ? styles.metaCardSelected : ""}`}
-                          onClick={() => handleSelectMetaTemplate(t)}
-                        >
-                          <div className={styles.metaCardTop}>
-                            <span className={styles.metaCardName}>{t.name}</span>
-                            <div className={styles.metaCardMeta}>
-                              <span className={styles.metaCatChip}><Tag size={10} />{CATEGORY_LABEL[t.category] ?? t.category}</span>
-                              <span className={styles.metaLangChip}><Globe size={10} />{t.language}</span>
-                            </div>
-                          </div>
-                          <p className={styles.metaCardBody}>{body.slice(0, 120)}{body.length > 120 ? "…" : ""}</p>
-                          {extractVarNumbers(body).length > 0 && (
-                            <span className={styles.metaVarCount}>
-                              <Variable size={11} />{extractVarNumbers(body).length} variável(is)
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Variable mapping for selected template */}
-                <AnimatePresence>
-                  {selectedMeta && bodyVars.length > 0 && (
-                    <motion.div
-                      className={styles.metaMapping}
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <div className={styles.metaMappingTitle}>
-                        <Variable size={14} />
-                        <strong>Mapeie as variáveis do template</strong>
-                        <span className={styles.metaMappingHint}>"{selectedMeta.name}"</span>
-                      </div>
-                      <div className={styles.metaMappingGrid}>
-                        {bodyVars.map(n => (
-                          <div key={n} className={styles.metaMappingRow}>
-                            <span className={styles.metaVarTag}>{`{{${n}}}`}</span>
-                            <span className={styles.metaMappingArrow}>→</span>
-                            <select
-                              className={styles.select}
-                              value={varMapping[n] ?? ""}
-                              onChange={e => setVarMapping(prev => ({ ...prev, [n]: e.target.value }))}
-                            >
-                              <option value="">Selecionar coluna…</option>
-                              {variables.map(v => (
-                                <option key={v.key} value={v.key}>{v.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {selectedMeta && (
-                  <div className={styles.metaApplyRow}>
-                    <div className={styles.metaApplyPreview}>
-                      <Eye size={13} />
-                      <span>{applyVarMapping(getBody(selectedMeta), varMapping).slice(0, 100)}…</span>
-                    </div>
-                    <button
-                      className={styles.metaApplyBtn}
-                      onClick={applyMetaTemplate}
-                      disabled={bodyVars.length > 0 && !allMapped}
-                    >
-                      <CheckCircle2 size={15} /> Usar este template
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-
-            {!metaLoading && !metaSynced && (
-              <p className={styles.metaEmpty}>Clique em "Buscar templates" para sincronizar com a Meta.</p>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
-  };
-
-  const renderStep2 = () => {
-    const previewRow = parsedFile?.preview[0] ?? {};
-    return (
-      <div className={styles.stepContent}>
-        <h2>Escreva o template</h2>
-        <p>Escreva manualmente ou importe um template aprovado da Meta.</p>
-
-        <div className={styles.formGrid}>
-          <div className={styles.formGroup}>
-            <label>Nome da campanha</label>
-            <input className={styles.input} value={campaignName}
-              onChange={e => setCampaignName(e.target.value)} placeholder="Ex: Promoção Outubro 2026" />
-          </div>
-          <div className={styles.formGroupRow}>
-            <div className={styles.formGroup}>
-              <label>Delay mínimo (seg)</label>
-              <input type="number" min={1} max={60} className={styles.input} value={delayMin}
-                onChange={e => setDelayMin(Number(e.target.value))} />
-            </div>
-            <div className={styles.formGroup}>
-              <label>Delay máximo (seg)</label>
-              <input type="number" min={1} max={60} className={styles.input} value={delayMax}
-                onChange={e => setDelayMax(Number(e.target.value))} />
+          )}
+          <div className={styles.field}>
+            <span>Responsável</span>
+            <div className={styles.chips}>
+              {options?.team.map((member) => <button key={member.id} type="button" className={`${styles.chip} ${crm.assignedTo.includes(member.id) ? styles.chipOn : ''}`} onClick={() => setCrm({ ...crm, assignedTo: toggle(crm.assignedTo, member.id) })}>{member.name}</button>)}
             </div>
           </div>
+          <label className={styles.field}>
+            <span>Cadastrados</span>
+            <select className={styles.input} value={crm.createdWithinDays} onChange={(e) => setCrm({ ...crm, createdWithinDays: Number(e.target.value) })}>
+              <option value={0}>Em qualquer data</option>
+              <option value={7}>Nos últimos 7 dias</option>
+              <option value={30}>Nos últimos 30 dias</option>
+              <option value={90}>Nos últimos 90 dias</option>
+              <option value={365}>No último ano</option>
+            </select>
+          </label>
+          {crmPreview ? (
+            <div className={crmPreview.valid ? styles.okBox : styles.errorBox}>
+              {crmPreview.valid ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+              <span><strong>{crmPreview.valid} lead(s) vão receber</strong> de {crmPreview.total} encontrado(s).{crmPreview.invalid ? ` ${crmPreview.invalid} sem telefone válido.` : ''}{crmPreview.duplicate ? ` ${crmPreview.duplicate} número(s) repetido(s).` : ''}{crmPreview.optout ? ` ${crmPreview.optout} pediram para sair.` : ''} Leads bloqueados nunca recebem.</span>
+            </div>
+          ) : <span className={styles.hint}><Loader2 size={14} className={styles.spin} /> Contando leads...</span>}
         </div>
+      )}
+    </>
+  );
 
-        <div className={styles.templateEditorWrap}>
-          <div className={styles.templateEditorHeader}>
-            <label>Mensagem</label>
-            <button
-              className={`${styles.metaImportBtn} ${showMetaPanel ? styles.metaImportBtnActive : ""}`}
-              onClick={handleOpenMetaPanel}
-            >
-              <MessageSquare size={14} />
-              Templates da Meta
-              {showMetaPanel ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+  const messageStep = (
+    <>
+      <div className={styles.card}>
+        <label className={styles.field}>
+          <span>Nome da campanha (só a equipe vê)</span>
+          <input className={styles.input} value={name} maxLength={80} placeholder="Ex.: Promoção de outubro" onChange={(e) => setName(e.target.value)} />
+        </label>
+        <div className={styles.field}>
+          <span>Enviar por</span>
+          <div className={styles.choiceGrid}>
+            <button type="button" className={`${styles.choice} ${channel === 'web' ? styles.choiceOn : ''}`} disabled={options ? !options.channels.web : false} onClick={() => setChannel('web')}>
+              <Send size={20} /><span><strong>WhatsApp Web</strong><small>{options && !options.channels.web ? 'Desconectado. Conecte em Integrações.' : 'Texto livre, variações e anexo.'}</small></span>
+            </button>
+            <button type="button" className={`${styles.choice} ${channel === 'api' ? styles.choiceOn : ''}`} disabled={options ? !options.channels.api : false} onClick={() => setChannel('api')}>
+              <Megaphone size={20} /><span><strong>API oficial da Meta</strong><small>{options && !options.channels.api ? 'Não configurada em Integrações.' : 'Usa um template aprovado (regra da Meta para campanhas).'}</small></span>
             </button>
           </div>
+        </div>
+      </div>
 
-          {renderMetaPanel()}
-
-          {variables.length > 0 && (
-            <div className={styles.varBar}>
-              <span className={styles.varBarLabel}>Inserir variável:</span>
-              {variables.map(v => (
-                <button key={v.key} className={styles.varInsertChip} onClick={() => insertVariable(v.key)}>
-                  <Plus size={12} /> {v.label}
+      {channel === 'web' ? (
+        <div className={styles.card}>
+          <div className={styles.field}>
+            <span>Mensagem</span>
+            <textarea className={styles.input} rows={6} value={template} onChange={(e) => setTemplate(e.target.value)} {...bind('template')} />
+          </div>
+          <VariableBar groups={variableGroups} onPick={pickVariable} />
+          {unknownVariables.length > 0 && <div className={styles.banner}><AlertTriangle size={16} /><span>{unknownVariables.map((name) => `{{${name}}}`).join(', ')} não existe neste público e vai sair vazio. Use {'{{nome|texto}}'} para ter um texto padrão.</span></div>}
+          <span className={styles.hint}>Clique numa variável para inserir onde está o cursor. <code>{'{{lead.first_name|cliente}}'}</code> usa &quot;cliente&quot; quando o nome está vazio. *negrito* e _itálico_ funcionam no WhatsApp.</span>
+          {variants.map((variant, index) => (
+            <div key={index} className={styles.field}>
+              <span>Variação {index + 2} (uma é sorteada para cada contato)</span>
+              <div className={styles.variant}>
+                <textarea className={styles.input} rows={3} value={variant} onChange={(e) => setVariants(variants.map((item, i) => (i === index ? e.target.value : item)))} {...bind(`variant-${index}`)} />
+                <button type="button" className={styles.iconBtn} aria-label="Remover variação" onClick={() => setVariants(variants.filter((_, i) => i !== index))}><Trash2 size={15} /></button>
+              </div>
+            </div>
+          ))}
+          <div className={styles.row}>
+            {variants.length < 4 && <button type="button" className={styles.secondaryBtn} onClick={() => setVariants([...variants, ''])}><Plus size={15} /> Variação da mensagem</button>}
+            <label className={styles.secondaryBtn}>
+              {mediaBusy ? <Loader2 size={15} className={styles.spin} /> : <Paperclip size={15} />} {media ? 'Trocar anexo' : 'Anexar imagem, vídeo ou PDF'}
+              <input type="file" hidden accept="image/*,video/mp4,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { const picked = e.target.files?.[0]; if (picked) uploadMedia(picked); e.target.value = ''; }} />
+            </label>
+            {media && <button type="button" className={styles.ghostBtn} onClick={() => setMedia(null)}><X size={14} /> {media.name || 'anexo'}</button>}
+          </div>
+          <span className={styles.hint}>Variações diminuem a chance de o WhatsApp tratar a campanha como spam.</span>
+          <label className={styles.check}>
+            <input type="checkbox" checked={optout} onChange={(e) => setOptout(e.target.checked)} />
+            <span>Incluir no fim como sair da lista (recomendado). Quem responder &quot;SAIR&quot; não recebe mais campanhas.</span>
+          </label>
+          {optout && <input className={styles.input} value={optoutText} maxLength={200} onChange={(e) => setOptoutText(e.target.value)} />}
+        </div>
+      ) : (
+        <div className={styles.card}>
+          <div className={styles.cardHead}>
+            <h3>Template aprovado</h3>
+            <button type="button" className={styles.ghostBtn} onClick={loadMetaTemplates}><RefreshCw size={14} /> Atualizar</button>
+          </div>
+          {metaError && <div className={styles.errorBox}><AlertTriangle size={16} /><span>{metaError}</span></div>}
+          {metaTemplates === null && <span className={styles.hint}><Loader2 size={14} className={styles.spin} /> Buscando templates na Meta...</span>}
+          {metaTemplates?.length === 0 && !metaError && <span className={styles.hint}>Nenhum template aprovado. Crie e aprove em business.facebook.com &gt; Gerenciador do WhatsApp.</span>}
+          {!metaTemplate && metaTemplates && metaTemplates.length > 0 && (
+            <div className={styles.templateList}>
+              {metaTemplates.map((item) => (
+                <button key={item.id} type="button" className={styles.templateItem} onClick={() => chooseMetaTemplate(item)}>
+                  <strong>{item.name} · {item.language}</strong>
+                  <small>{item.components.find((component) => component.type === 'BODY')?.text || ''}</small>
                 </button>
               ))}
             </div>
           )}
-
-          <textarea
-            ref={textareaRef}
-            className={styles.textarea}
-            rows={7}
-            value={template}
-            onChange={e => setTemplate(e.target.value)}
-            placeholder="Ex: Olá {{nome}}! Temos uma proposta especial para {{empresa}} 🎉"
-          />
-        </div>
-
-        {template && (
-          <div className={styles.livePreview}>
-            <div className={styles.previewLabel}><Eye size={14} /> Prévia com dados da 1ª linha:</div>
-            <div className={styles.previewBubble}>{renderMessage(template, previewRow)}</div>
-          </div>
-        )}
-
-        {/* Routing */}
-        <div className={styles.routingSection}>
-          <h4 className={styles.routingTitle}><UserCheck size={16} /> Direcionar respostas para</h4>
-          <p className={styles.routingDesc}>Quando um contato responder esta campanha, a conversa será automaticamente direcionada.</p>
-          <div className={styles.routeTypeGroup}>
-            {(["none", "user", "stage"] as const).map(t => (
-              <button key={t} className={`${styles.routeTypeBtn} ${routeType === t ? styles.routeTypeBtnActive : ""}`}
-                onClick={() => handleRouteTypeChange(t)}>
-                {t === "none" && <X size={14} />}
-                {t === "user" && <UserCheck size={14} />}
-                {t === "stage" && <GitBranch size={14} />}
-                {t === "none" ? "Sem direcionamento" : t === "user" ? "Usuário" : "Etapa do Pipeline"}
-              </button>
-            ))}
-          </div>
-          {routeType !== "none" && (
-            <div className={styles.routeSelect}>
-              {routeOptionsLoading ? (
-                <div className={styles.routeLoading}><Loader2 size={16} className={styles.spinner} /> Carregando opções...</div>
-              ) : (
-                <select className={styles.select} value={routeToId}
-                  onChange={e => { const opt = routeOptions.find(o => o.id === e.target.value); setRouteToId(e.target.value); setRouteToLabel(opt?.label ?? ""); }}>
-                  <option value="">{routeType === "user" ? "Selecione um usuário..." : "Selecione uma etapa..."}</option>
-                  {routeOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                </select>
-              )}
-            </div>
+          {metaTemplate && (
+            <>
+              <div className={styles.row}>
+                <strong className={styles.grow}>{metaTemplate.name} · {metaTemplate.language}</strong>
+                <button type="button" className={styles.ghostBtn} onClick={() => setMetaTemplate(null)}>Trocar</button>
+              </div>
+              <span className={styles.hint} style={{ whiteSpace: 'pre-wrap' }}>{metaTemplate.body}</span>
+              {metaTemplate.params.map((param, index) => (
+                <label key={index} className={styles.field}>
+                  <span>{`{{${index + 1}}}`} será</span>
+                  <input className={styles.input} value={param} onChange={(e) => setMetaTemplate({ ...metaTemplate, params: metaTemplate.params.map((item, i) => (i === index ? e.target.value : item)) })} {...bind(`param-${index}`)} />
+                </label>
+              ))}
+              {metaTemplate.params.length > 0 && <VariableBar groups={variableGroups} onPick={pickVariable} />}
+            </>
           )}
         </div>
-      </div>
-    );
-  };
+      )}
+    </>
+  );
 
-  const renderStep3 = () => {
-    if (!parsedFile) return null;
-    const previewRows = parsedFile.preview.slice(0, 3);
-    return (
-      <div className={styles.stepContent}>
-        <h2>Confirme e crie a campanha</h2>
-        <p>Revise as informações antes de criar. Você poderá iniciar o disparo na próxima tela.</p>
-        <div className={styles.summaryCards}>
-          <div className={styles.summaryCard}><strong>{parsedFile.totalRows}</strong><span>Contatos</span></div>
-          <div className={styles.summaryCard}><strong>{variables.length}</strong><span>Variáveis</span></div>
-          <div className={styles.summaryCard}><strong>{delayMin}–{delayMax}s</strong><span>Delay</span></div>
+  const sendingStep = (
+    <>
+      <div className={styles.card}>
+        <div className={styles.cardHead}><h2>Quando</h2></div>
+        <div className={styles.chips}>
+          <button type="button" className={`${styles.chip} ${when === 'now' ? styles.chipOn : ''}`} onClick={() => setWhen('now')}>Começar agora</button>
+          <button type="button" className={`${styles.chip} ${when === 'schedule' ? styles.chipOn : ''}`} onClick={() => setWhen('schedule')}>Agendar</button>
+          <button type="button" className={`${styles.chip} ${when === 'draft' ? styles.chipOn : ''}`} onClick={() => setWhen('draft')}>Salvar como rascunho</button>
         </div>
-        <div className={styles.summaryTemplate}>
-          <label>Template:</label>
-          <p>{template}</p>
+        {when === 'schedule' && (
+          <label className={styles.field}>
+            <span>Data e hora de início</span>
+            <input className={styles.input} type="datetime-local" min={minDate} value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
+          </label>
+        )}
+      </div>
+
+      <div className={styles.card}>
+        <div className={styles.cardHead}><h2>Ritmo</h2></div>
+        <div className={styles.speedGrid}>
+          {SPEEDS.map((item) => (
+            <button key={item.id} type="button" className={`${styles.choice} ${speed === item.id ? styles.choiceOn : ''}`} onClick={() => chooseSpeed(item.id)}>
+              <span><strong>{item.label}</strong><small>{item.min}–{item.max}s entre mensagens</small></span>
+            </button>
+          ))}
+          <button type="button" className={`${styles.choice} ${speed === 'custom' ? styles.choiceOn : ''}`} onClick={() => setSpeed('custom')}>
+            <span><strong>Personalizado</strong><small>Você define o intervalo</small></span>
+          </button>
         </div>
-        <h4 className={styles.previewTitle}>Prévia das primeiras mensagens:</h4>
-        {previewRows.map((row, i) => {
-          const phoneCol = columnConfigs.find(c => c.isPhone)?.key ?? "";
-          return (
-            <div key={i} className={styles.confirmPreviewItem}>
-              <span className={styles.confirmPhone}>{row[phoneCol] ?? "—"}</span>
-              <div className={styles.confirmBubble}>{renderMessage(template, row)}</div>
+        <span className={styles.hint}>{SPEEDS.find((item) => item.id === speed)?.hint || 'O intervalo é sorteado entre o mínimo e o máximo a cada mensagem.'}</span>
+        {speed === 'custom' && (
+          <div className={styles.grid2}>
+            <label className={styles.field}><span>Mínimo (segundos)</span><input className={styles.input} type="number" min={2} max={600} value={delay.min} onChange={(e) => setDelay({ ...delay, min: Number(e.target.value) })} /></label>
+            <label className={styles.field}><span>Máximo (segundos)</span><input className={styles.input} type="number" min={2} max={600} value={delay.max} onChange={(e) => setDelay({ ...delay, max: Number(e.target.value) })} /></label>
+          </div>
+        )}
+        <label className={styles.check}><input type="checkbox" checked={useWindow} onChange={(e) => setUseWindow(e.target.checked)} /><span>Enviar só em horário comercial (fora dele a campanha espera)</span></label>
+        {useWindow && (
+          <>
+            <div className={styles.grid2}>
+              <label className={styles.field}><span>Das</span><input className={styles.input} type="time" value={sendWindow.start} onChange={(e) => setSendWindow({ ...sendWindow, start: e.target.value })} /></label>
+              <label className={styles.field}><span>Até as</span><input className={styles.input} type="time" value={sendWindow.end} onChange={(e) => setSendWindow({ ...sendWindow, end: e.target.value })} /></label>
             </div>
-          );
-        })}
-        {createError && <div className={styles.errorMsg}><AlertTriangle size={16} />{createError}</div>}
+            <div className={styles.days}>
+              {WEEKDAYS.map((day, index) => (
+                <button key={day} type="button" className={`${styles.day} ${sendWindow.days.includes(index) ? styles.dayOn : ''}`} onClick={() => setSendWindow({ ...sendWindow, days: sendWindow.days.includes(index) ? sendWindow.days.filter((item) => item !== index) : [...sendWindow.days, index].sort() })}>{day.slice(0, 3)}</button>
+              ))}
+            </div>
+          </>
+        )}
+        <label className={styles.check}><input type="checkbox" checked={useLimit} onChange={(e) => setUseLimit(e.target.checked)} /><span>Limitar mensagens por dia (protege números novos)</span></label>
+        {useLimit && <input className={styles.input} type="number" min={1} max={10000} value={dailyLimit} onChange={(e) => setDailyLimit(Number(e.target.value))} />}
       </div>
-    );
-  };
 
-  // ─── Layout ───────────────────────────────────────────────────────────────────
+      <div className={styles.card}>
+        <div className={styles.cardHead}><h2>Quando o contato responder</h2></div>
+        <div className={styles.grid2}>
+          <label className={styles.field}>
+            <span>Encaminhar</span>
+            <select className={styles.input} value={routeType} onChange={(e) => { setRouteType(e.target.value as typeof routeType); setRouteToId(''); }}>
+              <option value="none">Não mudar nada</option>
+              <option value="user">Para uma pessoa da equipe</option>
+              <option value="stage">Para uma etapa do funil</option>
+            </select>
+          </label>
+          {routeType !== 'none' && (
+            <label className={styles.field}>
+              <span>{routeType === 'user' ? 'Pessoa' : 'Etapa'}</span>
+              <select className={styles.input} value={routeToId} onChange={(e) => setRouteToId(e.target.value)}>
+                <option value="">Escolha</option>
+                {(routeType === 'user' ? options?.team : options?.stages)?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
+        <div className={styles.grid2}>
+          <label className={styles.field}>
+            <span>Pôr a etiqueta</span>
+            <input className={styles.input} list="campaign-tags" value={tagOnReply} maxLength={40} placeholder="respondeu campanha" onChange={(e) => setTagOnReply(e.target.value)} />
+            <datalist id="campaign-tags">{options?.tags.map((tag) => <option key={tag} value={tag} />)}</datalist>
+          </label>
+          <label className={styles.field}>
+            <span>Iniciar a automação</span>
+            <select className={styles.input} value={flowOnReply} onChange={(e) => setFlowOnReply(e.target.value)}>
+              <option value="">Nenhuma</option>
+              {options?.flows.map((flow) => <option key={flow.id} value={flow.id} disabled={flow.status !== 'active'}>{flow.name}{flow.status !== 'active' ? ' (inativa)' : ''}</option>)}
+            </select>
+          </label>
+        </div>
+        <span className={styles.hint}>Vale para a primeira resposta em até 7 dias. As automações com gatilho &quot;Mensagem recebida&quot; também rodam normalmente.</span>
+        {audienceType === 'file' && (
+          <label className={styles.check}><input type="checkbox" checked={createLeads} onChange={(e) => setCreateLeads(e.target.checked)} /><span>Cadastrar como lead quem receber (com a etiqueta &quot;disparos&quot;). Sem isso, o lead só é criado quando a pessoa responde.</span></label>
+        )}
+      </div>
+    </>
+  );
+
+  const summary = (
+    <ul className={styles.summaryList}>
+      <li><span>Público</span><span>{audienceType === 'file' ? file?.name || '—' : 'Leads do CRM'}</span></li>
+      <li><span>Vão receber</span><span>{validCount.toLocaleString('pt-BR')}</span></li>
+      <li><span>Canal</span><span>{channelLabel}</span></li>
+      <li><span>Ritmo</span><span>{delay.min}–{delay.max}s</span></li>
+      <li><span>Horário</span><span>{useWindow ? `${sendWindow.start}–${sendWindow.end}` : 'Qualquer hora'}</span></li>
+      {useLimit && <li><span>Limite por dia</span><span>{dailyLimit}</span></li>}
+      <li><span>Início</span><span>{when === 'now' ? 'Agora' : when === 'schedule' ? (scheduledAt ? new Date(scheduledAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—') : 'Rascunho'}</span></li>
+      {eta && when !== 'draft' && <li><span>Previsão de término</span><span>{eta.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} ({formatDuration(eta.getTime() - (when === 'schedule' && scheduledAt ? new Date(scheduledAt).getTime() : openedAt))})</span></li>}
+    </ul>
+  );
+
+  const reviewStep = (
+    <div className={styles.card}>
+      <div className={styles.cardHead}><h2>Tudo certo?</h2></div>
+      {summary}
+      {routeType !== 'none' || tagOnReply || flowOnReply ? (
+        <span className={styles.hint}>Ao responder: {[routeType === 'user' ? `vai para ${options?.team.find((item) => item.id === routeToId)?.name}` : routeType === 'stage' ? `vai para a etapa ${options?.stages.find((item) => item.id === routeToId)?.name}` : '', tagOnReply ? `ganha a etiqueta "${tagOnReply}"` : '', flowOnReply ? `entra na automação "${options?.flows.find((item) => item.id === flowOnReply)?.name}"` : ''].filter(Boolean).join(', ')}.</span>
+      ) : null}
+      {options && !options.worker && <div className={styles.banner}><AlertTriangle size={16} /><span>O envio automático está desligado neste servidor: a campanha fica na fila até ele ser ligado (<code>CONTENT_SCHEDULER_ENABLED=true</code>).</span></div>}
+      <div className={styles.banner}><AlertTriangle size={16} /><span>Envie só para quem conhece sua empresa. Muitas denúncias de spam podem bloquear o número no WhatsApp.</span></div>
+    </div>
+  );
 
   return (
-    <div className={styles.container}>
-      <header className={styles.header}>
-        <button className={styles.backBtn} onClick={() => router.push("/disparos")}>
-          <ChevronLeft size={20} /> Voltar
-        </button>
-        <h1>Nova Campanha</h1>
-      </header>
+    <div className={styles.page}>
+      <div className={styles.detailHead}>
+        <div className={styles.detailTitle}>
+          <Link href="/disparos" className={styles.backLink}><ArrowLeft size={15} /> Disparos</Link>
+          <h1>Nova campanha</h1>
+        </div>
+      </div>
 
-      <div className={styles.stepper}>
-        {STEPS.map((s, i) => (
-          <React.Fragment key={s}>
-            <div className={`${styles.stepDot} ${i <= step ? styles.stepActive : ""} ${i < step ? styles.stepDone : ""}`}>
-              {i < step ? <CheckCircle2 size={16} /> : <span>{i + 1}</span>}
-              <label>{s}</label>
-            </div>
-            {i < STEPS.length - 1 && <div className={`${styles.stepLine} ${i < step ? styles.stepLineDone : ""}`} />}
-          </React.Fragment>
+      <nav className={styles.steps} aria-label="Passos">
+        {STEPS.map((label, index) => (
+          <button key={label} type="button" disabled={!canGo(index)} className={`${styles.stepBtn} ${step === index ? styles.stepOn : ''} ${index < step ? styles.stepDone : ''}`} onClick={() => setStep(index)}>
+            <span>{index < step ? '✓' : index + 1}</span> <em>{label}</em>
+          </button>
         ))}
-      </div>
+      </nav>
 
-      <div className={styles.body}>
-        <AnimatePresence mode="wait">
-          <motion.div key={step} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.2 }}>
-            {step === 0 && renderStep0()}
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      {error && <div className={styles.errorBox}><AlertTriangle size={16} /><span>{error}</span></div>}
 
-      <div className={styles.footer}>
-        {step > 0 && (
-          <button className={styles.prevBtn} onClick={() => setStep(s => s - 1)}>
-            <ChevronLeft size={18} /> Anterior
-          </button>
-        )}
-        <div style={{ flex: 1 }} />
-        {step < STEPS.length - 1 ? (
-          <button className={styles.nextBtn} onClick={() => setStep(s => s + 1)} disabled={!canProceed()}>
-            Próximo <ChevronRight size={18} />
-          </button>
-        ) : (
-          <button className={styles.createBtn} onClick={handleCreate} disabled={creating || !canProceed()}>
-            {creating ? <Loader2 size={18} className={styles.spinner} /> : <Send size={18} />}
-            {creating ? "Criando..." : "Criar Campanha"}
-          </button>
-        )}
+      <div className={styles.wizard}>
+        <div className={styles.wizardMain}>
+          {step === 0 && audienceStep}
+          {step === 1 && messageStep}
+          {step === 2 && sendingStep}
+          {step === 3 && reviewStep}
+
+          <div className={styles.wizardNav}>
+            <button type="button" className={styles.secondaryBtn} disabled={step === 0} onClick={() => setStep(step - 1)}><ArrowLeft size={15} /> Voltar</button>
+            {problem && <span className={styles.hint} style={{ alignSelf: 'center' }}>{problem}</span>}
+            {step < 3 ? (
+              <button type="button" className={styles.primaryBtn} disabled={Boolean(problem)} onClick={() => setStep(step + 1)}>Continuar <ArrowRight size={15} /></button>
+            ) : (
+              <button type="button" className={styles.primaryBtn} disabled={busy || [0, 1, 2].some((i) => stepProblem(i))} onClick={submit}>
+                {busy ? <Loader2 size={15} className={styles.spin} /> : <Send size={15} />}
+                {when === 'now' ? `Iniciar envio para ${validCount}` : when === 'schedule' ? 'Agendar campanha' : 'Salvar rascunho'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <aside className={styles.wizardSide}>
+          <div className={styles.card}>
+            <div className={styles.cardHead}><h3>Prévia</h3><span className={styles.hint}>{samples[0] ? samples[0].name || samples[0].phone : 'contato de exemplo'}</span></div>
+            <PhonePreview messages={previews} media={channel === 'web' ? media : null} />
+            {channel === 'web' && variants.some((item) => item.trim()) && <span className={styles.hint}>Mostrando a mensagem principal; cada contato recebe uma das {variants.filter((item) => item.trim()).length + 1} versões.</span>}
+          </div>
+          {step >= 1 && (
+            <div className={styles.card}>
+              <div className={styles.cardHead}><h3>Enviar um teste</h3></div>
+              <div className={styles.row}>
+                <input className={`${styles.input} ${styles.grow}`} placeholder="Seu WhatsApp com DDD" value={testPhone} onChange={(e) => setTestPhone(e.target.value)} />
+                <button type="button" className={styles.secondaryBtn} disabled={!testPhone.trim() || testState?.busy || Boolean(stepProblem(1))} onClick={sendTest}>
+                  {testState?.busy ? <Loader2 size={15} className={styles.spin} /> : <Send size={15} />} Testar
+                </button>
+              </div>
+              {testState?.message && <span className={testState.ok ? styles.hint : styles.errorBox}>{testState.message}</span>}
+            </div>
+          )}
+          {step >= 2 && <div className={styles.card}><div className={styles.cardHead}><h3>Resumo</h3></div>{summary}</div>}
+        </aside>
       </div>
     </div>
   );

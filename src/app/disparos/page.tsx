@@ -1,166 +1,158 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Send, Plus, Trash2, Eye, CheckCircle2, XCircle, Clock,
-  Loader2, Megaphone, AlertTriangle
-} from "lucide-react";
-import styles from "./disparos.module.css";
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { AlertTriangle, CalendarClock, Clock, Loader2, Megaphone, Plus, UserX } from 'lucide-react';
+import styles from './disparos.module.css';
+import { api, dateTime, percent, Progress, StatusBadge } from './components/Bits';
+import OptoutsModal from './components/OptoutsModal';
+import type { CampaignStatus, CampaignSummary } from '@/lib/disparos';
 
-interface Campaign {
-  id: string;
-  name: string;
-  template: string;
-  status: "draft" | "running" | "paused" | "completed" | "failed";
-  total_contacts: number;
-  sent_count: number;
-  failed_count: number;
-  delay_min: number;
-  delay_max: number;
-  created_at: string;
-}
+type Filter = 'all' | 'active' | 'scheduled' | 'draft' | 'done';
+const FILTERS: { id: Filter; label: string; match: (status: CampaignStatus) => boolean }[] = [
+  { id: 'all', label: 'Todas', match: () => true },
+  { id: 'active', label: 'Em andamento', match: (status) => status === 'running' || status === 'paused' },
+  { id: 'scheduled', label: 'Agendadas', match: (status) => status === 'scheduled' },
+  { id: 'draft', label: 'Rascunhos', match: (status) => status === 'draft' },
+  { id: 'done', label: 'Encerradas', match: (status) => status === 'completed' || status === 'canceled' },
+];
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Rascunho",
-  running: "Enviando",
-  paused: "Pausado",
-  completed: "Concluído",
-  failed: "Com Erros",
-};
-
-const STATUS_CLASS: Record<string, string> = {
-  draft: styles.statusDraft,
-  running: styles.statusRunning,
-  paused: styles.statusPaused,
-  completed: styles.statusCompleted,
-  failed: styles.statusFailed,
-};
+interface Options { channels: { web: boolean; api: boolean }; worker: boolean }
 
 export default function DisparosPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState<CampaignSummary[] | null>(null);
+  const [options, setOptions] = useState<Options | null>(null);
+  const [error, setError] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [optouts, setOptouts] = useState(false);
+  const [now] = useState(() => Date.now());
 
-  const fetchCampaigns = useCallback(async () => {
-    const res = await fetch("/api/disparos/campaigns");
-    const data = await res.json();
-    setCampaigns(data.campaigns ?? []);
-    setLoading(false);
+  const load = useCallback(async () => {
+    const result = await api<CampaignSummary[]>('/api/disparos/campaigns');
+    if (result.data) setCampaigns(result.data);
+    setError(result.error || '');
   }, []);
 
-  useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      load();
+      api<Options>('/api/disparos/options').then((result) => setOptions(result.data || null));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Excluir campanha "${name}"?`)) return;
-    setDeleting(id);
-    await fetch(`/api/disparos/campaigns/${id}`, { method: "DELETE" });
-    setCampaigns(prev => prev.filter(c => c.id !== id));
-    setDeleting(null);
-  };
+  // Enquanto alguma campanha envia, atualiza sozinho.
+  const live = Boolean(campaigns?.some((item) => item.status === 'running' || item.status === 'scheduled'));
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
+  }, [live, load]);
 
-  const pending = (c: Campaign) => c.total_contacts - c.sent_count - c.failed_count;
+  const stats = useMemo(() => {
+    const list = campaigns || [];
+    const since = now - 30 * 86400_000;
+    const recent = list.filter((item) => new Date(item.created_at).getTime() >= since);
+    const sent = recent.reduce((sum, item) => sum + item.counts.sent, 0);
+    const replied = recent.reduce((sum, item) => sum + item.counts.replied, 0);
+    return {
+      running: list.filter((item) => item.status === 'running').length,
+      scheduled: list.filter((item) => item.status === 'scheduled').length,
+      sent,
+      replied,
+      optouts: recent.reduce((sum, item) => sum + item.counts.optouts, 0),
+      failed: recent.reduce((sum, item) => sum + item.counts.failed, 0),
+    };
+  }, [campaigns, now]);
+
+  const shown = (campaigns || []).filter((item) => FILTERS.find((entry) => entry.id === filter)!.match(item.status));
+  const noChannel = options && !options.channels.web && !options.channels.api;
 
   return (
-    <div className={styles.container}>
+    <div className={styles.page}>
       <header className={styles.header}>
-        <div className={styles.titleSection}>
-          <h1><Megaphone size={28} /> Disparos em Massa</h1>
-          <p>Envie mensagens personalizadas para listas de contatos via WhatsApp.</p>
+        <div>
+          <h1><Megaphone size={26} /> Disparos</h1>
+          <p>Campanhas de WhatsApp para uma planilha ou para leads do CRM. O servidor envia sozinho, no ritmo e no horário que você escolher, mesmo com o sistema fechado.</p>
         </div>
-        <Link href="/disparos/nova" className={styles.newBtn}>
-          <Plus size={18} /> Nova Campanha
-        </Link>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.secondaryBtn} onClick={() => setOptouts(true)}><UserX size={16} /> Descadastrados</button>
+          <Link href="/disparos/nova" className={styles.primaryBtn}><Plus size={16} /> Nova campanha</Link>
+        </div>
       </header>
 
-      {loading ? (
-        <div className={styles.loadingCenter}><Loader2 className={styles.spinner} size={36} /></div>
-      ) : campaigns.length === 0 ? (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={styles.emptyState}>
-          <Send size={52} />
+      {options && !options.worker && (
+        <div className={styles.banner}><AlertTriangle size={16} /><span>O envio automático está desligado neste servidor (<code>CONTENT_SCHEDULER_ENABLED</code>). As campanhas ficam na fila até ele ser ligado.</span></div>
+      )}
+      {noChannel && (
+        <div className={styles.banner}><AlertTriangle size={16} /><span>Nenhum WhatsApp conectado. <Link href="/integrations">Conecte em Integrações</Link> antes de enviar.</span></div>
+      )}
+      {error && <div className={styles.errorBox}><AlertTriangle size={16} /><span>{error}</span></div>}
+
+      <div className={styles.stats}>
+        <div className={styles.stat}><span>Enviando agora</span><strong>{stats.running}</strong><small>{stats.scheduled} agendada(s)</small></div>
+        <div className={`${styles.stat} ${styles.statOk}`}><span>Mensagens enviadas</span><strong>{stats.sent.toLocaleString('pt-BR')}</strong><small>campanhas dos últimos 30 dias</small></div>
+        <div className={styles.stat}><span>Responderam</span><strong>{stats.replied.toLocaleString('pt-BR')}</strong><small>{percent(stats.replied, stats.sent)} de quem recebeu</small></div>
+        <div className={`${styles.stat} ${stats.optouts ? styles.statWarn : ''}`}><span>Pediram para sair</span><strong>{stats.optouts}</strong><small>{stats.failed} envio(s) com falha</small></div>
+      </div>
+
+      <div className={styles.filters}>
+        {FILTERS.map((item) => (
+          <button key={item.id} type="button" className={`${styles.chip} ${filter === item.id ? styles.chipOn : ''}`} onClick={() => setFilter(item.id)}>
+            {item.label} <b>{(campaigns || []).filter((campaign) => item.match(campaign.status)).length}</b>
+          </button>
+        ))}
+      </div>
+
+      {campaigns === null && !error ? (
+        <div className={styles.loading}><Loader2 size={20} className={styles.spin} /> Carregando campanhas...</div>
+      ) : campaigns && campaigns.length === 0 ? (
+        <div className={styles.empty}>
+          <Megaphone size={40} />
           <h2>Nenhuma campanha ainda</h2>
-          <p>Crie sua primeira campanha de disparo em massa importando uma planilha CSV ou Excel.</p>
-          <Link href="/disparos/nova" className={styles.newBtn}><Plus size={18} /> Criar Campanha</Link>
-        </motion.div>
+          <p>Importe uma planilha ou escolha leads do CRM, escreva a mensagem com variáveis e deixe o servidor enviar no ritmo certo.</p>
+          <Link href="/disparos/nova" className={styles.primaryBtn}><Plus size={16} /> Criar a primeira campanha</Link>
+        </div>
+      ) : shown.length === 0 ? (
+        <div className={styles.empty}><p>Nenhuma campanha neste filtro.</p></div>
       ) : (
-        <div className={styles.grid}>
-          <AnimatePresence>
-            {campaigns.map((c, i) => (
-              <motion.div
-                key={c.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: i * 0.04 }}
-                className={styles.card}
-              >
-                <div className={styles.cardTop}>
-                  <div>
-                    <h3>{c.name}</h3>
-                    <p className={styles.templatePreview}>{c.template.slice(0, 80)}{c.template.length > 80 ? "…" : ""}</p>
+        <div className={styles.campaignGrid}>
+          {shown.map((item) => {
+            const done = item.counts.sent + item.counts.failed + item.counts.skipped;
+            return (
+              <Link key={item.id} href={`/disparos/${item.id}`} className={styles.campaignCard}>
+                <div className={styles.campaignTop}>
+                  <div className={styles.grow}>
+                    <h3>{item.name}</h3>
+                    <p>{item.template || '—'}</p>
                   </div>
-                  <span className={`${styles.statusBadge} ${STATUS_CLASS[c.status] ?? ""}`}>
-                    {c.status === "running" && <Loader2 size={12} className={styles.spinnerInline} />}
-                    {STATUS_LABEL[c.status] ?? c.status}
-                  </span>
+                  <StatusBadge status={item.status} />
                 </div>
-
-                <div className={styles.progressWrap}>
-                  <div className={styles.progressBar}>
-                    <div
-                      className={styles.progressFill}
-                      style={{ width: c.total_contacts > 0 ? `${((c.sent_count + c.failed_count) / c.total_contacts) * 100}%` : "0%" }}
-                    />
-                    <div
-                      className={styles.progressFailed}
-                      style={{
-                        width: c.total_contacts > 0 ? `${(c.failed_count / c.total_contacts) * 100}%` : "0%",
-                        left: c.total_contacts > 0 ? `${(c.sent_count / c.total_contacts) * 100}%` : "0%",
-                      }}
-                    />
-                  </div>
-                  <span className={styles.progressLabel}>
-                    {c.sent_count + c.failed_count}/{c.total_contacts}
-                  </span>
+                {item.last_error && item.status === 'paused' ? (
+                  <span className={`${styles.detailLine} ${styles.detailBad}`}><AlertTriangle size={13} /> {item.last_error}</span>
+                ) : item.status_detail ? (
+                  <span className={styles.detailLine}><Clock size={13} /> {item.status_detail}</span>
+                ) : item.status === 'scheduled' ? (
+                  <span className={styles.detailLine}><CalendarClock size={13} /> Começa {dateTime(item.scheduled_at)}</span>
+                ) : null}
+                <Progress counts={item.counts} />
+                <div className={styles.metrics}>
+                  <div><strong>{item.counts.pending}</strong><span>Na fila</span></div>
+                  <div><strong>{item.counts.sent}</strong><span>Enviadas</span></div>
+                  <div><strong>{item.counts.failed}</strong><span>Falhas</span></div>
+                  <div><strong>{percent(item.counts.replied, item.counts.sent)}</strong><span>Respostas</span></div>
                 </div>
-
-                <div className={styles.stats}>
-                  <div className={styles.stat}>
-                    <Clock size={14} />
-                    <span>{pending(c)}</span>
-                    <label>Pendente</label>
-                  </div>
-                  <div className={styles.stat}>
-                    <CheckCircle2 size={14} />
-                    <span>{c.sent_count}</span>
-                    <label>Enviado</label>
-                  </div>
-                  <div className={`${styles.stat} ${c.failed_count > 0 ? styles.statError : ""}`}>
-                    <XCircle size={14} />
-                    <span>{c.failed_count}</span>
-                    <label>Falhou</label>
-                  </div>
+                <div className={styles.cardFoot}>
+                  <span className={styles.channelTag}>{item.channel === 'api' ? 'API oficial' : 'WhatsApp Web'}</span>
+                  <span>{done}/{item.counts.total} · {dateTime(item.started_at || item.created_at)}</span>
                 </div>
-
-                <div className={styles.cardActions}>
-                  <span className={styles.dateLabel}>{new Date(c.created_at).toLocaleDateString("pt-BR")}</span>
-                  <div className={styles.actionBtns}>
-                    <Link href={`/disparos/${c.id}`} className={styles.viewBtn}><Eye size={16} /> Ver</Link>
-                    <button
-                      className={styles.deleteBtn}
-                      onClick={() => handleDelete(c.id, c.name)}
-                      disabled={deleting === c.id}
-                    >
-                      {deleting === c.id ? <Loader2 size={14} className={styles.spinner} /> : <Trash2 size={14} />}
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+              </Link>
+            );
+          })}
         </div>
       )}
+
+      {optouts && <OptoutsModal onClose={() => setOptouts(false)} />}
     </div>
   );
 }

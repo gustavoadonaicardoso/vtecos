@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireActiveProfile } from '@/lib/session';
+import { requireCampaignUser } from '@/lib/disparos/auth';
 
 const GRAPH_VERSION = 'v21.0';
 
@@ -17,11 +17,11 @@ export interface MetaTemplateComponent {
   type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS';
   format?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'DOCUMENT';
   text?: string;
-  buttons?: any[];
+  buttons?: unknown[];
 }
 
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireCampaignUser();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const supabase = supabaseAdmin;
 
@@ -64,7 +64,7 @@ export async function GET() {
     );
 
     return NextResponse.json({ templates });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Erro.' }, { status: 500 });
   }
 }

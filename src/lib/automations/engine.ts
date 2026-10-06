@@ -21,6 +21,7 @@
 import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { assertPublicHttpsUrl } from '@/lib/integrations/safe-url';
+import { deliverWhatsApp, sendToLead } from '@/lib/whatsapp-outbound';
 import {
   aiCategories,
   applySetVariable,
@@ -97,7 +98,6 @@ function canStart(tenantId: string) {
 }
 
 const log = (...args: unknown[]) => console.error('[automações]', ...args);
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const nowIso = () => new Date().toISOString();
 
 export const newWebhookToken = () => `wh_${randomBytes(16).toString('hex')}`;
@@ -151,94 +151,6 @@ async function loadContext(tenantId: string, leadId: string, run: Pick<RunRow, '
       now: new Date(),
     },
   };
-}
-
-// ── Envio pelo WhatsApp da empresa ───────────────────────────
-
-type MediaKind = 'image' | 'document' | 'audio' | 'video';
-type WhatsAppPayload = {
-  text?: string;
-  mediaUrl?: string;
-  mediaKind?: MediaKind;
-  caption?: string;
-  fileName?: string;
-  typingSeconds?: number;
-  /** Menu com botões/lista (só na API oficial; no WhatsApp Web vai como texto numerado). */
-  menu?: { body: string; buttonLabel: string; options: { id: string; title: string }[] };
-};
-
-const withOptions = (menu: NonNullable<WhatsAppPayload['menu']>) => `${menu.body}\n\n${menu.options.map((option, index) => `${index + 1}. ${option.title}`).join('\n')}`.trim();
-
-/** WhatsApp Web conectado tem prioridade; senão, a API oficial da Meta. */
-async function deliverWhatsApp(tenantId: string, phone: string, payload: WhatsAppPayload): Promise<{ provider: string; text: string }> {
-  if (!phone) throw new Error('O contato não tem telefone.');
-  const { getWhatsAppWebStatus, sendWhatsAppWebMessage, sendWhatsAppWebMedia, sendWhatsAppWebTyping } = await import('@/lib/whatsapp-web');
-  const fileName = payload.fileName || (payload.mediaUrl ? decodeURIComponent(payload.mediaUrl.split('?')[0].split('/').pop() || 'arquivo') : 'arquivo');
-
-  if (getWhatsAppWebStatus(tenantId).connected) {
-    const typing = Math.min(10, Math.max(0, Number(payload.typingSeconds) || 0));
-    if (typing > 0) {
-      await sendWhatsAppWebTyping(tenantId, phone);
-      await sleep(typing * 1000);
-    }
-    if (payload.mediaUrl) {
-      const url = await assertPublicHttpsUrl(payload.mediaUrl);
-      const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(20000) });
-      if (!response.ok) throw new Error(`Não foi possível baixar o arquivo (${response.status}).`);
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.length > 16 * 1024 * 1024) throw new Error('Arquivo acima de 16 MB.');
-      const fallbackType = { image: 'image/jpeg', video: 'video/mp4', audio: 'audio/mpeg', document: 'application/pdf' }[payload.mediaKind || 'document'];
-      const mimetype = response.headers.get('content-type') || fallbackType;
-      await sendWhatsAppWebMedia(tenantId, phone, buffer, payload.mediaKind || 'document', { caption: payload.caption, fileName, mimetype });
-      return { provider: 'whatsapp_web', text: payload.caption || '' };
-    }
-    const text = payload.menu ? withOptions(payload.menu) : payload.text || '';
-    await sendWhatsAppWebMessage(tenantId, phone, text);
-    return { provider: 'whatsapp_web', text };
-  }
-
-  const { WhatsAppService, getWhatsAppConfig } = await import('@/lib/whatsapp');
-  const config = await getWhatsAppConfig(supabaseAdmin, tenantId).catch(() => null);
-  if (!config) throw new Error('Nenhum WhatsApp conectado: conecte o WhatsApp Web ou a API oficial em Integrações.');
-  const service = new WhatsAppService(config);
-  let result: { success: boolean; error?: string };
-  let text = payload.text || payload.caption || '';
-  if (payload.mediaUrl) {
-    const kind = payload.mediaKind || 'document';
-    result = kind === 'image' ? await service.sendImage(phone, payload.mediaUrl, payload.caption)
-      : kind === 'video' ? await service.sendVideo(phone, payload.mediaUrl, payload.caption)
-        : kind === 'audio' ? await service.sendAudio(phone, payload.mediaUrl)
-          : await service.sendDocument(phone, payload.mediaUrl, fileName, payload.caption);
-  } else if (payload.menu && payload.menu.options.length <= 3) {
-    result = await service.sendButtons(phone, payload.menu.body, payload.menu.options.map((option) => ({ id: option.id, title: option.title.slice(0, 20) })));
-    text = withOptions(payload.menu);
-  } else if (payload.menu) {
-    result = await service.sendList(phone, payload.menu.body, payload.menu.buttonLabel.slice(0, 20) || 'Ver opções', [
-      { title: 'Opções', rows: payload.menu.options.map((option) => ({ id: option.id, title: option.title.slice(0, 24) })) },
-    ]);
-    text = withOptions(payload.menu);
-  } else {
-    result = await service.sendText(phone, text);
-  }
-  if (!result.success) throw new Error(result.error || 'A Meta recusou a mensagem.');
-  return { provider: 'meta', text };
-}
-
-/** Envia para o lead e registra na conversa (aparece em Mensagens, como as respostas da equipe). */
-async function sendToLead(tenantId: string, leadId: string, phone: string, payload: WhatsAppPayload) {
-  const { provider, text } = await deliverWhatsApp(tenantId, phone, payload);
-  const label = { image: '📷 Imagem', video: '🎬 Vídeo', audio: '🎧 Áudio', document: '📎 Arquivo' }[payload.mediaKind || 'document'];
-  const preview = payload.mediaUrl ? `${text ? `${text}\n` : `${label}\n`}${payload.mediaUrl}` : text;
-  await supabaseAdmin.from('chat_messages').insert({
-    tenant_id: tenantId,
-    lead_id: leadId,
-    text: preview,
-    sent_by_me: true,
-    type: 'text',
-    status: 'sent',
-    provider,
-  });
-  await supabaseAdmin.from('leads').update({ last_msg: `🤖 ${(text || label).split('\n')[0]}`.slice(0, 200) }).eq('tenant_id', tenantId).eq('id', leadId);
 }
 
 // ── IA ───────────────────────────────────────────────────────
@@ -848,6 +760,7 @@ async function enqueueMany(flow: LoadedFlow, leads: { id: string; since?: string
       context: { message: context.message || '', vars: {}, input: context.input || {}, depth: context.depth || 0 },
       steps: [{ node_id: trigger.id, label: trigger.label, at, ok: true, detail: 'Na fila para começar.' }],
     }));
+    // tenant-scope: ok (cada linha leva o tenant_id do fluxo)
     const { error } = await supabaseAdmin.from('automation_runs').insert(rows);
     if (error) log('não foi possível enfileirar execuções', error.message);
   }

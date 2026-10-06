@@ -148,7 +148,7 @@ export async function buildDashboardSummary(profile: UserProfile, tenantId: stri
           if (error) throw new Error(error.message);
           const rows = data || [];
           return {
-            sending: rows.filter((row) => row.status === 'sending').length,
+            sending: rows.filter((row) => row.status === 'running').length,
             sentLast30: rows.reduce((sum, row) => sum + (row.sent_count || 0), 0),
             failedLast30: rows.reduce((sum, row) => sum + (row.failed_count || 0), 0),
             campaigns: rows.length,

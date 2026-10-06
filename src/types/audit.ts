@@ -10,7 +10,8 @@ export type AuditAction =
   | 'TICKET_CALL'
   | 'TICKET_COMPLETE'
   | 'SETTINGS_UPDATE'
-  | 'SUPPORT_ACCESS';
+  | 'SUPPORT_ACCESS'
+  | 'CAMPAIGN';
 
 export interface AuditLog {
   user_id: string;
