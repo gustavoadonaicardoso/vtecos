@@ -4,7 +4,7 @@ import { loadChatLead, sendTextToLead } from '@/services/conversations.service';
 
 /** Mensagem de texto da equipe para o cliente (WhatsApp Web ou API oficial). */
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: 'messages.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const body = await request.json().catch(() => ({}));

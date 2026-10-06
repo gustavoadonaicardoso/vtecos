@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 /** Encerra o atendimento do guichê e chama a próxima senha (preferenciais primeiro). */
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'senhas' });
+  const auth = await requireActiveProfile({ module: 'senhas', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const body = await request.json().catch(() => ({}));

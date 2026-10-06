@@ -14,6 +14,7 @@ import { requireActiveProfile } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
+    // permission: open (fiscal não tem permissão na tela Equipe; vale o plano)
     const auth = await requireActiveProfile({ module: 'fiscal' });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });

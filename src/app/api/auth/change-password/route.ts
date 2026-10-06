@@ -11,6 +11,7 @@ import { requireActiveProfile } from '@/lib/session';
  */
 export async function POST(request: Request) {
   try {
+    // permission: open (a própria senha)
     const auth = await requireActiveProfile();
     if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 

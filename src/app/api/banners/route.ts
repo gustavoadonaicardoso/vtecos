@@ -4,6 +4,7 @@ import { bannersFor } from '@/services/banners.service';
 
 /** Banners da tela Início para quem está logado (já filtrados por empresa, plano, cargo e data). */
 export async function GET() {
+  // permission: open (banners do Início)
   const auth = await requireActiveProfile();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 

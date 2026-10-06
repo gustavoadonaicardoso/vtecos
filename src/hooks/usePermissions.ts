@@ -11,7 +11,8 @@
  */
 
 import { useAuth } from '@/context/AuthContext';
-import type { UserPermissions } from '@/types';
+
+import { profileHasPermission } from '@/lib/permissions.constants';
 
 export { ROUTE_PERMISSIONS } from '@/lib/permissions.constants';
 
@@ -22,17 +23,14 @@ export function usePermissions() {
    * Verifica se o usuário tem permissão para uma rota/ação específica.
    * @param permissionPath ex: 'dashboard.view', 'admin.settings'
    */
+  /**
+   * Verifica se o usuário tem permissão para uma rota/ação específica.
+   * Mesma regra do servidor (profileHasPermission): admin pode tudo.
+   * @param permissionPath ex: 'dashboard.view', 'admin.settings'
+   */
   const hasPermission = (permissionPath?: string): boolean => {
     if (!permissionPath) return true;
-    if (!user) return false;
-    if (user.role === 'ADMIN') return true;
-
-    const [category, field] = permissionPath.split('.') as [string, string];
-
-    // Fallback: se permissões não configuradas, não trava o sistema
-    if (!user.permissions || Object.keys(user.permissions).length === 0) return true;
-
-    return (user.permissions as any)?.[category]?.[field] === true;
+    return profileHasPermission(user, permissionPath);
   };
 
   // Admin da própria empresa (equipe, integrações, configurações).

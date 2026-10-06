@@ -11,7 +11,7 @@ const ALLOWED_DAYS = [7, 30];
 const TOP_POSTS_SAMPLE = 12;
 
 export async function GET(request: Request) {
-  const auth = await requireActiveProfile({ module: 'social' });
+  const auth = await requireActiveProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

@@ -54,7 +54,7 @@ import { requireActiveProfile } from '@/lib/session';
 export async function POST(request: NextRequest) {
   // Antes esta rota não exigia login: qualquer pessoa enviava WhatsApp pela
   // conta oficial da empresa. Agora exige sessão e usa a conta DA empresa.
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: 'messages.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   let body: any;

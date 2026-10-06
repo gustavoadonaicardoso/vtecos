@@ -17,7 +17,7 @@ function backToAccounts(request: Request, params: Record<string, string>) {
 }
 
 export async function GET(request: Request) {
-  const auth = await requireAdminProfile({ module: 'social' });
+  const auth = await requireAdminProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) return backToAccounts(request, { oauth_error: auth.error.message });
 
   const params = new URL(request.url).searchParams;

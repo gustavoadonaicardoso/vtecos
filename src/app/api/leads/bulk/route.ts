@@ -13,7 +13,7 @@ const LABEL: Record<BulkAction, string> = {
 
 /** Ações em vários leads de uma vez (seleção na tela de Leads). */
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: ['leads.view', 'pipeline.view'] });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const body = await request.json().catch(() => ({}));

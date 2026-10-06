@@ -3,7 +3,7 @@ import { requireAdminOrManagerProfile } from '@/lib/session';
 import { updateTemplate, deactivateTemplate } from '@/services/templates.service';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'messages.templates' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;
@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'messages.templates' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;

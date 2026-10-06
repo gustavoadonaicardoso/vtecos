@@ -14,7 +14,7 @@ function backToAccounts(request: Request, error: string) {
 }
 
 export async function GET(request: Request) {
-  const auth = await requireAdminProfile({ module: 'social' });
+  const auth = await requireAdminProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) return backToAccounts(request, auth.error.message);
 
   if (!isMetaAppConfigured()) {

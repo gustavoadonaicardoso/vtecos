@@ -4,7 +4,7 @@ import { isMetaAppConfigured } from '@/lib/social/meta-graph';
 import { listAccounts } from '@/services/social.service';
 
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'social' });
+  const auth = await requireActiveProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

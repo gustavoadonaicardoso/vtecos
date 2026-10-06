@@ -4,7 +4,7 @@ import { createItem, listItems } from '@/services/scheduling.service';
 
 /** Agenda (?from=&to=, datas AAAA-MM-DD), quadro de tarefas (?tasks=1) ou um item (?id=). */
 export async function GET(request: Request) {
-  const auth = await requireActiveProfile({ module: 'agendamento' });
+  const auth = await requireActiveProfile({ module: 'agendamento', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const params = new URL(request.url).searchParams;
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'agendamento' });
+  const auth = await requireActiveProfile({ module: 'agendamento', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const result = await createItem(auth.tenantId, auth.profile, await request.json().catch(() => ({})));

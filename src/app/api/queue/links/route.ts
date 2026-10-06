@@ -4,7 +4,7 @@ import { displayKeyOf } from '@/services/tenant-public.service';
 
 /** Links do totem e do painel DESTA empresa (levam a chave dela). */
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'senhas' });
+  const auth = await requireActiveProfile({ module: 'senhas', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const key = await displayKeyOf(auth.tenantId);

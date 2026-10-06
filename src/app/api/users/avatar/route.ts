@@ -30,6 +30,7 @@ async function setAvatar(tenantId: string, profileId: string, avatarUrl: string 
  * vai para profiles.avatar_url (menu, chat, equipe e Início).
  */
 export async function POST(request: Request) {
+  // permission: open (a própria foto)
   const auth = await requireActiveProfile();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
 
 // DELETE: remove a foto (volta às iniciais do nome).
 export async function DELETE() {
+  // permission: open (a própria foto)
   const auth = await requireActiveProfile();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 

@@ -25,9 +25,20 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/queue': 'integrations.view',
   '/users': 'team.view',
   '/automations': 'automations.view',
+  '/disparos': 'messages.send',
+  '/discador': 'leads.view',
   '/integrations': 'integrations.view',
   '/master': 'admin.root',
 };
+
+/** Permissão de uma página, incluindo as internas (/disparos/nova usa a de /disparos). */
+export function routePermission(pathname: string): string | undefined {
+  if (ROUTE_PERMISSIONS[pathname]) return ROUTE_PERMISSIONS[pathname];
+  const parent = Object.keys(ROUTE_PERMISSIONS)
+    .filter((route) => route !== '/' && pathname.startsWith(`${route}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  return parent ? ROUTE_PERMISSIONS[parent] : undefined;
+}
 
 /**
  * Catálogo ÚNICO das permissões que o sistema realmente usa -- a tela
@@ -111,4 +122,19 @@ export function permissionEnabled(permissions: unknown, id: string) {
   if (!permissions || typeof permissions !== 'object' || Object.keys(permissions).length === 0) return true;
   const [cat, field] = id.split('.');
   return (permissions as PermissionMap)[cat]?.[field] === true;
+}
+
+/**
+ * Regra única (tela e servidor): administrador pode tudo; os demais
+ * precisam de pelo menos uma das permissões pedidas ligada no perfil.
+ */
+export function profileHasPermission(profile: { role?: string | null; permissions?: unknown } | null | undefined, ids: string | string[]) {
+  if (!profile) return false;
+  if (profile.role === 'ADMIN') return true;
+  const list = Array.isArray(ids) ? ids : [ids];
+  return list.length === 0 || list.some((id) => permissionEnabled(profile.permissions, id));
+}
+
+export function permissionLabel(id: string) {
+  return PERMISSION_ITEMS.find((permission) => permission.id === id)?.label || id;
 }

@@ -8,7 +8,7 @@ const ACTIONS: TicketAction[] = ['call', 'recall', 'finish', 'no_show', 'cancel'
 
 /** Chamar fora de ordem, chamar de novo, finalizar, não compareceu, cancelar ou devolver à fila. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireActiveProfile({ module: 'senhas' });
+  const auth = await requireActiveProfile({ module: 'senhas', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;

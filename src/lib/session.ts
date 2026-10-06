@@ -21,6 +21,7 @@ import { fetchProfileById, fetchProfileByEmail } from '@/services/profile-lookup
 import { loadWorkspace } from '@/services/workspace.service';
 import { applySupportAccess } from '@/services/support-access.service';
 import type { UserProfile } from '@/types';
+import { permissionLabel, profileHasPermission } from '@/lib/permissions.constants';
 
 const ACCESS_COOKIE = 'vortice_at';
 const REFRESH_COOKIE = 'vortice_rt';
@@ -141,7 +142,17 @@ export interface TenantAuth {
  * `module`: exige que o plano da empresa inclua o módulo (a empresa da
  * plataforma tem todos).
  */
-export async function requireActiveProfile(options: { module?: string } = {}): Promise<
+export interface AccessOptions {
+  /** Módulo do plano da empresa (crm, financeiro, social...). */
+  module?: string;
+  /**
+   * Permissão da tela Equipe (ex.: 'leads.view'). Com uma lista, basta
+   * uma delas. Administrador sempre passa.
+   */
+  permission?: string | string[];
+}
+
+export async function requireActiveProfile(options: AccessOptions = {}): Promise<
   TenantAuth | AuthError
 > {
   const profile = await getAuthenticatedProfile();
@@ -163,6 +174,10 @@ export async function requireActiveProfile(options: { module?: string } = {}): P
   if (options.module && !workspace.modules.includes(options.module)) {
     return { error: { message: 'Este módulo não faz parte do plano da sua empresa.', status: 403 } };
   }
+  if (options.permission && !profileHasPermission(profile, options.permission)) {
+    const first = Array.isArray(options.permission) ? options.permission[0] : options.permission;
+    return { error: { message: `Seu perfil não tem acesso a "${permissionLabel(first)}". Peça a um administrador em Equipe.`, status: 403 } };
+  }
 
   return {
     profile: { ...profile, workspace },
@@ -176,7 +191,7 @@ export async function requireActiveProfile(options: { module?: string } = {}): P
 /**
  * Helper para rotas que exigem administrador ativo (da própria empresa).
  */
-export async function requireAdminProfile(options: { module?: string } = {}): Promise<TenantAuth | AuthError> {
+export async function requireAdminProfile(options: AccessOptions = {}): Promise<TenantAuth | AuthError> {
   const result = await requireActiveProfile(options);
   if ('error' in result) return result;
 
@@ -190,7 +205,7 @@ export async function requireAdminProfile(options: { module?: string } = {}): Pr
 /**
  * Helper para rotas que exigem administrador ou gerente ativo.
  */
-export async function requireAdminOrManagerProfile(options: { module?: string } = {}): Promise<TenantAuth | AuthError> {
+export async function requireAdminOrManagerProfile(options: AccessOptions = {}): Promise<TenantAuth | AuthError> {
   const result = await requireActiveProfile(options);
   if ('error' in result) return result;
 

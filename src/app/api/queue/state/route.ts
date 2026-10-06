@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 /** Recepção: senhas de hoje, configurações e links do totem/TV desta empresa. */
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'senhas' });
+  const auth = await requireActiveProfile({ module: 'senhas', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   try {

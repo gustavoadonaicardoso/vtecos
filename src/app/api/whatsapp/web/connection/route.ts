@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
 
 /** Só lê a situação (a tela consulta a cada 2s enquanto espera o QR). */
 export async function GET() {
+  // permission: open (só a situação da conexão; conectar e desconectar é de admin)
   const auth = await requireActiveProfile({ module: 'crm' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 

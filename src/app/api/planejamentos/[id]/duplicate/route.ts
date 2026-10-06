@@ -3,7 +3,7 @@ import { duplicateBoard } from '@/services/planning.service';
 import { requireActiveProfile } from '@/lib/session';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: 'planejamentos.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
