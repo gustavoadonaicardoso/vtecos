@@ -4,7 +4,7 @@ import { requireActiveProfile } from '@/lib/session';
 
 /** Qualquer usuário ativo pode editar; excluir exige ser quem criou ou ADMIN/MANAGER. */
 async function authorizeDelete(boardId: string) {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: 'planejamentos.view' });
   if ('error' in auth) return auth;
 
   const owner = await fetchBoardOwner(auth.tenantId, boardId);
@@ -20,7 +20,7 @@ async function authorizeDelete(boardId: string) {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: 'planejamentos.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -32,7 +32,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: 'planejamentos.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

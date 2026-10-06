@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 /** Arquivo, imagem ou áudio da equipe para o cliente. */
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: 'messages.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const form = await request.formData().catch(() => null);

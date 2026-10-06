@@ -5,7 +5,7 @@ import { requireActiveProfile } from '@/lib/session';
 // Usuário e empresa vêm da sessão (antes: cabeçalho x-user-id, forjável).
 
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: ['admin.projects', 'planejamentos.view', 'social.view'] });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const permissions = auth.profile.permissions as { admin?: { projects?: boolean } } | undefined;
@@ -24,7 +24,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: ['admin.projects', 'planejamentos.view', 'social.view'] });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   if (auth.profile.role !== 'ADMIN') {

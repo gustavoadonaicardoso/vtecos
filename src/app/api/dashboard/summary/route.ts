@@ -4,7 +4,7 @@ import { buildDashboardSummary } from '@/services/dashboard.service';
 
 /** Números de todos os módulos para o dashboard, filtrados pelas permissões do usuário. */
 export async function GET() {
-  const auth = await requireActiveProfile();
+  const auth = await requireActiveProfile({ permission: 'dashboard.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

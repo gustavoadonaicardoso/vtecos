@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       tenant = await resolveTenantByDisplayKey(payload.key);
       if (!tenant) return NextResponse.json({ error: 'Totem não configurado. Peça o link correto à recepção.' }, { status: 404 });
     } else {
-      const auth = await requireActiveProfile({ module: 'senhas' });
+      const auth = await requireActiveProfile({ module: 'senhas', permission: 'integrations.view' });
       if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
       tenant = { id: auth.tenantId, name: auth.tenantName };
     }

@@ -15,7 +15,7 @@ export function needsApproval(profile: UserProfile, settings: SocialSettings) {
 export async function requirePostAccess(
   postId: string
 ): Promise<{ profile: UserProfile; post: SocialPost; tenantId: string } | { error: { message: string; status: number } }> {
-  const auth = await requireActiveProfile({ module: 'social' });
+  const auth = await requireActiveProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) return auth;
 
   // Só posts da empresa da sessão.

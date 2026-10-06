@@ -14,6 +14,7 @@ import { fireAutomation, onLeadCreated } from '@/lib/automations/engine';
  */
 export async function GET() {
   try {
+    // permission: open (Início, Metas, Relatórios e Agenda também usam a lista; vendedor já só recebe os próprios leads)
     const auth = await requireActiveProfile({ module: 'crm' });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
@@ -29,7 +30,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireActiveProfile({ module: 'crm' });
+    const auth = await requireActiveProfile({ module: 'crm', permission: ['leads.view', 'leads.create', 'pipeline.view'] });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }

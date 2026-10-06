@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 
 // POST { leadIds: string[] } -- a equipe roda o fluxo para leads escolhidos.
 export async function POST(request: Request, { params }: Params) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'automations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const { id } = await params;
   const body = await request.json().catch(() => ({}));

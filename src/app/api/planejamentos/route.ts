@@ -3,7 +3,7 @@ import { fetchBoards, createBoard } from '@/services/planning.service';
 import { requireActiveProfile } from '@/lib/session';
 
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: 'planejamentos.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -14,7 +14,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: 'planejamentos.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

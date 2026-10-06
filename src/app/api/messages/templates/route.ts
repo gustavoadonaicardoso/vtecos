@@ -4,7 +4,7 @@ import { fetchVisibleTemplates, createTemplate } from '@/services/templates.serv
 
 // GET — templates da empresa visíveis para o usuário da sessão
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: ['messages.templates', 'integrations.view'] });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const result = await fetchVisibleTemplates(auth.tenantId, auth.profile.id);
@@ -14,7 +14,7 @@ export async function GET() {
 
 // POST — criar template (admin/gerente da empresa)
 export async function POST(req: NextRequest) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'messages.templates' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { name, content } = await req.json();

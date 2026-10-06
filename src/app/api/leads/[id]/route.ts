@@ -13,10 +13,11 @@ const FIELD_LABEL: Record<string, string> = {
 /**
  * Antes: qualquer requisição podia editar/apagar qualquer lead, sem
  * checar quem estava pedindo. Agora exige sessão válida e, pra quem
- * não é ADMIN/MANAGER, confere que o lead é mesmo do usuário.
+ * não é ADMIN/MANAGER, confere que o lead é mesmo do usuário. Editar
+ * vale para Leads, Pipeline e Mensagens; excluir, para Leads e Pipeline.
  */
-async function authorizeLeadAccess(leadId: string) {
-  const auth = await requireActiveProfile({ module: 'crm' });
+async function authorizeLeadAccess(leadId: string, permission: string[]) {
+  const auth = await requireActiveProfile({ module: 'crm', permission });
   if ('error' in auth) return auth;
 
   if (auth.profile.role === 'ADMIN' || auth.profile.role === 'MANAGER') return auth;
@@ -33,7 +34,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const { id: leadId } = await params;
 
-    const auth = await authorizeLeadAccess(leadId);
+    const auth = await authorizeLeadAccess(leadId, ['leads.view', 'pipeline.view', 'messages.view']);
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }
@@ -110,7 +111,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const { id: leadId } = await params;
 
-    const auth = await authorizeLeadAccess(leadId);
+    const auth = await authorizeLeadAccess(leadId, ['leads.view', 'pipeline.view']);
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }

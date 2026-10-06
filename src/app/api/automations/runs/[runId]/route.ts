@@ -4,7 +4,7 @@ import { cancelRun } from '@/services/automations.service';
 
 // DELETE: cancela uma execução que está esperando.
 export async function DELETE(_request: Request, { params }: { params: Promise<{ runId: string }> }) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'automations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const { runId } = await params;
   const result = await cancelRun(auth.tenantId, runId);

@@ -9,6 +9,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  * vem do Supabase Realtime Presence (PresenceContext).
  */
 export async function POST() {
+  // permission: open (quem está online, para todos)
   const auth = await requireActiveProfile();
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });

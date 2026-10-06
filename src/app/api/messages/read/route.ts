@@ -4,7 +4,7 @@ import { loadChatLead, markLeadRead } from '@/services/conversations.service';
 
 /** Conversa aberta: zera as não lidas do lead. */
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: 'messages.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const body = await request.json().catch(() => ({}));
   const leadId = typeof body.leadId === 'string' ? body.leadId : '';

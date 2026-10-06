@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 // POST multipart { file } -- arquivo do bloco "Enviar arquivo".
 export async function POST(request: Request) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'automations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const form = await request.formData().catch(() => null);

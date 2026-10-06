@@ -5,7 +5,7 @@ import { deleteItem, updateItem } from '@/services/scheduling.service';
 type Context = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, { params }: Context) {
-  const auth = await requireActiveProfile({ module: 'agendamento' });
+  const auth = await requireActiveProfile({ module: 'agendamento', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;
@@ -15,7 +15,7 @@ export async function PATCH(request: Request, { params }: Context) {
 }
 
 export async function DELETE(_request: Request, { params }: Context) {
-  const auth = await requireActiveProfile({ module: 'agendamento' });
+  const auth = await requireActiveProfile({ module: 'agendamento', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;

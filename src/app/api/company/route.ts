@@ -6,6 +6,7 @@ import { fetchCompany, parseCompanyInput, updateCompany } from '@/services/compa
 
 // GET: cadastro e plano da empresa de quem está logado.
 export async function GET() {
+  // permission: open (nome e logo da empresa, para todos)
   const auth = await requireActiveProfile();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 

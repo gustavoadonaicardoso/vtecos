@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Escopo inválido.' }, { status: 400 });
     }
 
-    const auth = scope === 'team' ? await requireAdminOrManagerProfile() : await requireActiveProfile();
+    const auth = scope === 'team' ? await requireActiveProfile({ permission: 'team.view' }) : await requireActiveProfile();
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }

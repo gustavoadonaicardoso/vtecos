@@ -4,6 +4,7 @@ import { createLeadTag, deleteLeadTag, listLeadTags, updateLeadTag } from '@/ser
 
 /** Etiquetas da empresa: todos veem; admin e gerente criam, editam e apagam. */
 export async function GET() {
+  // permission: open (lista de etiquetas, usada em todas as telas do CRM)
   const auth = await requireActiveProfile({ module: 'crm' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const result = await listLeadTags(auth.tenantId);
@@ -12,7 +13,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'leads.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const body = await request.json().catch(() => ({}));
   const result = await createLeadTag(auth.tenantId, String(body.name || ''), String(body.color || ''));
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'leads.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const body = await request.json().catch(() => ({}));
   const result = await updateLeadTag(auth.tenantId, String(body.name || ''), { name: body.newName, color: body.color });
@@ -30,7 +31,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'leads.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const name = new URL(request.url).searchParams.get('name') || '';
   if (!name) return NextResponse.json({ error: 'Informe a etiqueta.' }, { status: 400 });

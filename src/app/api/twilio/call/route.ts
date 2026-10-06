@@ -5,7 +5,7 @@ import { requireActiveProfile } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireActiveProfile({ module: 'crm' });
+    const auth = await requireActiveProfile({ module: 'crm', permission: 'leads.view' });
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
     }

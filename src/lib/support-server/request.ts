@@ -3,6 +3,7 @@ import type { UploadFile, Viewer } from '@/services/support.service';
 
 /** Quem está pedindo (qualquer usuário ativo; a Vórtice vira "atendimento"). */
 export async function supportViewer(): Promise<Viewer | { error: { message: string; status: number } }> {
+  // permission: open (chamados: cada um vê os próprios)
   const auth = await requireActiveProfile();
   if ('error' in auth) return auth;
   return {

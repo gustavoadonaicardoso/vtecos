@@ -4,7 +4,7 @@ import { parsePostInput } from '@/lib/social/input';
 import { createPost, listPosts } from '@/services/social.service';
 
 export async function GET(request: Request) {
-  const auth = await requireActiveProfile({ module: 'social' });
+  const auth = await requireActiveProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'social' });
+  const auth = await requireActiveProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

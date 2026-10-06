@@ -4,7 +4,7 @@ import { createChatGroup } from '@/services/chat.service';
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ permission: 'messages.send' });
     if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
     const { name, members } = await request.json();

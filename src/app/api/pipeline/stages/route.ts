@@ -7,7 +7,7 @@ import { parseStagesInput, savePipelineStages } from '@/services/pipeline.servic
  * Só admin e gerente: as etapas são compartilhadas por toda a equipe.
  */
 export async function PUT(request: Request) {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: 'pipeline.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

@@ -4,7 +4,7 @@ import { getSocialSettings, saveSocialSettings } from '@/services/social.service
 
 /** Qualquer usuário lê (o criador de post precisa das contas padrão e da regra de aprovação). */
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'social' });
+  const auth = await requireActiveProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }
@@ -12,7 +12,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const auth = await requireAdminProfile({ module: 'social' });
+  const auth = await requireAdminProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

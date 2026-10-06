@@ -5,6 +5,7 @@ import { fetchSalesContact } from '@/services/plans.service';
 
 // GET: conteúdo publicado da Central de Ajuda + contato da Vórtice.
 export async function GET() {
+  // permission: open (Central de Ajuda)
   const auth = await requireActiveProfile();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 

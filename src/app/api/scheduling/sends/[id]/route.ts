@@ -6,7 +6,7 @@ type Context = { params: Promise<{ id: string }> };
 
 /** Muda texto/horário de um envio pendente ou reagenda um que falhou/foi cancelado. */
 export async function PATCH(request: Request, { params }: Context) {
-  const auth = await requireActiveProfile({ module: 'agendamento' });
+  const auth = await requireActiveProfile({ module: 'agendamento', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;
@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: Context) {
 
 /** Cancela um envio que ainda não saiu (fica no histórico como cancelado). */
 export async function DELETE(_request: Request, { params }: Context) {
-  const auth = await requireActiveProfile({ module: 'agendamento' });
+  const auth = await requireActiveProfile({ module: 'agendamento', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;

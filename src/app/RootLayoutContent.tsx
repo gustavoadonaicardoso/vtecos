@@ -18,7 +18,8 @@ import InAppToasts from "@/components/InAppToasts";
 import SupportAccessBar from "@/components/SupportAccessBar";
 import { isPublicRoute } from "@/lib/public-routes";
 // FIX #7: hook centralizado de permissões — sem duplicação
-import { usePermissions, ROUTE_PERMISSIONS } from "@/lib/permissions";
+import { usePermissions } from "@/lib/permissions";
+import { routePermission } from "@/lib/permissions.constants";
 import { isRouteAllowed } from "@/lib/plans";
 
 function AppGuard({ children }: { children: React.ReactNode }) {
@@ -50,7 +51,7 @@ function AppGuard({ children }: { children: React.ReactNode }) {
     if (modules && !isRouteAllowed(pathname, modules)) return false;
     if (pathname === '/') return true;
 
-    const requiredPermission = ROUTE_PERMISSIONS[pathname];
+    const requiredPermission = routePermission(pathname);
     if (!requiredPermission) return true;
 
     // FIX #7: rota admin.root bloqueada explicitamente para não-ADMIN

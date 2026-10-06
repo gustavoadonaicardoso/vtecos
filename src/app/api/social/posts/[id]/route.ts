@@ -10,7 +10,7 @@ const LOCKED_STATUSES: SocialPostStatus[] = ['publishing', 'published', 'publish
 const REAPPROVAL_STATUSES: SocialPostStatus[] = ['scheduled', 'failed'];
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireActiveProfile({ module: 'social' });
+  const auth = await requireActiveProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

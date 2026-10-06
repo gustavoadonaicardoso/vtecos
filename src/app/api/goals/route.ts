@@ -6,7 +6,7 @@ import type { GoalPlan } from '@/lib/goals';
 // Antes o usuário vinha do cabeçalho x-user-id (forjável). Agora vem da
 // sessão, junto com a empresa.
 async function getRequester() {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: 'dashboard.view' });
   if ('error' in auth) return null;
   return { tenantId: auth.tenantId, requester: { id: auth.profile.id, role: auth.profile.role, status: auth.profile.status } };
 }

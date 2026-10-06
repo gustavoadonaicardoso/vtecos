@@ -24,24 +24,13 @@ export interface FinanceAccess {
 
 type AccessResult = { access: FinanceAccess } | { error: { message: string; status: number } };
 
-function staffHasPermission(profile: UserProfile, path: string) {
-  if (profile.role === 'ADMIN') return true;
-  const permissions = profile.permissions as Record<string, Record<string, boolean>> | undefined;
-  if (!permissions || Object.keys(permissions).length === 0) return true;
-  const [category, field] = path.split('.');
-  return permissions?.[category]?.[field] === true;
-}
-
 export async function requireFinanceAccess(request: Request, need: 'view' | 'manage' | 'sell' = 'view'): Promise<AccessResult> {
-  const auth = await requireActiveProfile({ module: 'financeiro' });
+  const auth = await requireActiveProfile({ module: 'financeiro', permission: 'financeiro.view' });
   if ('error' in auth) return auth;
   const { profile } = auth;
   const isClient = !auth.isPlatform;
 
   let tenant = { id: auth.tenantId, name: auth.tenantName };
-  if (!staffHasPermission(profile, 'financeiro.view')) {
-    return { error: { message: 'Sem permissão para Custos e Precificação.', status: 403 } };
-  }
 
   // Equipe da plataforma pode abrir a planilha de uma empresa cliente
   // (suporte). Qualquer outra empresa fica presa à própria.

@@ -77,7 +77,7 @@ export default function AccessEditor({ role, permissions, modules, readOnly, onC
         </div>
       )}
 
-      {renderGroup('menu', 'Páginas', 'O que aparece no menu lateral desta pessoa.')}
+      {renderGroup('menu', 'Páginas', 'O que esta pessoa vê no menu e consegue usar. Vale também no servidor: sem a permissão, o sistema recusa o acesso mesmo por link direto.')}
       {items.some((item) => item.kind === 'action') && renderGroup('action', 'Recursos', 'Botões e ferramentas dentro das páginas.')}
 
       {onTemplatesChange && templates.length > 0 && (

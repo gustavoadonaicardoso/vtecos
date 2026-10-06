@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: Params) {
 
   // Seletor de empresa: só a equipe da plataforma (Vórtice) lista outras empresas.
   if (resource === 'tenants') {
-    const auth = await requireActiveProfile({ module: 'financeiro' });
+    const auth = await requireActiveProfile({ module: 'financeiro', permission: 'financeiro.view' });
     if ('error' in auth) return fail(auth.error.message, auth.error.status);
     if (!auth.isPlatform) return NextResponse.json({ data: [{ id: auth.tenantId, name: auth.tenantName, status: 'ACTIVE' }] });
     try {

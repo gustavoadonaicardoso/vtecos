@@ -5,7 +5,7 @@ import { requireActiveProfile } from '@/lib/session';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'planejamentos' });
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: 'planejamentos.view' });
   if ('error' in auth) {
     return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   }

@@ -8,7 +8,7 @@ import { cancelWaitingRuns } from '@/lib/automations/engine';
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
-  const auth = await requireActiveProfile({ module: 'crm' });
+  const auth = await requireActiveProfile({ module: 'crm', permission: 'automations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const { id } = await params;
   const flow = await getFlow(auth.tenantId, id);
@@ -20,7 +20,7 @@ export async function GET(_request: Request, { params }: Params) {
 
 // PATCH { name?, description?, graph?, status?, regenerateToken? }
 export async function PATCH(request: Request, { params }: Params) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'automations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
@@ -43,7 +43,7 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const auth = await requireAdminOrManagerProfile({ module: 'crm' });
+  const auth = await requireAdminOrManagerProfile({ module: 'crm', permission: 'automations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const { id } = await params;
   await cancelWaitingRuns(auth.tenantId, id, 'Fluxo excluído.');

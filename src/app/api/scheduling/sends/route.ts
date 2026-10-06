@@ -4,7 +4,7 @@ import { createSend, isFailure, listSends, sendWorkerEnabled } from '@/services/
 
 /** Envios agendados (vendedor: só os dele) e se o envio automático está ligado neste servidor. */
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'agendamento' });
+  const auth = await requireActiveProfile({ module: 'agendamento', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   try {
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'agendamento' });
+  const auth = await requireActiveProfile({ module: 'agendamento', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const result = await createSend(auth.tenantId, auth.profile, await request.json().catch(() => ({})));

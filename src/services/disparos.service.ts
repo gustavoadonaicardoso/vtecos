@@ -13,7 +13,7 @@
 
 import { supabaseAdmin as db } from '@/lib/supabase-admin';
 import { logAudit } from '@/lib/audit';
-import { permissionEnabled } from '@/lib/permissions.constants';
+import { profileHasPermission } from '@/lib/permissions.constants';
 import type { RunContext } from '@/lib/automations/flow';
 import {
   columnVariable,
@@ -47,9 +47,9 @@ const UUID_RE = /^[0-9a-f-]{36}$/i;
 const nowIso = () => new Date().toISOString();
 const text = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
-/** Quem pode criar e controlar campanhas: admin, gerente ou quem tem "Chat interno e Disparos". */
+/** Quem pode criar e controlar campanhas: administrador ou quem tem "Chat interno e Disparos". */
 export function canUseCampaigns(profile: Actor) {
-  return profile.role === 'ADMIN' || profile.role === 'MANAGER' || permissionEnabled(profile.permissions, 'messages.send');
+  return profileHasPermission(profile, 'messages.send');
 }
 
 const missingTable = (message?: string) => Boolean(message && /blast_|whatsapp_optouts|schema cache|does not exist|column/i.test(message));

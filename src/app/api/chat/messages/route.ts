@@ -9,7 +9,7 @@ const messageType = (value: unknown) => (value === 'group' ? 'group' : 'direct')
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ permission: 'messages.send' });
     if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
     const body = await request.json();
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ permission: 'messages.send' });
     if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
     const { type, id, text } = await request.json();
@@ -62,7 +62,7 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const auth = await requireActiveProfile();
+    const auth = await requireActiveProfile({ permission: 'messages.send' });
     if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
     const { type, id } = await request.json();

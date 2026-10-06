@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 /** Recepção chamou (ou rechamou) a senha: avisa a pessoa no WhatsApp. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireActiveProfile({ module: 'senhas' });
+  const auth = await requireActiveProfile({ module: 'senhas', permission: 'integrations.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const { id } = await params;
