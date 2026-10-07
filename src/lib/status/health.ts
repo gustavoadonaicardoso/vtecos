@@ -25,7 +25,7 @@ export const FAILS_TO_ALERT = 2;
 const WORKER_MAX_SILENCE_MS = 10 * 60_000;
 /** Logo depois de subir, o agendador ainda não bateu: não acusa. */
 const STARTUP_GRACE_S = 180;
-const WORKERS = ['automacoes', 'disparos', 'agendamento', 'redes'];
+const WORKERS = ['automacoes', 'disparos', 'agendamento', 'redes', 'discador'];
 /** Banco e agendadores a cada minuto; IA e Meta (serviços de fora) a cada 2. */
 export const EXTERNAL_CHECKS = ['ia', 'meta'];
 

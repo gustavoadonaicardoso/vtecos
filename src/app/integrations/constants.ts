@@ -87,7 +87,7 @@ export const CATALOG: CatalogItem[] = [
     id: 'twilio',
     provider: 'twilio',
     name: 'Discador (Twilio)',
-    description: 'Ligações pelo navegador com o número da sua empresa, gravadas no histórico do lead.',
+    description: 'Discador automático: liga para a sua planilha e passa para a equipe só quem atendeu. Também liga manualmente pelo navegador, com gravação.',
     icon: Phone,
     color: '#F22F46',
     category: 'Telefonia',

@@ -34,6 +34,10 @@ export async function register() {
   const { startBlastWorker } = await import('./lib/disparos/worker');
   startBlastWorker();
 
+  // Discador automático: liga para as campanhas quando há atendente livre.
+  const { startDialerWorker } = await import('./lib/dialer/engine');
+  startDialerWorker();
+
   // Status do sistema: confere banco, IA, Meta e os agendadores acima.
   const { startHealthChecks } = await import('./lib/status/health');
   startHealthChecks();

@@ -57,7 +57,7 @@ export function TwilioPanel({ integration, onChanged }: PanelProps) {
             <PlugZap size={20} />
             <div>
               <strong>Conectado: {String(saved.phoneNumber || '')}</strong>
-              <span>Conta {String(saved.accountName || saved.accountSid || '')}. As ligações saem por esse número e são cobradas na sua conta Twilio.</span>
+              <span>Conta {String(saved.accountName || saved.accountSid || '')}. As ligações saem por esse número e são cobradas na sua conta Twilio. Abra o <strong>Discador</strong> no menu para subir uma planilha e começar a ligar.</span>
             </div>
           </div>
           <FeedbackBox feedback={feedback} />
@@ -76,7 +76,7 @@ export function TwilioPanel({ integration, onChanged }: PanelProps) {
         </>
       ) : (
         <form className={styles.panelBody} onSubmit={findNumbers}>
-          <p className={styles.hint}>Cole os dados da <strong>sua</strong> conta Twilio (painel do Twilio, quadro Account Info). O vtec os cria sozinho a chave de API e o aplicativo de voz na sua conta.</p>
+          <p className={styles.hint}>Cole os dados da <strong>sua</strong> conta Twilio (painel do Twilio, quadro Account Info). O vtec os cria sozinho a chave de API e o aplicativo de voz na sua conta. Antes, libere ligações para o Brasil em Voice &gt; Settings &gt; Geo Permissions e tire a conta do modo de teste (Upgrade), senão só dá para ligar para números verificados.</p>
           <div className={styles.formGrid}>
             <label className={styles.field}>
               <span className={styles.label}>Account SID</span>

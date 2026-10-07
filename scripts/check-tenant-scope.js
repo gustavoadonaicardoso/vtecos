@@ -26,7 +26,7 @@ const TENANT_TABLES = [
   'queue_tickets', 'system_updates', 'integrations_config', 'audit_logs', 'social_accounts', 'social_posts',
   'social_post_targets', 'profiles', 'fin_settings', 'fin_ingredients', 'fin_products', 'fin_product_items',
   'fin_fixed_costs', 'fin_channels', 'fin_sales', 'support_tickets', 'support_ticket_messages',
-  'automation_flows', 'automation_runs', 'whatsapp_optouts',
+  'automation_flows', 'automation_runs', 'whatsapp_optouts', 'dialer_campaigns', 'dialer_contacts', 'dialer_agents',
 ];
 
 const root = path.join(__dirname, '..', 'src');

@@ -1,354 +1,214 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { 
-  Phone, 
-  Upload, 
-  Play, 
-  Pause, 
-  Users, 
-  BarChart3, 
-  CheckCircle2, 
-  XCircle, 
-  Clock,
-  UserCheck,
-  FileSpreadsheet
-} from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { AlertTriangle, BookOpen, PhoneCall } from 'lucide-react';
 import styles from './discador.module.css';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { formatPhone } from '@/lib/dialer/phone';
+import type { AgentState, DialerCampaign, TeamAgent } from '@/lib/dialer/types';
+import AgentConsole from './components/AgentConsole';
+import CampaignDetail from './components/CampaignDetail';
+import CampaignList from './components/CampaignList';
+import NewCampaignModal from './components/NewCampaignModal';
+import TeamPanel from './components/TeamPanel';
+import { useAgentPhone } from './components/useAgentPhone';
+import { request } from './components/shared';
 
-interface CallQueueItem {
-  id: number;
-  name: string;
-  phone: string;
-  status: 'pending' | 'calling' | 'completed' | 'failed';
-}
+const HEARTBEAT_MS = 5000;
+const agentPost = (body: Record<string, unknown>) => request<AgentState>('/api/dialer/agent', { method: 'POST', body: JSON.stringify(body) });
 
-export default function PowerDialerPage() {
+/**
+ * Discador automático: o atendente fica disponível e recebe as ligações
+ * atendidas; administradores e gerentes sobem planilhas e controlam as
+ * campanhas. O servidor é quem liga (src/lib/dialer/engine.ts).
+ */
+export default function DiscadorPage() {
   const { user } = useAuth();
-  const [queue, setQueue] = useState<CallQueueItem[]>([]);
-  const [isDialing, setIsDialing] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(-1);
-  const [agents, setAgents] = useState<any[]>([]);
+  const isManager = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const [agent, setAgent] = useState<AgentState | null>(null);
+  const [team, setTeam] = useState<TeamAgent[]>([]);
+  const [campaigns, setCampaigns] = useState<DialerCampaign[] | null>(null);
+  const [openId, setOpenId] = useState<string | null>(() => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('campanha')));
+  const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [busyCampaign, setBusyCampaign] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [callEnded, setCallEnded] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const statusRef = useRef<string>('offline');
 
-  // Fetch real agents from database
-  useEffect(() => {
-    async function fetchAgents() {
-      if (!supabase) return;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, status, role')
-        
-        .order('name');
-      
-      if (data) {
-        // Map database status to UI status
-        const mappedAgents = data.map(agent => ({
-          id: `u_${String(agent.id).replace(/-/g, '')}`, // identidade no Twilio Client = id do perfil
-          name: agent.name,
-          status: agent.status === 'ACTIVE' ? 'available' : 'offline',
-          role: agent.role
-        }));
-        setAgents(mappedAgents);
-      }
+  const applyAgent = useCallback((result: { data?: AgentState; error?: string }) => {
+    if (result.data) {
+      setAgent(result.data);
+      statusRef.current = result.data.status;
     }
-    fetchAgents();
+    return result;
   }, []);
+  const heartbeat = useCallback(() => agentPost({ action: 'heartbeat' }).then(applyAgent), [applyAgent]);
 
-  // Sync current user with agents list and ensure they are 'available'
-  useEffect(() => {
-    if (user?.name) {
-      setAgents(prev => {
-        const userExists = prev.find(a => a.name === user.name);
-        if (userExists) {
-          return prev.map(a => a.name === user.name ? { ...a, status: 'available', name: `${user.name} (Você)` } : a);
-        }
-        return [...prev, { id: `u_${user.id.replace(/-/g, '')}`, name: `${user.name} (Você)`, status: 'available' }];
-      });
-    }
-  }, [user]);
-
-  const [logs, setLogs] = useState<{time: string, msg: string}[]>([]);
-  const [stats, setStats] = useState({
-    total: 0,
-    completed: 0,
-    failed: 0,
-    pending: 0
+  const phone = useAgentPhone({
+    onIncoming: () => { setCallEnded(false); void heartbeat(); },
+    onEnded: () => { setCallEnded(true); void heartbeat(); setTimeout(() => void heartbeat(), 1500); },
   });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Ao abrir a tela o telefone do navegador ainda está desligado: não
+  // fica "disponível" de uma visita anterior (finalização continua).
+  useEffect(() => {
+    request<AgentState>('/api/dialer/agent').then(async (result) => {
+      if (result.error) setError(result.error);
+      if (!result.data) return;
+      if (result.data.status === 'available' || result.data.status === 'paused') applyAgent(await agentPost({ action: 'offline' }));
+      else applyAgent(result);
+    });
+  }, [applyAgent]);
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws) as any[];
-
-      const newQueue: CallQueueItem[] = data.map((row, index) => ({
-        id: index,
-        name: row.Nome || row.name || 'Sem nome',
-        phone: String(row.Telefone || row.phone || '').replace(/\D/g, ''),
-        status: 'pending' as const
-      })).filter(item => item.phone.length >= 8);
-
-      setQueue(newQueue);
-      setStats({
-        total: newQueue.length,
-        completed: 0,
-        failed: 0,
-        pending: newQueue.length
-      });
+  // Sinal de vida + situação (a cada 5 s enquanto não estiver offline).
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (statusRef.current !== 'offline') void heartbeat();
+    }, HEARTBEAT_MS);
+    const leave = () => {
+      if (statusRef.current !== 'offline' && statusRef.current !== 'on_call') navigator.sendBeacon('/api/dialer/agent', JSON.stringify({ action: 'offline' }));
     };
-    reader.readAsBinaryString(file);
-  };
+    window.addEventListener('pagehide', leave);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('pagehide', leave);
+      leave();
+    };
+  }, [heartbeat]);
 
-  const addLog = (msg: string) => {
-    const time = new Date().toLocaleTimeString('pt-BR');
-    setLogs(prev => [{ time, msg }, ...prev].slice(0, 50));
-  };
-
-  const processNextCall = useCallback(async (index: number) => {
-    if (!isDialing || index >= queue.length) {
-      if (index >= queue.length) {
-        setIsDialing(false);
-        addLog("Campanha finalizada.");
-      }
-      return;
-    }
-
-    const contact = queue[index];
-    if (!contact) return;
-
-    setCurrentIndex(index);
-    setQueue(prev => prev.map((item, i) => i === index ? { ...item, status: 'calling' } : item));
-    
-    // Find available agent
-    const availableAgent = agents.find(a => a.status === 'available');
-    
-    if (!availableAgent) {
-      addLog(`Falha: Nenhum agente disponível para ${contact.name}`);
-      setQueue(prev => prev.map((item, i) => i === index ? { ...item, status: 'failed' } : item));
-      setStats(prev => ({ ...prev, failed: prev.failed + 1, pending: prev.pending - 1 }));
-      setTimeout(() => processNextCall(index + 1), 2000);
-      return;
-    }
-
-    addLog(`Ligando para ${contact.name}...`);
-
-    try {
-      const response = await fetch('/api/twilio/call', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: contact.phone,
-          userId: user?.id,
-          agentId: availableAgent.id
-        })
-      });
-
-      if (response.ok) {
-        addLog(`Encaminhando ${contact.name} para ${availableAgent.name}`);
-        setQueue(prev => prev.map((item, i) => i === index ? { ...item, status: 'completed' } : item));
-        setStats(prev => ({ ...prev, completed: prev.completed + 1, pending: prev.pending - 1 }));
-      } else {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`Server error: ${response.status}`);
-      }
-    } catch (error) {
-      addLog(`Erro ao ligar para ${contact.name}`);
-      setQueue(prev => prev.map((item, i) => i === index ? { ...item, status: 'failed' } : item));
-      setStats(prev => ({ ...prev, failed: prev.failed + 1, pending: prev.pending - 1 }));
-    }
-
-    // Wait before next call
-    setTimeout(() => processNextCall(index + 1), 3000);
-  }, [isDialing, queue, agents, user]);
+  // Equipe e campanhas.
+  const fetchTeam = useCallback(() => request<TeamAgent[]>('/api/dialer/team'), []);
+  const fetchCampaigns = useCallback(() => request<DialerCampaign[]>('/api/dialer/campaigns'), []);
+  const applyTeam = useCallback((result: { data?: TeamAgent[] }) => { if (result.data) setTeam(result.data); setNow(Date.now()); }, []);
+  const applyCampaigns = useCallback((result: { data?: DialerCampaign[]; error?: string }) => { if (result.data) setCampaigns(result.data); }, []);
+  const reloadCampaigns = useCallback(() => { void fetchCampaigns().then(applyCampaigns); }, [fetchCampaigns, applyCampaigns]);
 
   useEffect(() => {
-    if (isDialing && currentIndex === -1) {
-      processNextCall(0);
-    }
-  }, [isDialing, currentIndex, processNextCall]);
+    fetchTeam().then(applyTeam);
+    if (isManager) fetchCampaigns().then(applyCampaigns);
+    const timer = setInterval(() => {
+      fetchTeam().then(applyTeam);
+      if (isManager) fetchCampaigns().then(applyCampaigns);
+    }, HEARTBEAT_MS);
+    return () => clearInterval(timer);
+  }, [isManager, fetchTeam, fetchCampaigns, applyTeam, applyCampaigns]);
 
-  const startAutoDialer = () => {
-    if (queue.length === 0) return;
-    setIsDialing(true);
-    setCurrentIndex(-1);
-    addLog("Iniciando campanha automática...");
+  const goAvailable = async () => {
+    setBusy(true);
+    setError('');
+    setCallEnded(false);
+    const ready = await phone.start();
+    if (!ready) {
+      setBusy(false);
+      return;
+    }
+    const result = applyAgent(await agentPost({ action: 'available' }));
+    setBusy(false);
+    if (result.error) {
+      setError(result.error);
+      phone.stop();
+    }
   };
 
-  const stopAutoDialer = () => {
-    setIsDialing(false);
-    addLog("Discador pausado pelo usuário.");
+  const pause = async () => {
+    setBusy(true);
+    const result = applyAgent(await agentPost({ action: 'pause' }));
+    setBusy(false);
+    if (result.error) setError(result.error);
+  };
+
+  const leave = async () => {
+    setBusy(true);
+    const result = applyAgent(await agentPost({ action: 'offline' }));
+    setBusy(false);
+    if (result.error) setError(result.error);
+    else phone.stop();
+  };
+
+  const wrapup = async (outcome: string | null, notes: string, next: 'available' | 'pause') => {
+    setBusy(true);
+    setError('');
+    let target = next;
+    if (next === 'available' && phone.state !== 'ready' && !(await phone.start())) target = 'pause';
+    const result = applyAgent(await agentPost({ action: 'wrapup', outcome, notes, next: target }));
+    setBusy(false);
+    setCallEnded(false);
+    if (result.error) setError(result.error);
+  };
+
+  const campaignAction = async (id: string, action: 'start' | 'pause') => {
+    setBusyCampaign(id);
+    setError('');
+    const result = await request(`/api/dialer/campaigns/${id}`, { method: 'PATCH', body: JSON.stringify({ action }) });
+    setBusyCampaign(null);
+    if (result.error) setError(result.error);
+    reloadCampaigns();
   };
 
   return (
-    <div className={styles.pageWrapper}>
+    <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>Power Dialer</h1>
-          <p className={styles.subtitle}>Gestão de chamadas automáticas e redirecionamento</p>
+          <h1>Discador</h1>
+          <p>O sistema liga para a lista e passa para você só quem atendeu.</p>
         </div>
-        
-        <div className={styles.actions}>
-          <label className={styles.uploadBtn}>
-            <Upload size={18} />
-            <span>Subir Planilha</span>
-            <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} hidden />
-          </label>
-          
-          {isDialing ? (
-            <button className={styles.stopBtn} onClick={stopAutoDialer}>
-              <Pause size={18} />
-              <span>Parar Discador</span>
-            </button>
-          ) : (
-            <button className={styles.startBtn} onClick={startAutoDialer} disabled={queue.length === 0}>
-              <Play size={18} />
-              <span>Iniciar Campanha</span>
-            </button>
-          )}
-        </div>
+        {agent?.phoneNumber && <span className={styles.numberChip}><PhoneCall size={15} /> Ligando de {formatPhone(agent.phoneNumber)}</span>}
       </header>
 
-      {/* Stats Cards */}
-      <div className={styles.statsGrid}>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8' }}>
-            <FileSpreadsheet size={20} />
-          </div>
-          <div className={styles.statInfo}>
-            <span className={styles.statLabel}>Total na Fila</span>
-            <span className={styles.statValue}>{stats.total}</span>
-          </div>
+      {agent && !agent.connected && (
+        <div className={styles.banner}>
+          <AlertTriangle size={16} />
+          <span>
+            O Discador ainda não está conectado.{' '}
+            {user?.role === 'ADMIN'
+              ? <>Conecte a conta Twilio da empresa em <Link href="/integrations">Integrações &gt; Discador</Link>.</>
+              : 'Peça a um administrador para conectar a conta Twilio da empresa em Integrações.'}
+          </span>
         </div>
-        
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
-            <CheckCircle2 size={20} />
-          </div>
-          <div className={styles.statInfo}>
-            <span className={styles.statLabel}>Atendidas</span>
-            <span className={styles.statValue}>{stats.completed}</span>
-          </div>
-        </div>
+      )}
 
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
-            <XCircle size={20} />
-          </div>
-          <div className={styles.statInfo}>
-            <span className={styles.statLabel}>Falhas</span>
-            <span className={styles.statValue}>{stats.failed}</span>
-          </div>
+      <div className={styles.layout}>
+        <div className={styles.side}>
+          <AgentConsole
+            state={agent}
+            phone={phone}
+            busy={busy}
+            error={error}
+            callEnded={callEnded}
+            onGoAvailable={goAvailable}
+            onPause={pause}
+            onLeave={leave}
+            onWrapup={wrapup}
+          />
+          {isManager && (openId
+            ? <CampaignDetail key={openId} id={openId} onBack={() => { setOpenId(null); window.history.replaceState(null, '', '/discador'); }} onChanged={reloadCampaigns} />
+            : <CampaignList campaigns={campaigns} busyId={busyCampaign} onNew={() => setCreating(true)} onOpen={setOpenId} onAction={campaignAction} />)}
         </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
-            <UserCheck size={20} />
-          </div>
-          <div className={styles.statInfo}>
-            <span className={styles.statLabel}>Agentes Online</span>
-            <span className={styles.statValue}>4</span>
-          </div>
+        <div className={styles.side}>
+          <TeamPanel agents={team} now={now} />
+          <section className={styles.card}>
+            <div className={styles.cardHead}><h2><BookOpen size={18} /> Como funciona</h2></div>
+            <ol className={styles.hint} style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>
+              <li>{isManager ? 'Suba a planilha em Nova campanha e clique em Começar.' : 'Um gerente sobe a planilha e começa a campanha.'}</li>
+              <li>Coloque o fone e clique em <strong>Ficar disponível</strong>.</li>
+              <li>O sistema liga sozinho; caixa postal e quem não atende ficam de fora.</li>
+              <li>Quem atender entra direto no seu fone, com os dados da planilha na tela.</li>
+              <li>Ao desligar, marque o resultado e siga para a próxima.</li>
+            </ol>
+            <Link href="/help/discador" className={styles.secondaryBtn}>Ver o tutorial completo</Link>
+          </section>
         </div>
       </div>
 
-      <div className={styles.mainContent}>
-        {/* Queue Table */}
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <h3 className={styles.cardTitle}>Fila de Chamadas</h3>
-            <span className={styles.badge}>{queue.length} contatos</span>
-          </div>
-          <div className={styles.tableWrapper}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Contato</th>
-                  <th>Telefone</th>
-                  <th>Status</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {queue.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className={styles.emptyRow}>
-                      Nenhuma planilha importada. Comece subindo um arquivo .xlsx
-                    </td>
-                  </tr>
-                ) : (
-                  queue.map((item, i) => (
-                    <tr key={item.id} className={i === currentIndex ? styles.rowCalling : ''}>
-                      <td>{item.name}</td>
-                      <td>{item.phone}</td>
-                      <td>
-                        <span className={`${styles.statusBadge} ${styles[item.status]}`}>
-                          {item.status === 'pending' && 'Pendente'}
-                          {item.status === 'calling' && 'Chamando...'}
-                          {item.status === 'completed' && 'Finalizada'}
-                          {item.status === 'failed' && 'Falha'}
-                        </span>
-                      </td>
-                      <td>
-                        <button className={styles.rowBtn} title="Ligar agora">
-                          <Phone size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Agents & Live Feed */}
-        <div className={styles.sidePanel}>
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>Agentes Disponíveis</h3>
-            </div>
-            <div className={styles.agentList}>
-              {agents.map((agent, i) => (
-                <div key={i} className={styles.agentItem}>
-                  <div className={styles.agentAvatar}>{agent.name.charAt(0)}</div>
-                  <div className={styles.agentInfo}>
-                    <p>{agent.name}</p>
-                    <span className={styles[agent.status]}>{agent.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className={styles.card} style={{ marginTop: '1rem' }}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>Monitor em Tempo Real</h3>
-            </div>
-            <div className={styles.liveLog}>
-              {logs.map((log, i) => (
-                <div key={i} className={styles.logItem}>
-                  <Clock size={12} />
-                  <span>[{log.time}] {log.msg}</span>
-                </div>
-              ))}
-              {logs.length === 0 && (
-                <div className={styles.emptyLog}>Aguardando atividade...</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      {creating && (
+        <NewCampaignModal
+          onClose={() => setCreating(false)}
+          onCreated={(id) => { setCreating(false); reloadCampaigns(); setOpenId(id); }}
+        />
+      )}
     </div>
   );
 }

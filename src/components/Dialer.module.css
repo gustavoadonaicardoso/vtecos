@@ -289,3 +289,10 @@
   color: #475569;
   font-size: 0.85rem;
 }
+
+/* Aviso de discador não conectado e número de saída. */
+.notice { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; line-height: 1.4; }
+.notice strong { color: #f59e0b; }
+.notice span { opacity: 0.8; }
+.fromNumber { display: block; margin-top: 4px; font-size: 0.72rem; opacity: 0.65; }
+.key:disabled, .controlBtn:disabled { opacity: 0.45; cursor: not-allowed; }

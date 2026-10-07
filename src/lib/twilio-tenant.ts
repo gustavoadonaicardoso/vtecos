@@ -24,6 +24,8 @@ export interface TwilioConfig {
 }
 
 const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
+/** Endereço público deste servidor (os avisos da Twilio chegam nele). */
+export const publicUrl = (path: string) => `${appUrl()}${path}`;
 export const voiceConnectUrl = () => `${appUrl()}/api/twilio/voice/connect`;
 export const recordingStatusUrl = () => `${appUrl()}/api/twilio/voice/status`;
 
@@ -87,29 +89,16 @@ export function voiceToken(config: TwilioConfig, identity: string) {
   return token.toJwt();
 }
 
-/** Ligação iniciada pelo servidor, com gravação. */
-export function placeCall(config: TwilioConfig, to: string, twimlUrl: string) {
-  return twilio(config.accountSid, config.authToken).calls.create({
-    url: twimlUrl,
-    to,
-    from: config.phoneNumber,
-    record: true,
-    recordingStatusCallback: recordingStatusUrl(),
-  });
-}
-
-/** Liga para um número, mostrando o número da empresa e gravando. */
+/** Liga para um número (discador manual), mostrando o número da empresa e gravando. */
 export function dialNumberTwiml(to: string, callerId?: string) {
   const response = new twilio.twiml.VoiceResponse();
-  const dial = response.dial({ record: 'record-from-answer', recordingStatusCallback: recordingStatusUrl(), ...(callerId ? { callerId } : {}) });
+  const dial = response.dial({
+    record: 'record-from-answer',
+    recordingStatusCallback: recordingStatusUrl(),
+    action: publicUrl('/api/twilio/voice/done'),
+    method: 'POST',
+    ...(callerId ? { callerId } : {}),
+  });
   dial.number(to);
-  return response.toString();
-}
-
-/** Conecta a ligação atendida a um usuário do sistema (navegador). */
-export function dialAgentTwiml(agentIdentity: string) {
-  const response = new twilio.twiml.VoiceResponse();
-  const dial = response.dial({ record: 'record-from-answer', recordingStatusCallback: recordingStatusUrl() });
-  dial.client(agentIdentity);
   return response.toString();
 }
