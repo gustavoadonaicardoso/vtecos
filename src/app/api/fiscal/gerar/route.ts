@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     const prompt = buildNfePrompt({ emitente, quantidade, contexto, dataHoje, anoAtual });
 
-    const geminiResult = await callAI(prompt, { temperature: 0.8, maxOutputTokens: 32768, preferCloud: true });
+    const geminiResult = await callAI(prompt, { temperature: 0.8, maxOutputTokens: 32768, preferCloud: true , tenantId: auth.tenantId });
 
     if (!geminiResult.success) {
       return NextResponse.json({ error: geminiResult.error }, { status: 502 });

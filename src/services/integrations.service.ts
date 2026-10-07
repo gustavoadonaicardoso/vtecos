@@ -21,14 +21,17 @@ import {
   type DeliveryResult,
 } from '@/lib/integrations/events';
 import type { ServiceResult } from '@/types';
-import { aiLabel, aiProvider } from '@/lib/ai';
+import { aiConfigured, aiLabel, aiProvider, checkGeminiKey, forgetTenantAiKey } from '@/lib/ai';
+import { embeddedSignupReady } from '@/services/whatsapp-signup.service';
 
-export const PROVIDERS = ['whatsapp_meta', 'webhook_custom', 'google_sheets', 'lead_capture'] as const;
+export const PROVIDERS = ['whatsapp_meta', 'webhook_custom', 'google_sheets', 'lead_capture', 'twilio', 'ai'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 /** Campos que nunca voltam para o navegador. */
 const SECRET_FIELDS: Partial<Record<Provider, string[]>> = {
   whatsapp_meta: ['token', 'appSecret'],
+  twilio: ['authToken', 'apiKeySecret'],
+  ai: ['geminiKey'],
 };
 
 const LEGACY_VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'vortice_verify_token_2024';
@@ -83,6 +86,20 @@ export async function listIntegrations(tenantId: string): Promise<IntegrationVie
 async function buildConfig(provider: Provider, input: Config, existing: Config | null): Promise<{ config: Config } | { error: string }> {
   const current = existing || {};
 
+  if (provider === 'twilio') {
+    return { error: 'Use o botão Conectar do Discador (Integrações > Discador).' };
+  }
+
+  if (provider === 'ai') {
+    const geminiKey = str(input.geminiKey, 200) || str(current.geminiKey, 200);
+    if (!geminiKey) return { error: 'Cole a chave da API do Gemini.' };
+    if (str(input.geminiKey, 200)) {
+      const checked = await checkGeminiKey(geminiKey);
+      if (!checked.ok) return { error: checked.error };
+    }
+    return { config: { geminiKey, enabled: input.enabled !== false, savedAt: new Date().toISOString() } };
+  }
+
   if (provider === 'whatsapp_meta') {
     const token = str(input.token, 1000) || str(current.token, 1000);
     const appSecret = str(input.appSecret, 200) || str(current.appSecret, 200);
@@ -95,7 +112,7 @@ async function buildConfig(provider: Provider, input: Config, existing: Config |
     // Configuração nova ganha um token de verificação só desta empresa;
     // as antigas continuam com o token que a Meta já tem cadastrado.
     const webhookVerifyToken = existing ? str(current.webhookVerifyToken, 100) || undefined : `vtec_${random(12)}`;
-    return { config: { token, appSecret, phoneId, wabaId, ...(webhookVerifyToken ? { webhookVerifyToken } : {}) } };
+    return { config: { token, appSecret, phoneId, wabaId, source: 'manual', ...(webhookVerifyToken ? { webhookVerifyToken } : {}) } };
   }
 
   if (provider === 'webhook_custom') {
@@ -136,14 +153,17 @@ export async function saveIntegration(tenantId: string, provider: Provider, inpu
     { onConflict: 'tenant_id,provider' }
   );
   if (error) return { success: false, error: error.message };
+  if (provider === 'ai') forgetTenantAiKey(tenantId);
 
   const { visible, secrets } = maskConfig(provider, built.config);
   return { success: true, data: { provider, config: visible, secrets, updated_at: updatedAt } };
 }
 
 export async function removeIntegration(tenantId: string, provider: string): Promise<ServiceResult> {
+  if (provider === 'twilio') return { success: false, error: 'Use o botão Desconectar do Discador.' };
   const { error } = await supabaseAdmin.from('integrations_config').delete().eq('tenant_id', tenantId).eq('provider', provider);
   if (error) return { success: false, error: error.message };
+  if (provider === 'ai') forgetTenantAiKey(tenantId);
   return { success: true };
 }
 
@@ -205,6 +225,21 @@ export async function testIntegration(tenantId: string, provider: Provider): Pro
       : { ok: false, message: `${delivery.error || 'O Apps Script não aceitou o teste.'} Confira se a implantação está como "Qualquer pessoa".`, delivery };
   }
 
+  if (provider === 'ai') {
+    const checked = await checkGeminiKey(String(config.geminiKey || ''));
+    return checked.ok ? { ok: true, message: 'Chave do Gemini funcionando: a IA desta empresa usa a sua chave.' } : { ok: false, message: checked.error };
+  }
+
+  if (provider === 'twilio') {
+    const { listTwilioNumbers } = await import('@/services/twilio-connect.service');
+    const listed = await listTwilioNumbers(config.accountSid, config.authToken);
+    if ('error' in listed) return { ok: false, message: listed.error };
+    const owned = listed.numbers.some((item) => item.phoneNumber === config.phoneNumber);
+    return owned
+      ? { ok: true, message: `Conta "${listed.accountName}" ativa, com o número ${config.phoneNumber}.` }
+      : { ok: false, message: `O número ${config.phoneNumber} não está mais na conta Twilio. Conecte de novo e escolha outro.` };
+  }
+
   return { ok: true, message: 'Nada a testar: use o formulário de exemplo para enviar um lead.' };
 }
 
@@ -239,14 +274,23 @@ export async function integrationsOverview(tenantId: string, options: { isPlatfo
 
   const platform = options.isPlatform
     ? [
-        envStatus('twilio', 'Twilio (Discador)', 'Ligações pelo navegador no Discador e no card do lead.', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_API_KEY', 'TWILIO_API_SECRET', 'TWILIO_TWIML_APP_SID', 'TWILIO_PHONE_NUMBER']),
         aiProvider() === 'ollama'
-          ? envStatus('ai', aiLabel(), 'IA rodando na própria VPS (Ollama): blocos de IA das Automações, legendas das Redes Sociais e, sem Gemini, as notas fiscais.', [])
-          : envStatus('ai', 'Google Gemini (IA)', 'Blocos de IA das Automações, legendas com IA nas Redes Sociais e geração de notas fiscais. Para usar uma IA local, configure AI_PROVIDER=ollama.', ['GEMINI_API_KEY']),
-        envStatus('meta-app', 'App da Meta (Redes Sociais)', 'Conectar Instagram/Facebook e publicar posts.', ['META_APP_ID', 'META_APP_SECRET']),
+          ? envStatus('ai', `IA da Vórtice: ${aiLabel()}`, 'IA padrão de todas as empresas que não cadastraram a própria chave do Gemini.', [])
+          : envStatus('ai', 'IA da Vórtice: Google Gemini', 'IA padrão de todas as empresas que não cadastraram a própria chave do Gemini. Para usar uma IA local, configure AI_PROVIDER=ollama.', ['GEMINI_API_KEY']),
+        envStatus('meta-app', 'App da Meta', 'Login com Facebook das empresas: Redes Sociais e WhatsApp oficial.', ['META_APP_ID', 'META_APP_SECRET']),
+        envStatus('meta-wa', 'Cadastro do WhatsApp oficial', 'Botão "Conectar com Facebook" do WhatsApp Business API (configuração de cadastro incorporado do app da Meta).', ['META_WA_CONFIG_ID']),
         envStatus('scheduler', 'Agendador do servidor', 'Publica os posts agendados e continua as esperas das automações.', [], () => (process.env.CONTENT_SCHEDULER_ENABLED === 'true' ? null : 'CONTENT_SCHEDULER_ENABLED=true')),
       ]
     : null;
 
-  return { integrations, whatsappWeb, socialAccounts, platform };
+  return {
+    integrations,
+    whatsappWeb,
+    socialAccounts,
+    platform,
+    /** IA da Vórtice disponível para quem não tem chave própria. */
+    platformAi: aiConfigured(),
+    /** Botão "Conectar com Facebook" do WhatsApp oficial pronto. */
+    whatsappSignup: embeddedSignupReady(),
+  };
 }

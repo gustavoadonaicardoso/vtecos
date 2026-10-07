@@ -59,7 +59,7 @@ ${currentCaption ? `Rascunho atual para melhorar: """${currentCaption}"""` : ''}
 
 Responda só com JSON no formato {"caption": "texto da legenda", "hashtags": ["#exemplo"]}.`;
 
-  const result = await callAI(prompt, { temperature: 0.8, maxOutputTokens: 2048 });
+  const result = await callAI(prompt, { temperature: 0.8, maxOutputTokens: 2048 , tenantId: auth.tenantId });
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 502 });
   }

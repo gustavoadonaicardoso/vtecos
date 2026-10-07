@@ -70,7 +70,9 @@ function configFromRow(row: ConfigRow | null): MetaWhatsAppConfig | null {
     phoneNumberId: dbConfig.phoneId,
     businessAccountId: dbConfig.wabaId,
     webhookVerifyToken: dbConfig.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'vortice_verify_token_2024',
-    appSecret: dbConfig.appSecret || process.env.WHATSAPP_APP_SECRET || '',
+    // Conectado pelo "Conectar com Facebook": as mensagens chegam pelo app da
+    // Vórtice, assinadas com o segredo dele.
+    appSecret: dbConfig.source === 'embedded' ? process.env.META_APP_SECRET || '' : dbConfig.appSecret || process.env.WHATSAPP_APP_SECRET || '',
     apiVersion: API_VERSION,
   };
 }

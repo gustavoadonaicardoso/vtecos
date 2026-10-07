@@ -21,11 +21,21 @@ function statusOf(item: CatalogItem, overview: Overview): { status: CardStatus; 
     return count > 0 ? { status: 'connected', detail: `${count} conta(s) conectada(s)` } : { status: 'off', detail: 'Conecte em Redes Sociais > Contas' };
   }
   const integration = overview.integrations.find((row) => row.provider === item.provider);
+  if (item.id === 'ai') {
+    if (integration) return { status: 'connected', detail: 'Usando a sua chave do Gemini' };
+    return overview.platformAi ? { status: 'connected', detail: 'Usando a IA da Vórtice' } : { status: 'off', detail: 'Cadastre a sua chave do Gemini' };
+  }
+  if (item.id === 'twilio') {
+    return integration ? { status: 'connected', detail: `Número ${String(integration.config.phoneNumber || '')}` } : { status: 'off', detail: 'Conecte a conta Twilio da empresa' };
+  }
   if (!integration) return { status: 'off', detail: 'Ainda não configurado' };
   if (integration.config.enabled === false) return { status: 'attention', detail: 'Desativado' };
   const delivery = integration.config.last_delivery as DeliveryInfo | undefined;
   if (delivery && !delivery.ok) return { status: 'attention', detail: `Último envio falhou: ${delivery.error || 'erro'}` };
-  if (item.id === 'whatsapp-api' && !integration.secrets.appSecret) return { status: 'attention', detail: 'Falta a chave secreta do app' };
+  if (item.id === 'whatsapp-api') {
+    if (integration.config.source === 'embedded') return { status: 'connected', detail: `Número ${String(integration.config.displayPhone || integration.config.phoneId || '')}` };
+    if (!integration.secrets.appSecret) return { status: 'attention', detail: 'Falta a chave secreta do app' };
+  }
   return { status: 'connected', detail: delivery ? `Último envio ${new Date(delivery.at).toLocaleString('pt-BR')}` : 'Configurado' };
 }
 
@@ -160,7 +170,7 @@ export default function IntegrationsPage() {
             <Server size={18} />
             <div>
               <h2>Serviços da plataforma</h2>
-              <p>Configurados no servidor (arquivo <code>.env.local</code> da VPS) e válidos para todas as empresas. Só a Vórtice vê este quadro.</p>
+              <p>Configurados uma vez no servidor (arquivo <code>.env.local</code> da VPS) pela Vórtice. Cada empresa conecta as próprias contas nos cartões acima. Só a Vórtice vê este quadro.</p>
             </div>
           </div>
           <div className={styles.platformGrid}>

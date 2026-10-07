@@ -7,6 +7,7 @@ import { ExternalLink, KeyRound, Plug, PlugZap, QrCode, RefreshCcw, Save, Send, 
 import styles from '../integrations.module.css';
 import RichText from '@/components/help/RichText';
 import type { DeliveryInfo, IntegrationView, Overview } from '../constants';
+import { WhatsAppSignupButton } from './whatsapp-signup';
 import {
   api,
   BusyIcon,
@@ -19,7 +20,7 @@ import {
   type Feedback,
 } from './shared';
 
-interface PanelProps {
+export interface PanelProps {
   integration: IntegrationView | null;
   overview: Overview;
   onChanged: () => Promise<void>;
@@ -28,7 +29,7 @@ interface PanelProps {
 const origin = () => (typeof window !== 'undefined' ? window.location.origin : '');
 
 /** Botões de salvar/testar/remover com o mesmo comportamento em todos os painéis. */
-function useActions(onChanged: () => Promise<void>) {
+export function useActions(onChanged: () => Promise<void>) {
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const run = useCallback(async (name: string, action: () => Promise<string | void>) => {
@@ -47,7 +48,7 @@ function useActions(onChanged: () => Promise<void>) {
   return { busy, feedback, setFeedback, run };
 }
 
-async function runTest(provider: Parameters<typeof testProvider>[0]) {
+export async function runTest(provider: Parameters<typeof testProvider>[0]) {
   const result = await testProvider(provider);
   if (!result.ok) throw new Error(result.message);
   return result.message;
@@ -147,7 +148,65 @@ export function WhatsAppWebPanel({ overview, onChanged }: PanelProps) {
 
 // ── WhatsApp Business API (Meta) ─────────────────────────────
 
-export function WhatsAppApiPanel({ integration, onChanged }: PanelProps) {
+export function WhatsAppApiPanel(props: PanelProps) {
+  const { integration, overview, onChanged } = props;
+  const embedded = integration?.config?.source === 'embedded';
+  const [manual, setManual] = useState(!overview.whatsappSignup || Boolean(integration && !embedded));
+  const { busy, feedback, setFeedback, run } = useActions(onChanged);
+  const done = useCallback(async (message: string) => {
+    setFeedback({ type: 'success', text: message });
+    await onChanged();
+  }, [onChanged, setFeedback]);
+
+  if (embedded) {
+    const saved = integration!.config;
+    return (
+      <div className={styles.panelBody}>
+        <div className={`${styles.statusCard} ${styles.statusOk}`}>
+          <PlugZap size={20} />
+          <div>
+            <strong>Conectado: {String(saved.displayPhone || saved.phoneId || '')}</strong>
+            <span>{saved.verifiedName ? `${String(saved.verifiedName)} · ` : ''}Conectado pelo Facebook. As mensagens chegam em Mensagens e as automações e disparos podem usar templates aprovados.</span>
+          </div>
+        </div>
+        <FeedbackBox feedback={feedback} />
+        <div className={styles.actions}>
+          <button type="button" className={styles.dangerBtn} disabled={busy !== null} onClick={() => confirm('Desconectar o WhatsApp oficial? As mensagens deixam de chegar por ele até conectar de novo.') && run('remove', async () => { await removeProvider('whatsapp_meta'); return 'WhatsApp oficial desconectado.'; })}>
+            <BusyIcon busy={busy === 'remove'} icon={<Trash2 size={16} />} /> Desconectar
+          </button>
+          <span className={styles.spacer} />
+          <button type="button" className={styles.secondaryBtn} disabled={busy !== null} onClick={() => run('test', () => runTest('whatsapp_meta'))}>
+            <BusyIcon busy={busy === 'test'} icon={<Plug size={16} />} /> Testar conexão
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.panelBody}>
+      {overview.whatsappSignup && (
+        <div className={styles.signupBox}>
+          <div>
+            <strong>Conecte em 2 minutos com o Facebook</strong>
+            <span>Entre com a conta que administra a empresa no Facebook, escolha (ou crie) a conta do WhatsApp Business e o número. O vtec os faz o resto: token, webhook e registro do número.</span>
+          </div>
+          <WhatsAppSignupButton onDone={done} onFeedback={setFeedback} />
+        </div>
+      )}
+      <FeedbackBox feedback={feedback} />
+      {overview.whatsappSignup && (
+        <button type="button" className={styles.linkBtn} onClick={() => setManual((value) => !value)}>
+          {manual ? 'Esconder a configuração manual' : 'Prefiro configurar manualmente (token, IDs e webhook)'}
+        </button>
+      )}
+      {manual && <ManualWhatsAppForm {...props} />}
+    </div>
+  );
+}
+
+
+function ManualWhatsAppForm({ integration, onChanged }: PanelProps) {
   const saved = integration?.config || {};
   const [form, setForm] = useState({
     token: '',

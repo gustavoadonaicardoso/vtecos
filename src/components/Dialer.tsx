@@ -27,7 +27,12 @@ export default function Dialer({ onClose }: DialerProps) {
       try {
         const identity = user?.name || 'Agente';
         const response = await fetch(`/api/twilio/token?identity=${encodeURIComponent(identity)}`);
-        
+
+        if (response.status === 409) {
+          // A empresa ainda não conectou a conta Twilio em Integrações.
+          setStatus('Discador não conectado: um administrador conecta em Integrações');
+          return;
+        }
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Server error: ${response.status} - ${errorText.substring(0, 50)}`);

@@ -1,15 +1,15 @@
-import { FileSpreadsheet, Globe, MessageCircle, QrCode, Share2, UserPlus } from 'lucide-react';
+import { FileSpreadsheet, Globe, MessageCircle, Phone, QrCode, Share2, Sparkles, UserPlus } from 'lucide-react';
 
-export type Provider = 'whatsapp_meta' | 'webhook_custom' | 'google_sheets' | 'lead_capture';
+export type Provider = 'whatsapp_meta' | 'webhook_custom' | 'google_sheets' | 'lead_capture' | 'twilio' | 'ai';
 
 export interface CatalogItem {
-  id: 'whatsapp-web' | 'whatsapp-api' | 'lead-capture' | 'webhooks' | 'google-sheets' | 'social';
+  id: 'whatsapp-web' | 'whatsapp-api' | 'lead-capture' | 'webhooks' | 'google-sheets' | 'social' | 'twilio' | 'ai';
   provider: Provider | null;
   name: string;
   description: string;
   icon: typeof MessageCircle;
   color: string;
-  category: 'WhatsApp' | 'Leads' | 'Automação' | 'Marketing';
+  category: 'WhatsApp' | 'Leads' | 'Automação' | 'Marketing' | 'Telefonia' | 'IA';
   /** Módulo do plano que precisa estar liberado. */
   module: string;
   /** Artigo da Central de Ajuda com o passo a passo (editável no Painel Master). */
@@ -32,7 +32,7 @@ export const CATALOG: CatalogItem[] = [
     id: 'whatsapp-api',
     provider: 'whatsapp_meta',
     name: 'WhatsApp Business API',
-    description: 'Conexão oficial da Meta: templates aprovados e mais estabilidade.',
+    description: 'Conexão oficial da Meta pelo login do Facebook: templates aprovados e mais estabilidade.',
     icon: MessageCircle,
     color: '#128C7E',
     category: 'WhatsApp',
@@ -83,9 +83,31 @@ export const CATALOG: CatalogItem[] = [
     module: 'social',
     helpSlug: 'conectar-redes-sociais',
   },
+  {
+    id: 'twilio',
+    provider: 'twilio',
+    name: 'Discador (Twilio)',
+    description: 'Ligações pelo navegador com o número da sua empresa, gravadas no histórico do lead.',
+    icon: Phone,
+    color: '#F22F46',
+    category: 'Telefonia',
+    module: 'crm',
+    helpSlug: 'integracao-twilio',
+  },
+  {
+    id: 'ai',
+    provider: 'ai',
+    name: 'Inteligência artificial',
+    description: 'Atendente com IA, legendas e notas fiscais. Use a IA da Vórtice ou a sua chave do Gemini.',
+    icon: Sparkles,
+    color: '#8b5cf6',
+    category: 'IA',
+    module: 'crm',
+    helpSlug: 'integracao-ia',
+  },
 ];
 
-export const CATEGORIES = ['Todos', 'WhatsApp', 'Leads', 'Automação', 'Marketing'] as const;
+export const CATEGORIES = ['Todos', 'WhatsApp', 'Leads', 'Automação', 'Marketing', 'Telefonia', 'IA'] as const;
 
 export interface DeliveryInfo {
   ok: boolean;
@@ -115,6 +137,10 @@ export interface Overview {
   whatsappWeb: { status: string; connected: boolean; qrCode: string | null; phone?: string | null; lastError?: string | null } | null;
   socialAccounts: number | null;
   platform: PlatformService[] | null;
+  /** IA da Vórtice disponível para quem não tem chave própria. */
+  platformAi: boolean;
+  /** Botão "Conectar com Facebook" do WhatsApp oficial pronto. */
+  whatsappSignup: boolean;
 }
 
 export type CardStatus = 'connected' | 'attention' | 'off';
