@@ -68,7 +68,6 @@ function ChatContent() {
     async function fetchProfiles() {
       if (!supabase || !user) return;
       const profilesResponse = await fetch('/api/users?scope=chat', {
-        headers: { 'x-user-id': user.id },
         cache: 'no-store',
       });
       const profilesJson = await profilesResponse.json().catch(() => ({}));

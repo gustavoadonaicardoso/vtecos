@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { findProfileByEmail, notifyAdminsOfPasswordResetRequest } from '@/services/users.service';
+import { clientIp } from '@/lib/rate-limit';
 
 // Mesma resposta exista ou não o e-mail: a tela pública de "Esqueci a
 // senha" não pode servir para descobrir quem tem conta no sistema.
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Informe um e-mail válido.' }, { status: 400 });
     }
 
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'local';
+    const ip = clientIp(request);
     if (throttled(email, ip)) {
       return NextResponse.json({ success: true, message: GENERIC_MESSAGE });
     }

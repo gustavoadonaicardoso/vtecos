@@ -24,6 +24,7 @@ import type {
   WhatsAppInboundMessage,
   WhatsAppMessageStatus,
 } from '@/types';
+import { META_GRAPH_URL, META_GRAPH_VERSION } from '@/lib/meta-graph-version';
 
 export type {
   MetaWhatsAppConfig,
@@ -33,8 +34,7 @@ export type {
   WhatsAppMessageStatus,
 };
 
-const API_VERSION = 'v21.0';
-const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
+const API_VERSION = META_GRAPH_VERSION;
 
 // ─── Helpers de configuração ──────────────────────────────────
 
@@ -546,8 +546,7 @@ export class WhatsAppService {
    * @deprecated Prefira instanciar WhatsAppService e usar validateConnection() de instância.
    */
   static async validateConnection(config: { token: string; phoneId: string }): Promise<boolean> {
-    const apiVersion = 'v21.0';
-    const url = `https://graph.facebook.com/${apiVersion}/${config.phoneId}?fields=display_phone_number,verified_name`;
+    const url = `${META_GRAPH_URL}/${config.phoneId}?fields=display_phone_number,verified_name`;
     try {
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${config.token}` },

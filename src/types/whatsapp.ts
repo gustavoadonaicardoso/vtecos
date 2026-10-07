@@ -7,7 +7,7 @@ export interface MetaWhatsAppConfig {
   businessAccountId: string;
   webhookVerifyToken: string;
   appSecret?: string;
-  apiVersion?: string; // default: v21.0
+  apiVersion?: string; // padrão: META_GRAPH_VERSION (src/lib/meta-graph-version.ts)
 }
 
 /** Payload de mensagem de saída — suporta todos os tipos Meta */

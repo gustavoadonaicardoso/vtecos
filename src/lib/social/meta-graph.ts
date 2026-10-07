@@ -9,9 +9,10 @@
  */
 
 import { platformSettings } from '@/lib/platform-settings';
+import { META_GRAPH_URL, META_GRAPH_VERSION } from '@/lib/meta-graph-version';
 
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
-const GRAPH_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
+const GRAPH_VERSION = META_GRAPH_VERSION;
+const GRAPH_URL = META_GRAPH_URL;
 
 export const META_OAUTH_SCOPES = [
   'pages_show_list',

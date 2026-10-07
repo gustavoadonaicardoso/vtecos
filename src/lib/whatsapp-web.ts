@@ -10,6 +10,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
+import { safeContentType } from '@/lib/safe-content-type';
 
 // downloadMediaMessage exige um logger no formato do pino -- não
 // precisamos de log de verdade aqui, só satisfazer o formato esperado.
@@ -214,8 +215,9 @@ export async function startWhatsAppWeb(tenantId: string) {
               ? 'audio'
               : 'document';
 
-            const mimetype = mediaContent.mimetype || 'application/octet-stream';
-            const ext = content.stickerMessage ? 'webp' : (mimetype.split('/')[1]?.split(';')[0] || 'bin');
+            // Tipo informado por quem mandou: HTML/SVG viram download comum.
+            const mimetype = safeContentType(mediaContent.mimetype);
+            const ext = content.stickerMessage ? 'webp' : (mimetype.split('/')[1]?.split(';')[0].replace(/[^a-z0-9.+-]/g, '') || 'bin').replace('octet-stream', 'bin');
             const storagePath = `${tenantId}/inbound/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
             const { supabaseAdmin: admin } = await import('@/lib/supabase-admin');

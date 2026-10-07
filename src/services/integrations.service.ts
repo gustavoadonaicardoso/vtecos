@@ -23,6 +23,7 @@ import {
 import type { ServiceResult } from '@/types';
 import { aiConfigured, aiLabel, checkGeminiKey, forgetTenantAiKey } from '@/lib/ai';
 import { platformSettings } from '@/lib/platform-settings';
+import { META_GRAPH_URL } from '@/lib/meta-graph-version';
 
 export const PROVIDERS = ['whatsapp_meta', 'webhook_custom', 'google_sheets', 'lead_capture', 'twilio', 'ai'] as const;
 export type Provider = (typeof PROVIDERS)[number];
@@ -175,7 +176,7 @@ export interface TestResult {
   delivery?: DeliveryResult;
 }
 
-const GRAPH = `https://graph.facebook.com/${process.env.META_GRAPH_VERSION || 'v21.0'}`;
+const GRAPH = META_GRAPH_URL;
 
 export async function testIntegration(tenantId: string, provider: Provider): Promise<TestResult> {
   const row = await loadRow(tenantId, provider);

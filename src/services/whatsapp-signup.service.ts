@@ -20,9 +20,10 @@
 import { randomInt } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { platformSettings } from '@/lib/platform-settings';
+import { META_GRAPH_URL, META_GRAPH_VERSION } from '@/lib/meta-graph-version';
 
-const graphVersion = () => process.env.META_GRAPH_VERSION || 'v23.0';
-const graph = (path: string) => `https://graph.facebook.com/${graphVersion()}/${path}`;
+const graphVersion = () => META_GRAPH_VERSION;
+const graph = (path: string) => `${META_GRAPH_URL}/${path}`;
 
 export async function embeddedSignupReady() {
   const settings = await platformSettings();
