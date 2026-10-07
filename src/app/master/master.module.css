@@ -854,3 +854,69 @@
 .testFail svg { flex: none; margin-top: 2px; }
 .saveRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
 .saveRow p { margin: 0 auto 0 0; }
+
+/* ===== Aba Status ===== */
+.statusHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.statusHead .cardHeader { margin-bottom: 0; }
+.healthGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 14px; }
+.healthCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: var(--glass-bg);
+}
+.healthCard[data-status='down'] { border-color: rgba(239, 68, 68, 0.55); background: rgba(239, 68, 68, 0.06); }
+.healthCard .saveBtn { align-self: flex-start; padding: 8px 14px; font-size: 0.84rem; margin-top: 4px; }
+.healthTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.9rem; }
+.healthInfo { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+.healthPill {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--muted);
+}
+.healthPill[data-status='ok'] { background: rgba(16, 185, 129, 0.14); color: #10b981; }
+.healthPill[data-status='down'] { background: rgba(239, 68, 68, 0.14); color: #ef4444; }
+
+.noticeList { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.noticeCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  border-left: 4px solid #64748b;
+  background: var(--glass-bg);
+}
+.noticeCard[data-tone='incident'] { border-left-color: #ea580c; }
+.noticeCard[data-tone='maintenance'] { border-left-color: #2563eb; }
+.noticeCard[data-tone='resolved'] { border-left-color: #10b981; opacity: 0.85; }
+.noticeHead { display: flex; align-items: flex-start; gap: 10px; }
+.noticeIcon { flex: none; display: inline-flex; margin-top: 2px; color: var(--muted); }
+.noticeCard[data-tone='incident'] .noticeIcon { color: #ea580c; }
+.noticeCard[data-tone='maintenance'] .noticeIcon { color: #2563eb; }
+.noticeCard[data-tone='resolved'] .noticeIcon { color: #10b981; }
+.noticeTitle { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.noticeTitle span { font-size: 0.8rem; color: var(--muted); }
+.noticePhase { flex: none; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(148, 163, 184, 0.16); color: var(--muted); }
+.noticePhase[data-phase='active'] { background: rgba(234, 88, 12, 0.14); color: #ea580c; }
+.noticePhase[data-phase='scheduled'] { background: rgba(37, 99, 235, 0.14); color: #3b82f6; }
+.noticeMessage { margin: 0; font-size: 0.88rem; line-height: 1.5; white-space: pre-line; }
+.noticeMeta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.78rem; color: var(--muted); }
+.timeline { margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--card-border); list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; }
+.timeline time { font-weight: 700; margin-right: 6px; }
+.timeline em { color: var(--muted); font-style: normal; }
+.composer { display: flex; flex-direction: column; gap: 8px; }
+.noticeCard .inlineActions .resetBtn,
+.noticeCard .inlineActions .dangerBtn,
+.noticeCard .inlineActions .saveBtn { padding: 8px 12px; font-size: 0.82rem; }
+.noticeSubhead { margin: 22px 0 0; font-size: 0.9rem; color: var(--muted); }
+.emptyNotice { margin: 12px 0 0; padding: 18px; border-radius: 12px; border: 1px dashed var(--card-border); text-align: center; color: var(--muted); font-size: 0.88rem; }
+.noticePreview { border-radius: 10px; overflow: hidden; }

@@ -33,4 +33,8 @@ export async function register() {
   // Disparos: envia as campanhas (fila, horário de envio e limite por dia).
   const { startBlastWorker } = await import('./lib/disparos/worker');
   startBlastWorker();
+
+  // Status do sistema: confere banco, IA, Meta e os agendadores acima.
+  const { startHealthChecks } = await import('./lib/status/health');
+  startHealthChecks();
 }

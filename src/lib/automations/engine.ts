@@ -20,6 +20,7 @@
 
 import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { beat } from '@/lib/heartbeat';
 import { assertPublicHttpsUrl } from '@/lib/integrations/safe-url';
 import { deliverWhatsApp, sendToLead } from '@/lib/whatsapp-outbound';
 import {
@@ -1448,8 +1449,10 @@ export function startAutomationScheduler() {
     scheduler.running = true;
     try {
       await tick();
+      beat('automacoes');
     } catch (error) {
       log('erro no agendador', error);
+      beat('automacoes', error);
     } finally {
       scheduler.running = false;
     }

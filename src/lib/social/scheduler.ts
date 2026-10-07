@@ -14,6 +14,7 @@
 
 import { claimAndPublishPost, consolidatePostStatus } from '@/lib/social/publisher';
 import { getPost, getPostTenant, listDuePostIds, listStuckPublishingPostIds, updateTarget } from '@/services/social.service';
+import { beat } from '@/lib/heartbeat';
 
 const TICK_INTERVAL_MS = 60_000;
 const MAX_POSTS_PER_TICK = 10;
@@ -49,8 +50,10 @@ async function tick() {
     for (const postId of dueIds) {
       await claimAndPublishPost(postId, ['scheduled'], { detectLate: true });
     }
+    beat('redes');
   } catch (err) {
     console.error('[social-scheduler] erro no ciclo:', err);
+    beat('redes', err);
   } finally {
     runtime.running = false;
   }

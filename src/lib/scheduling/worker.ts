@@ -13,6 +13,7 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { beat } from '@/lib/heartbeat';
 import { TIME_ZONE } from '@/services/scheduling.service';
 
 type Row = Record<string, unknown>;
@@ -158,8 +159,10 @@ export function startSchedulingWorker() {
     worker.running = true;
     try {
       await runSchedulingTick();
+      beat('agendamento');
     } catch (error) {
       log('erro no agendador', error);
+      beat('agendamento', error);
     } finally {
       worker.running = false;
     }

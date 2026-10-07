@@ -110,6 +110,14 @@ export const MASTER_MODULES: { id: string; title: string; desc: string; icon: ty
     tab: 'banners',
   },
   {
+    id: 'status',
+    title: 'Status do Sistema',
+    desc: 'Verificação automática dos serviços e avisos de instabilidade ou manutenção para as empresas.',
+    icon: Activity,
+    color: '#ea580c',
+    tab: 'status',
+  },
+  {
     id: 'platform',
     title: 'Plataforma',
     desc: 'App da Meta, webhook do WhatsApp e IA padrão da Vórtice, sem mexer no .env.',
