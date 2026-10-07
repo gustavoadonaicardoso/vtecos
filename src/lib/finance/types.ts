@@ -1,7 +1,10 @@
 /** Custos & Precificação — tipos compartilhados (navegador e servidor). */
 
-export type FinUnit = 'kg' | 'g' | 'l' | 'ml' | 'un' | 'dz';
-export type IngredientCategory = 'ingrediente' | 'embalagem' | 'outro';
+import type { FinBusiness } from './business';
+
+export type FinUnit = 'kg' | 'g' | 'l' | 'ml' | 'un' | 'dz' | 'm' | 'cm' | 'm2' | 'h' | 'min';
+/** Chave de um tipo de insumo da empresa (ver business.ts: cada empresa cria os seus). */
+export type IngredientCategory = string;
 
 export interface FinSettings {
   tax_pct: number;
@@ -34,7 +37,7 @@ export interface FinProduct {
   id: string;
   name: string;
   category: string;
-  /** product = vendido; base = preparo usado dentro de outras fichas (massa, recheio...). */
+  /** product = vendido; base = parte pronta usada dentro de outros itens (preparo, kit, componente...). */
   kind: 'product' | 'base';
   yield_qty: number;
   yield_unit: string;
@@ -93,6 +96,7 @@ export interface FinMonthRevenue {
 export interface FinWorkspace {
   tenant: { id: string; name: string };
   settings: FinSettings;
+  business: FinBusiness;
   ingredients: FinIngredient[];
   products: FinProduct[];
   channels: FinChannel[];

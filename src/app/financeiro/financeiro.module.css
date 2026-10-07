@@ -704,3 +704,44 @@
   .drawer { padding: 16px; }
   .drawerHead { margin: -16px -16px 0; padding: 14px 16px; top: -16px; }
 }
+
+/* ── Totais dos insumos ── */
+.totalsRow { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.totalCard {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 12px; text-align: left;
+  border: 1px solid var(--card-border, var(--glass-border)); background: var(--glass-bg-medium, transparent); color: var(--foreground);
+  font: inherit; cursor: pointer; min-width: 0;
+}
+.totalCard:hover { border-color: var(--accent, #3b82f6); }
+.totalCard span { font-size: 0.76rem; color: var(--muted, #94a3b8); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.totalCard strong { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.totalCard small { font-size: 0.74rem; color: var(--muted, #94a3b8); }
+.totalCardOn { border-color: var(--accent, #3b82f6); box-shadow: inset 0 0 0 1px var(--accent, #3b82f6); }
+.totalRow td { font-weight: 600; border-top: 2px solid var(--card-border, var(--glass-border)); }
+
+/* ── Meu negócio ── */
+.presetGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.presetCard {
+  display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 12px; text-align: left;
+  border: 1px solid var(--card-border); background: transparent; color: var(--foreground); font: inherit; cursor: pointer;
+}
+.presetCard:hover:not(:disabled) { border-color: var(--accent, #3b82f6); }
+.presetCard:disabled { cursor: default; }
+.presetCard strong { display: inline-flex; align-items: center; gap: 6px; font-size: 0.95rem; }
+.presetCard span { font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
+.presetCard small { font-size: 0.74rem; color: var(--muted); margin-top: 4px; }
+.presetCardOn { border-color: var(--accent, #3b82f6); background: rgba(59, 130, 246, 0.08); box-shadow: inset 0 0 0 1px var(--accent, #3b82f6); }
+.categoryList { display: flex; flex-direction: column; gap: 8px; }
+.categoryRow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.saveBar { display: flex; justify-content: flex-end; }
+.setupBanner { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(59, 130, 246, 0.35); background: rgba(59, 130, 246, 0.08); }
+.setupBanner > div { flex: 1; min-width: 220px; }
+.setupBanner strong { display: block; }
+.setupBanner span { font-size: 0.86rem; color: var(--muted); }
+@media (max-width: 640px) {
+  .categoryRow { grid-template-columns: minmax(0, 1fr) auto; }
+  .categoryRow select { grid-column: 1 / -1; grid-row: 2; }
+}
+.spin { animation: finSpin 0.9s linear infinite; }
+@keyframes finSpin { to { transform: rotate(360deg); } }
+.inputGroup .input:first-child { min-width: 56px; }

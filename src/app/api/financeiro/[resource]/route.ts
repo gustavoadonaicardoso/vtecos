@@ -3,7 +3,7 @@ import { requireActiveProfile } from '@/lib/session';
 import { requireFinanceAccess } from '@/lib/finance/access';
 import {
   createSales, importRows, insertRow, listSales, listTenantsForStaff, mappers, parseChannel, parseFixedCost,
-  parseIngredient, parseProduct, parseSaleInput, parseSettings, reorderChannels, saveProduct, saveSettings,
+  loadBusiness, parseIngredient, parseProduct, parseSaleInput, parseSettings, reorderChannels, saveBusiness, saveProduct, saveSettings,
 } from '@/services/finance.service';
 
 type Params = { params: Promise<{ resource: string }> };
@@ -57,7 +57,7 @@ export async function POST(request: Request, { params }: Params) {
   try {
     switch (resource) {
       case 'ingredients': {
-        const parsed = parseIngredient(body);
+        const parsed = parseIngredient(body, (await loadBusiness(tenantId)).categories);
         if ('error' in parsed) return fail(parsed.error);
         return NextResponse.json({ data: mappers.toIngredient(await insertRow('fin_ingredients', tenantId, parsed.data)) }, { status: 201 });
       }
@@ -81,6 +81,11 @@ export async function POST(request: Request, { params }: Params) {
         const result = await saveProduct(tenantId, null, parsed.data);
         if ('error' in result && result.error) return fail(result.error);
         return NextResponse.json({ data: result.data }, { status: 201 });
+      }
+      case 'business': {
+        const result = await saveBusiness(tenantId, body);
+        if ('error' in result) return fail(result.error);
+        return NextResponse.json({ data: result.data });
       }
       case 'settings': {
         return NextResponse.json({ data: await saveSettings(tenantId, parseSettings(body)) });

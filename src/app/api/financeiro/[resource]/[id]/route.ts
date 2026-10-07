@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireFinanceAccess } from '@/lib/finance/access';
 import {
-  deleteRow, mappers, parseChannel, parseFixedCost, parseIngredient, parseProduct, saveProduct, updateRow,
+  deleteRow, loadBusiness, mappers, parseChannel, parseFixedCost, parseIngredient, parseProduct, saveProduct, updateRow,
 } from '@/services/finance.service';
 
 type Params = { params: Promise<{ resource: string; id: string }> };
@@ -26,7 +26,7 @@ export async function PUT(request: Request, { params }: Params) {
     const body = await request.json();
     switch (resource) {
       case 'ingredients': {
-        const parsed = parseIngredient(body);
+        const parsed = parseIngredient(body, (await loadBusiness(tenantId)).categories);
         if ('error' in parsed) return fail(parsed.error);
         const row = await updateRow('fin_ingredients', tenantId, id, parsed.data);
         return row ? NextResponse.json({ data: mappers.toIngredient(row) }) : fail('Insumo não encontrado.', 404);

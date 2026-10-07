@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Calculator, ChefHat, Copy, Plus, Tag, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Calculator, ClipboardList, Copy, Plus, Tag, Trash2, X } from 'lucide-react';
 import styles from '../financeiro.module.css';
 import { currentMonth, finRequest, numText, toNum } from '../api';
 import { marginTone, pricingBase, type TabProps } from './shared';
@@ -9,6 +9,7 @@ import {
   UNIT_INFO, breakEvenUnits, buildCostContext, compatibleUnits, computeProductCost, formatMoney, formatPct, formatQty,
   priceForChannel,
 } from '@/lib/finance/calc';
+import { capitalize, categoryInfo, presetFor } from '@/lib/finance/business';
 import type { FinProduct, FinProductItem, FinUnit } from '@/lib/finance/types';
 
 interface DraftItem {
@@ -34,7 +35,7 @@ interface Draft {
   items: DraftItem[];
 }
 
-const YIELD_UNITS = ['un', 'fatia', 'porção', 'kg', 'g', 'litro', 'ml', 'cento', 'caixa'];
+const YIELD_UNITS = ['un', 'peça', 'kit', 'atendimento', 'sessão', 'hora', 'porção', 'fatia', 'kg', 'g', 'litro', 'ml', 'metro', 'm²', 'cento', 'caixa', 'lote'];
 
 let keySeq = 0;
 const newKey = () => `n${++keySeq}`;
@@ -106,7 +107,9 @@ interface Props extends TabProps {
 }
 
 export default function ProductEditor({ workspace, tenantId, setWorkspace, product, initialKind, onClose }: Props) {
-  const { ingredients, products, channels, settings, access } = workspace;
+  const { ingredients, products, channels, settings, access, business } = workspace;
+  const terms = business.terms;
+  const example = presetFor(business.type).examples;
   const [draft, setDraft] = useState<Draft>(() => toDraft(product, initialKind));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -114,8 +117,8 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
 
   const current = useMemo(() => fromDraft(draft), [draft]);
   const ctx = useMemo(
-    () => buildCostContext(products.filter((item) => item.id !== current.id).concat(current), ingredients, settings),
-    [products, ingredients, settings, current]
+    () => buildCostContext(products.filter((item) => item.id !== current.id).concat(current), ingredients, settings, business.categories),
+    [products, ingredients, settings, business.categories, current]
   );
   const cost = useMemo(() => computeProductCost(current, ctx), [current, ctx]);
   const { fixedMonthly, base, fixedPct } = useMemo(() => pricingBase(workspace, currentMonth()), [workspace]);
@@ -168,7 +171,7 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
 
   const save = async (asCopy = false) => {
     if (!draft.name.trim()) {
-      setError('Dê um nome para a ficha.');
+      setError('Dê um nome.');
       return;
     }
     setSaving(true);
@@ -212,15 +215,15 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
     <div className={styles.overlay} onClick={onClose}>
       <aside className={styles.drawer} onClick={(event) => event.stopPropagation()} aria-label="Ficha técnica">
         <div className={styles.drawerHead}>
-          <h2><ChefHat size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />{draft.id ? draft.name || 'Ficha técnica' : draft.kind === 'base' ? 'Novo preparo-base' : 'Nova ficha técnica'}</h2>
+          <h2><ClipboardList size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />{draft.id ? draft.name || capitalize(terms.product) : `Adicionar ${draft.kind === 'base' ? terms.base : terms.product}`}</h2>
           <div className={styles.headerActions}>
             {!readOnly && draft.id && (
               <>
-                <button className={`${styles.iconButton} ${styles.iconDanger}`} onClick={remove} title="Excluir ficha"><Trash2 size={16} /></button>
+                <button className={`${styles.iconButton} ${styles.iconDanger}`} onClick={remove} title="Excluir"><Trash2 size={16} /></button>
                 <button className={styles.secondaryButton} onClick={() => save(true)} disabled={saving}><Copy size={15} /> Duplicar</button>
               </>
             )}
-            {!readOnly && <button className={styles.primaryButton} onClick={() => save(false)} disabled={saving}>{saving ? 'Salvando…' : 'Salvar ficha'}</button>}
+            {!readOnly && <button className={styles.primaryButton} onClick={() => save(false)} disabled={saving}>{saving ? 'Salvando…' : 'Salvar'}</button>}
             <button className={styles.iconButton} onClick={onClose} title="Fechar"><X size={16} /></button>
           </div>
         </div>
@@ -233,11 +236,11 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
               <div className={styles.formGrid}>
                 <label className={`${styles.field} ${styles.span2}`}>
                   Nome
-                  <input className={styles.input} value={draft.name} onChange={(event) => set('name', event.target.value)} placeholder="Ex.: Bolo de chocolate 20 cm" disabled={readOnly} autoFocus={!draft.id} />
+                  <input className={styles.input} value={draft.name} onChange={(event) => set('name', event.target.value)} placeholder={`Ex.: ${draft.kind === 'base' ? example.base : example.product}`} disabled={readOnly} autoFocus={!draft.id} />
                 </label>
                 <label className={styles.field}>
                   Categoria
-                  <input className={styles.input} value={draft.category} onChange={(event) => set('category', event.target.value)} placeholder="Ex.: Bolos" disabled={readOnly} list="fin-categories" />
+                  <input className={styles.input} value={draft.category} onChange={(event) => set('category', event.target.value)} placeholder="Ex.: Linha principal" disabled={readOnly} list="fin-categories" />
                   <datalist id="fin-categories">
                     {Array.from(new Set(products.map((item) => item.category).filter(Boolean))).map((item) => <option key={item} value={item} />)}
                   </datalist>
@@ -245,21 +248,21 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                 <label className={styles.field}>
                   Tipo
                   <select className={styles.input} value={draft.kind} onChange={(event) => set('kind', event.target.value as Draft['kind'])} disabled={readOnly}>
-                    <option value="product">Produto</option>
-                    <option value="base">Preparo-base</option>
+                    <option value="product">À venda</option>
+                    <option value="base">{capitalize(terms.base)} (usado em outros)</option>
                   </select>
                 </label>
                 <label className={styles.field}>
-                  Rendimento da receita
+                  {terms.yield}
                   <div className={styles.inputGroup}>
                     <input className={styles.input} inputMode="decimal" value={draft.yield_qty} onChange={(event) => set('yield_qty', event.target.value)} disabled={readOnly} />
-                    <select className={styles.input} style={{ width: 'auto', flex: 'none', paddingInline: 8 }} value={draft.yield_unit} onChange={(event) => set('yield_unit', event.target.value)} disabled={readOnly}>
+                    <select className={styles.input} style={{ width: 'auto', maxWidth: 110, flex: 'none', paddingInline: 8 }} value={draft.yield_unit} onChange={(event) => set('yield_unit', event.target.value)} disabled={readOnly}>
                       {Array.from(new Set([...YIELD_UNITS, draft.yield_unit])).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                     </select>
                   </div>
                 </label>
                 <label className={styles.field}>
-                  Tempo de preparo
+                  {terms.prep}
                   <div className={styles.inputGroup}>
                     <input className={styles.input} inputMode="decimal" value={draft.prep_minutes} onChange={(event) => set('prep_minutes', event.target.value)} placeholder="0" disabled={readOnly} />
                     <span>min</span>
@@ -286,15 +289,15 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
 
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
-                <h2><Calculator size={18} /> Ingredientes da receita</h2>
+                <h2><Calculator size={18} /> {terms.composition}</h2>
                 {!readOnly && (
                   <div className={styles.headerActions}>
-                    <button className={styles.secondaryButton} onClick={() => addItem('i')}><Plus size={15} /> Insumo</button>
-                    <button className={styles.secondaryButton} onClick={() => addItem('p')}><Plus size={15} /> Preparo-base</button>
+                    <button className={styles.secondaryButton} onClick={() => addItem('i')}><Plus size={15} /> {capitalize(terms.ingredient)}</button>
+                    <button className={styles.secondaryButton} onClick={() => addItem('p')}><Plus size={15} /> {capitalize(terms.base)}</button>
                   </div>
                 )}
               </div>
-              {ingredients.length === 0 && <p className={styles.panelHint}>Cadastre os insumos na aba “Insumos” para montar a receita.</p>}
+              {ingredients.length === 0 && <p className={styles.panelHint}>Cadastre os {terms.ingredients.toLowerCase()} na aba “{terms.ingredients}” para montar a lista.</p>}
 
               {draft.items.map((item, index) => {
                 const line = cost.lines.find((entry) => entry.key === item.key);
@@ -304,14 +307,14 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                 return (
                   <div key={item.key} className={styles.itemRow}>
                     <select className={styles.input} value={item.source} onChange={(event) => setItem(item.key, { source: event.target.value })} disabled={readOnly} aria-label={`Item ${index + 1}`}>
-                      <option value={isComponent ? 'p:' : ''}>{isComponent ? 'Escolha o preparo…' : 'Escolha o insumo…'}</option>
+                      <option value={isComponent ? 'p:' : ''}>{isComponent ? `Escolha: ${terms.base}…` : `Escolha: ${terms.ingredient}…`}</option>
                       {isComponent ? (
                         bases.map((entry) => <option key={entry.id} value={`p:${entry.id}`}>{entry.name}</option>)
                       ) : (
-                        (['ingrediente', 'embalagem', 'outro'] as const).map((category) => {
+                        Array.from(new Set([...business.categories.map((entry) => entry.key), ...ingredients.map((entry) => entry.category)])).map((category) => {
                           const list = ingredients.filter((entry) => entry.category === category);
                           return list.length > 0 && (
-                            <optgroup key={category} label={category === 'ingrediente' ? 'Ingredientes' : category === 'embalagem' ? 'Embalagens' : 'Outros'}>
+                            <optgroup key={category} label={categoryInfo(business, category).label}>
                               {list.map((entry) => <option key={entry.id} value={`i:${entry.id}`}>{entry.name}</option>)}
                             </optgroup>
                           );
@@ -334,7 +337,7 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                   </div>
                 );
               })}
-              {draft.items.length === 0 && <div className={styles.empty}>Adicione os ingredientes, embalagens e preparos usados nesta receita.</div>}
+              {draft.items.length === 0 && <div className={styles.empty}>Adicione os {terms.ingredients.toLowerCase()} e {terms.bases} usados aqui, com a quantidade de cada um.</div>}
             </section>
 
             {draft.kind === 'product' && (
@@ -412,7 +415,7 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
             )}
 
             <label className={styles.field}>
-              Modo de preparo / observações
+              Observações e modo de fazer
               <textarea className={styles.input} rows={3} value={draft.notes} onChange={(event) => set('notes', event.target.value)} disabled={readOnly} />
             </label>
           </div>
@@ -422,19 +425,19 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
               <span className={styles.muted} style={{ fontSize: '0.82rem' }}>Custo por {draft.yield_unit || 'unidade'}</span>
               <div className={styles.bigNumber}>{formatMoney(cost.unitCost)}</div>
               <span className={styles.muted} style={{ fontSize: '0.8rem' }}>
-                Receita inteira: {formatMoney(cost.batchTotal)} · rende {formatQty(current.yield_qty)} {current.yield_unit}
+                Custo total: {formatMoney(cost.batchTotal)} · {terms.yield.toLowerCase()}: {formatQty(current.yield_qty)} {current.yield_unit}
               </span>
               <div className={styles.costList} style={{ marginTop: 16 }}>
-                <div><span>Ingredientes</span><strong>{formatMoney(cost.ingredients)}</strong></div>
-                {cost.bases > 0 && <div><span>Preparos-base</span><strong>{formatMoney(cost.bases)}</strong></div>}
+                <div><span>{terms.ingredients}</span><strong>{formatMoney(cost.ingredients)}</strong></div>
+                {cost.bases > 0 && <div><span>{capitalize(terms.bases)}</span><strong>{formatMoney(cost.bases)}</strong></div>}
                 <div><span>Embalagens</span><strong>{formatMoney(cost.packaging)}</strong></div>
-                {cost.other > 0 && <div><span>Outros materiais</span><strong>{formatMoney(cost.other)}</strong></div>}
+                {cost.other > 0 && <div><span>Outros custos</span><strong>{formatMoney(cost.other)}</strong></div>}
                 <div><span>Perda ({formatPct(current.loss_pct, 0)})</span><strong>{formatMoney(cost.loss)}</strong></div>
                 <div>
                   <span>Mão de obra {settings.labor_hour_cost > 0 ? `(${formatQty(current.prep_minutes)} min)` : ''}</span>
                   <strong>{settings.labor_hour_cost > 0 ? formatMoney(cost.labor) : <span className={styles.muted}>não configurada</span>}</strong>
                 </div>
-                <div className={styles.costTotal}><span>Total da receita</span><strong>{formatMoney(cost.batchTotal)}</strong></div>
+                <div className={styles.costTotal}><span>Custo total</span><strong>{formatMoney(cost.batchTotal)}</strong></div>
               </div>
             </section>
 

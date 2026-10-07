@@ -10,6 +10,10 @@
 
 import { supabaseAdmin as db } from '@/lib/supabase-admin';
 import {
+  categoryInfo, categoryKey, isBusinessType, presetFor, resolveBusiness, TERM_INFO,
+  type BusinessType, type CategoryGroup, type FinBusiness, type IngredientCategoryDef, type Terms,
+} from '@/lib/finance/business';
+import {
   buildCostContext, computeProductCost, defaultSalePrice, isUnit, monthKey, saleSnapshot,
 } from '@/lib/finance/calc';
 import type {
@@ -28,10 +32,11 @@ export const DEFAULT_SETTINGS: FinSettings = {
   expected_monthly_revenue: 0,
 };
 
+// Canais comuns a qualquer ramo (cada empresa ajusta, renomeia ou apaga).
 const DEFAULT_CHANNELS = [
-  { name: 'Balcão / Loja', fee_pct: 3, fixed_fee: 0, extra_cost: 0 },
-  { name: 'Encomendas / WhatsApp', fee_pct: 0, fixed_fee: 0, extra_cost: 0 },
-  { name: 'iFood', fee_pct: 26.2, fixed_fee: 0, extra_cost: 0 },
+  { name: 'Venda direta / WhatsApp', fee_pct: 0, fixed_fee: 0, extra_cost: 0 },
+  { name: 'Cartão (maquininha)', fee_pct: 3, fixed_fee: 0, extra_cost: 0 },
+  { name: 'Marketplace / aplicativo', fee_pct: 20, fixed_fee: 0, extra_cost: 0 },
 ];
 
 // ── Normalização ─────────────────────────────────────────────
@@ -148,9 +153,18 @@ function toSale(row: Row): FinSale {
 
 // ── Leitura ──────────────────────────────────────────────────
 
-async function loadSettings(tenantId: string) {
+async function loadSettingsRow(tenantId: string): Promise<Row | null> {
   const { data } = await db.from('fin_settings').select('*').eq('tenant_id', tenantId).maybeSingle();
-  return toSettings(data);
+  return (data as Row) || null;
+}
+
+async function loadSettings(tenantId: string) {
+  return toSettings(await loadSettingsRow(tenantId));
+}
+
+/** Ramo, nomes das telas e tipos de insumo da empresa. */
+export async function loadBusiness(tenantId: string): Promise<FinBusiness> {
+  return resolveBusiness(await loadSettingsRow(tenantId));
 }
 
 async function loadChannels(tenantId: string) {
@@ -218,8 +232,8 @@ async function loadRevenueHistory(tenantId: string): Promise<FinMonthRevenue[]> 
 
 export async function loadWorkspace(access: FinanceAccess): Promise<FinWorkspace> {
   const tenantId = access.tenant.id;
-  const [settings, ingredients, products, channels, fixedCosts, revenueHistory] = await Promise.all([
-    loadSettings(tenantId),
+  const [settingsRow, ingredients, products, channels, fixedCosts, revenueHistory] = await Promise.all([
+    loadSettingsRow(tenantId),
     loadIngredients(tenantId),
     loadProducts(tenantId),
     loadChannels(tenantId),
@@ -228,7 +242,8 @@ export async function loadWorkspace(access: FinanceAccess): Promise<FinWorkspace
   ]);
   return {
     tenant: access.tenant,
-    settings,
+    settings: toSettings(settingsRow),
+    business: resolveBusiness(settingsRow),
     ingredients,
     products,
     channels,
@@ -273,10 +288,21 @@ export function parseSettings(body: Row): FinSettings {
   };
 }
 
-export function parseIngredient(body: Row): Parsed<Omit<FinIngredient, 'id'>> {
+/** Tipo do insumo: chave ou nome de um tipo da empresa (planilhas trazem o nome). */
+function resolveCategory(value: unknown, categories: IngredientCategoryDef[]) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (categories.length === 0) return /^[a-z0-9_-]{1,40}$/.test(raw) ? raw : 'ingrediente';
+  const byKey = categories.find((item) => item.key === raw);
+  if (byKey) return byKey.key;
+  const folded = normalizeName(raw);
+  const byLabel = folded ? categories.find((item) => normalizeName(item.label) === folded || normalizeName(item.label).startsWith(folded)) : null;
+  return (byLabel || categories[0]).key;
+}
+
+export function parseIngredient(body: Row, categories: IngredientCategoryDef[] = []): Parsed<Omit<FinIngredient, 'id'>> {
   const name = text(body.name, 120);
-  if (!name) return { error: 'Informe o nome do insumo.' };
-  const category = ['ingrediente', 'embalagem', 'outro'].includes(body.category as string) ? body.category as FinIngredient['category'] : 'ingrediente';
+  if (!name) return { error: 'Informe o nome.' };
+  const category = resolveCategory(body.category, categories);
   const purchase_unit = isUnit(body.purchase_unit) ? body.purchase_unit : 'kg';
   const purchase_qty = num(body.purchase_qty, 1);
   const purchase_price = num(body.purchase_price);
@@ -421,6 +447,60 @@ export async function deleteRow(table: SimpleTable | 'fin_products' | 'fin_sales
 
 export async function reorderChannels(tenantId: string, ids: string[]) {
   await Promise.all(ids.map((id, position) => db.from('fin_channels').update({ position }).eq('tenant_id', tenantId).eq('id', id)));
+}
+
+/**
+ * Ramo do negócio, nomes das telas e tipos de insumo.
+ * applyPreset: troca de ramo (nomes voltam ao padrão do ramo; tipos em
+ * uso continuam). Sem ele, salva os nomes e tipos editados à mão.
+ */
+export async function saveBusiness(tenantId: string, body: Row): Promise<{ data: FinBusiness } | { error: string }> {
+  const current = await loadBusiness(tenantId);
+  const type: BusinessType | null = isBusinessType(body.type) ? body.type : current.type;
+  if (!type) return { error: 'Escolha o ramo do negócio.' };
+  const preset = presetFor(type);
+  const { data: used } = await db.from('fin_ingredients').select('category').eq('tenant_id', tenantId);
+  const usage = new Map<string, number>();
+  for (const row of used || []) usage.set(String(row.category), (usage.get(String(row.category)) || 0) + 1);
+
+  const terms: Partial<Terms> = {};
+  let categories: IngredientCategoryDef[];
+  if (body.applyPreset === true) {
+    // Tipos já usados por algum insumo continuam existindo.
+    const kept = [...usage.keys()].filter((key) => !preset.categories.some((item) => item.key === key)).map((key) => categoryInfo(current, key));
+    categories = [...preset.categories, ...kept];
+  } else {
+    const rawTerms = body.terms && typeof body.terms === 'object' ? (body.terms as Row) : {};
+    for (const info of TERM_INFO) {
+      const value = text(rawTerms[info.key], 40);
+      if (value && value !== preset.terms[info.key]) terms[info.key] = value;
+    }
+    const list = Array.isArray(body.categories) ? (body.categories as Row[]) : current.categories;
+    const seen = new Set<string>();
+    categories = [];
+    for (const item of list.slice(0, 20)) {
+      const label = text(item?.label, 40);
+      if (!label) continue;
+      let key = typeof item?.key === 'string' && /^[a-z0-9_-]{1,40}$/.test(item.key) ? item.key : categoryKey(label);
+      while (seen.has(key)) key = `${key.slice(0, 36)}_${seen.size}`;
+      seen.add(key);
+      const group = ['material', 'packaging', 'other'].includes(String(item?.group)) ? (item.group as CategoryGroup) : 'material';
+      categories.push({ key, label, group });
+    }
+    if (categories.length === 0) return { error: 'Deixe pelo menos um tipo.' };
+    const missing = [...usage.entries()].filter(([key]) => !categories.some((item) => item.key === key));
+    if (missing.length > 0) {
+      const [key, count] = missing[0];
+      return { error: `O tipo "${categoryInfo(current, key).label}" está em ${count} item(ns). Mude o tipo deles antes de apagar.` };
+    }
+  }
+
+  const { error } = await db.from('fin_settings').upsert(
+    { tenant_id: tenantId, business_type: type, terms, ingredient_categories: categories, updated_at: new Date().toISOString() },
+    { onConflict: 'tenant_id' }
+  );
+  if (error) return { error: error.message };
+  return { data: resolveBusiness({ business_type: type, terms, ingredient_categories: categories }) };
 }
 
 export async function saveSettings(tenantId: string, settings: FinSettings) {
@@ -570,8 +650,9 @@ export async function createSales(
 export async function importRows(tenantId: string, kind: 'ingredients' | 'fixed_costs', rows: Row[]) {
   const errors: { row: number; message: string }[] = [];
   const valid: Row[] = [];
+  const { categories } = await loadBusiness(tenantId);
   rows.slice(0, 2000).forEach((row, index) => {
-    const parsed = kind === 'ingredients' ? parseIngredient(row) : parseFixedCost(row);
+    const parsed = kind === 'ingredients' ? parseIngredient(row, categories) : parseFixedCost(row);
     if ('error' in parsed) errors.push({ row: index + 1, message: parsed.error });
     else valid.push({ ...parsed.data, tenant_id: tenantId });
   });

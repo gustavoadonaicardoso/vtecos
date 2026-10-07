@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  BarChart3, Building2, ChefHat, FileSpreadsheet, Package, ShoppingBag, Wallet,
+  BarChart3, Building2, ClipboardList, FileSpreadsheet, Package, ShoppingBag, Store, Wallet,
 } from 'lucide-react';
 import styles from './financeiro.module.css';
 import { useAuth } from '@/context/AuthContext';
@@ -15,17 +15,19 @@ import IngredientsTab from './components/IngredientsTab';
 import CostsTab from './components/CostsTab';
 import SalesTab from './components/SalesTab';
 import ImportTab from './components/ImportTab';
+import BusinessTab from './components/BusinessTab';
 import type { TabProps } from './components/shared';
 
-type TabId = 'overview' | 'products' | 'ingredients' | 'costs' | 'sales' | 'import';
+type TabId = 'overview' | 'products' | 'ingredients' | 'costs' | 'sales' | 'import' | 'business';
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'overview', label: 'Resultado', icon: BarChart3 },
-  { id: 'products', label: 'Fichas técnicas', icon: ChefHat },
+  { id: 'products', label: 'Fichas técnicas', icon: ClipboardList },
   { id: 'ingredients', label: 'Insumos', icon: Package },
   { id: 'costs', label: 'Despesas e canais', icon: Wallet },
   { id: 'sales', label: 'Vendas', icon: ShoppingBag },
   { id: 'import', label: 'Importar planilha', icon: FileSpreadsheet },
+  { id: 'business', label: 'Meu negócio', icon: Store },
 ];
 
 const TENANT_KEY = 'vortice-financeiro-tenant';
@@ -104,7 +106,7 @@ export default function FinanceiroPage() {
   };
 
   const tabProps: TabProps | null = useMemo(
-    () => (workspace ? { workspace, tenantId, setWorkspace, reload } : null),
+    () => (workspace ? { workspace, tenantId, setWorkspace, reload, onNavigate: (id: string) => setTab(id as TabId) } : null),
     [workspace, tenantId, reload]
   );
 
@@ -151,7 +153,7 @@ export default function FinanceiroPage() {
       {error && <div className={styles.errorBanner}>{error}</div>}
 
       <nav className={styles.tabs} role="tablist">
-        {TABS.filter((item) => item.id !== 'import' || workspace?.access.canManage).map((item) => (
+        {TABS.filter((item) => (item.id !== 'import' && item.id !== 'business') || workspace?.access.canManage).map((item) => (
           <button
             key={item.id}
             role="tab"
@@ -159,7 +161,7 @@ export default function FinanceiroPage() {
             className={`${styles.tab} ${tab === item.id ? styles.tabActive : ''}`}
             onClick={() => setTab(item.id)}
           >
-            <item.icon size={16} /> {item.label}
+            <item.icon size={16} /> {item.id === 'products' ? workspace?.business.terms.products || item.label : item.id === 'ingredients' ? workspace?.business.terms.ingredients || item.label : item.label}
           </button>
         ))}
       </nav>
@@ -176,6 +178,8 @@ export default function FinanceiroPage() {
         <CostsTab {...tabProps} />
       ) : tab === 'sales' ? (
         <SalesTab {...tabProps} month={month} onMonthChange={setMonth} sales={sales} onChanged={afterSalesChange} />
+      ) : tab === 'business' ? (
+        <BusinessTab key={workspace?.tenant.id} {...tabProps} />
       ) : (
         <ImportTab {...tabProps} onSalesImported={afterSalesChange} />
       )}
@@ -189,7 +193,7 @@ function Header({ children }: { children?: React.ReactNode }) {
       <div>
         <h1 className={styles.title}>Custos e Precificação</h1>
         <p className={styles.subtitle}>
-          Ficha técnica de cada produto, preço certo em cada canal e quanto sobra de lucro no fim do mês.
+          Custo de cada produto ou serviço, preço certo em cada canal e quanto sobra de lucro no fim do mês.
         </p>
       </div>
       <div className={styles.headerActions}>
