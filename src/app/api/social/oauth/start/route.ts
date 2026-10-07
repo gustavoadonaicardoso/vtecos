@@ -17,14 +17,14 @@ export async function GET(request: Request) {
   const auth = await requireAdminProfile({ module: 'social', permission: 'social.view' });
   if ('error' in auth) return backToAccounts(request, auth.error.message);
 
-  if (!isMetaAppConfigured()) {
+  if (!(await isMetaAppConfigured())) {
     return backToAccounts(request, 'O app da Meta ainda não foi configurado no servidor (META_APP_ID/META_APP_SECRET).');
   }
 
   // "state" aleatório num cookie httpOnly: o callback só aceita a volta
   // da Meta se trouxer o mesmo valor (proteção contra CSRF no login).
   const state = randomUUID();
-  const response = NextResponse.redirect(buildOAuthDialogUrl(state, getOAuthRedirectUri(request)));
+  const response = NextResponse.redirect(await buildOAuthDialogUrl(state, getOAuthRedirectUri(request)));
   response.cookies.set(OAUTH_STATE_COOKIE, state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

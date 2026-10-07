@@ -4,8 +4,11 @@
  * ============================================================
  * Server-only: usa META_APP_SECRET e tokens de Página. Nunca importe
  * isto de código que roda no navegador.
+ * O app (ID e segredo) vem do Painel Master > Plataforma.
  * ============================================================
  */
+
+import { platformSettings } from '@/lib/platform-settings';
 
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
 const GRAPH_URL = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -85,23 +88,24 @@ export async function graphRequest<T>(
   return body as T;
 }
 
-function requireAppCredentials() {
-  const appId = process.env.META_APP_ID;
-  const appSecret = process.env.META_APP_SECRET;
+async function requireAppCredentials() {
+  const { metaAppId: appId, metaAppSecret: appSecret } = await platformSettings();
   if (!appId || !appSecret) {
-    throw new MetaGraphError('META_APP_ID e META_APP_SECRET não estão configurados no servidor (.env.local).');
+    throw new MetaGraphError('O app da Meta da Vórtice não está configurado (Painel Master > Plataforma).');
   }
   return { appId, appSecret };
 }
 
 // ── OAuth ──────────────────────────────────────────────────────
 
-export function isMetaAppConfigured() {
-  return Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET);
+export async function isMetaAppConfigured() {
+  const settings = await platformSettings();
+  return Boolean(settings.metaAppId && settings.metaAppSecret);
 }
 
-export function buildOAuthDialogUrl(state: string, redirectUri: string) {
-  const { appId } = requireAppCredentials();
+export async function buildOAuthDialogUrl(state: string, redirectUri: string) {
+  const { appId } = await requireAppCredentials();
+  const { metaLoginConfigId } = await platformSettings();
   const params = new URLSearchParams({
     client_id: appId,
     redirect_uri: redirectUri,
@@ -110,8 +114,8 @@ export function buildOAuthDialogUrl(state: string, redirectUri: string) {
   });
   // Facebook Login for Business usa uma "configuração" criada no painel do
   // app em vez de uma lista de escopos; sem ela, cai no login clássico.
-  if (process.env.META_LOGIN_CONFIG_ID) {
-    params.set('config_id', process.env.META_LOGIN_CONFIG_ID);
+  if (metaLoginConfigId) {
+    params.set('config_id', metaLoginConfigId);
   } else {
     params.set('scope', META_OAUTH_SCOPES.join(','));
   }
@@ -119,7 +123,7 @@ export function buildOAuthDialogUrl(state: string, redirectUri: string) {
 }
 
 export async function exchangeCodeForLongLivedToken(code: string, redirectUri: string): Promise<string> {
-  const { appId, appSecret } = requireAppCredentials();
+  const { appId, appSecret } = await requireAppCredentials();
 
   const shortLived = await graphRequest<{ access_token: string }>('GET', '/oauth/access_token', {
     client_id: appId,

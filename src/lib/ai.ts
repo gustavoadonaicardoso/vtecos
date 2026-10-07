@@ -2,8 +2,8 @@
  * IA do sistema: local (Ollama, na própria VPS) ou Google Gemini.
  *
  * Todas as partes que usam IA (blocos de IA das Automações, legendas das
- * Redes Sociais, notas fiscais) chamam callAI(), que escolhe o provedor
- * pelas variáveis do .env.local:
+ * Redes Sociais, notas fiscais) chamam callAI(). A IA da Vórtice é
+ * escolhida no Painel Master > Plataforma (campo vazio cai para o .env):
  *
  *   AI_PROVIDER=ollama            usa a IA local (padrão: gemini)
  *   OLLAMA_URL=http://127.0.0.1:11434
@@ -24,6 +24,7 @@
 
 import { callGemini, type GeminiResult, type GeminiError } from '@/lib/gemini';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { platformSettings } from '@/lib/platform-settings';
 
 export interface AiCallOptions {
   temperature?: number;
@@ -38,26 +39,28 @@ export type AiResult = GeminiResult | GeminiError;
 
 export type AiProvider = 'ollama' | 'gemini';
 
-export function aiProvider(): AiProvider {
-  return (process.env.AI_PROVIDER || '').trim().toLowerCase() === 'ollama' ? 'ollama' : 'gemini';
+// IA da Vórtice: Painel Master > Plataforma (ou .env, se o campo estiver vazio).
+export async function aiProvider(): Promise<AiProvider> {
+  return (await platformSettings()).aiProvider;
 }
 
-const ollamaUrl = () => (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/+$/, '');
-export const ollamaModel = () => (process.env.OLLAMA_MODEL || 'gemma3:4b').trim();
-const hasGemini = () => Boolean(process.env.GEMINI_API_KEY);
-
-/** Há alguma IA configurada no servidor? */
-export function aiConfigured() {
-  return aiProvider() === 'ollama' || hasGemini();
+/** Há alguma IA da Vórtice configurada? */
+export async function aiConfigured() {
+  const settings = await platformSettings();
+  return settings.aiProvider === 'ollama' || Boolean(settings.geminiKey);
 }
 
 /** Nome para mostrar nas telas (Integrações, avisos). */
-export function aiLabel() {
-  if (aiProvider() === 'ollama') return `IA local (${ollamaModel()})${hasGemini() ? ' + Gemini de reserva' : ''}`;
-  return hasGemini() ? 'Google Gemini' : 'Nenhuma';
+export async function aiLabel() {
+  const settings = await platformSettings();
+  if (settings.aiProvider === 'ollama') return `IA local (${settings.ollamaModel})${settings.geminiKey ? ' + Gemini de reserva' : ''}`;
+  return settings.geminiKey ? 'Google Gemini' : 'Nenhuma';
 }
 
 async function callOllama(prompt: string, options: AiCallOptions): Promise<AiResult> {
+  const settings = await platformSettings();
+  const ollamaUrl = () => settings.ollamaUrl.replace(/\/+$/, '');
+  const ollamaModel = () => settings.ollamaModel;
   const timeoutSeconds = Math.max(10, Number(process.env.OLLAMA_TIMEOUT_SECONDS) || 180);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
@@ -128,7 +131,7 @@ export const forgetTenantAiKey = (tenantId: string) => keyCache.delete(tenantId)
 
 /** A empresa tem alguma IA para usar (a própria ou a da Vórtice)? */
 export async function aiAvailableFor(tenantId: string) {
-  return aiConfigured() || Boolean(await tenantGeminiKey(tenantId));
+  return (await aiConfigured()) || Boolean(await tenantGeminiKey(tenantId));
 }
 
 /** Confere uma chave do Gemini (lista os modelos, sem gastar). */
@@ -149,14 +152,16 @@ export async function callAI(prompt: string, options: AiCallOptions = {}): Promi
     const own = await tenantGeminiKey(options.tenantId).catch(() => null);
     if (own) {
       const result = await callGemini(prompt, { ...options, apiKey: own });
-      return result.success ? result : { ...result, error: `Chave do Gemini da empresa: ${result.error.replace(/ ?— ?Verifique sua GEMINI_API_KEY\.?/, '')} Confira a chave em Integrações > Inteligência artificial.` };
+      return result.success ? result : { ...result, error: `Chave do Gemini da empresa: ${result.error.replace(/ ?Confira a chave do Gemini\.?/, '')} Confira a chave em Integrações > Inteligência artificial.` };
     }
   }
-  if (aiProvider() !== 'ollama') return callGemini(prompt, options);
-  if (options.preferCloud && hasGemini()) return callGemini(prompt, options);
+  const settings = await platformSettings();
+  const platformKey = settings.geminiKey || undefined;
+  if (settings.aiProvider !== 'ollama') return callGemini(prompt, { ...options, apiKey: platformKey });
+  if (options.preferCloud && platformKey) return callGemini(prompt, { ...options, apiKey: platformKey });
 
   const local = await callOllama(prompt, options);
-  if (local.success || !hasGemini()) return local;
+  if (local.success || !platformKey) return local;
   console.warn('[IA] Usando o Gemini de reserva:', local.error);
-  return callGemini(prompt, options);
+  return callGemini(prompt, { ...options, apiKey: platformKey });
 }

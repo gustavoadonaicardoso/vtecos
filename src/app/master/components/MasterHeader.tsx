@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Building2, CheckCircle2, Layout, LayoutGrid, LifeBuoy, Loader2, Palette, Plus, RotateCcw, Save, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Building2, CheckCircle2, Layout, LayoutGrid, LifeBuoy, Loader2, Palette, Plus, RotateCcw, Save, ServerCog, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import styles from '../master.module.css';
 import type { TabId } from '../types';
 
@@ -20,6 +20,7 @@ const TABS: { id: TabId; label: string; icon: typeof Layout }[] = [
   { id: 'branding', label: 'Identidade Visual', icon: Palette },
   { id: 'permissions', label: 'Menu por Função', icon: SlidersHorizontal },
   { id: 'banners', label: 'Banners', icon: Layout },
+  { id: 'platform', label: 'Plataforma', icon: ServerCog },
   { id: 'help', label: 'Ajuda', icon: LifeBuoy },
 ];
 

@@ -170,7 +170,7 @@ export default function IntegrationsPage() {
             <Server size={18} />
             <div>
               <h2>Serviços da plataforma</h2>
-              <p>Configurados uma vez no servidor (arquivo <code>.env.local</code> da VPS) pela Vórtice. Cada empresa conecta as próprias contas nos cartões acima. Só a Vórtice vê este quadro.</p>
+              <p>Configurados uma vez pela Vórtice em <Link href="/master?tab=platform">Painel Master &gt; Plataforma</Link>. Cada empresa conecta as próprias contas nos cartões acima. Só a Vórtice vê este quadro.</p>
             </div>
           </div>
           <div className={styles.platformGrid}>
@@ -186,7 +186,7 @@ export default function IntegrationsPage() {
               </div>
             ))}
           </div>
-          <p className={styles.hint}>Depois de alterar o <code>.env.local</code>, rode o deploy (ou <code>pm2 restart vtec-os</code>) para valer.</p>
+          <p className={styles.hint}>As mudanças feitas no Painel Master valem em até 30 segundos, sem deploy.</p>
         </section>
       )}
 

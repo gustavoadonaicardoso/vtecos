@@ -21,8 +21,8 @@ import {
   type DeliveryResult,
 } from '@/lib/integrations/events';
 import type { ServiceResult } from '@/types';
-import { aiConfigured, aiLabel, aiProvider, checkGeminiKey, forgetTenantAiKey } from '@/lib/ai';
-import { embeddedSignupReady } from '@/services/whatsapp-signup.service';
+import { aiConfigured, aiLabel, checkGeminiKey, forgetTenantAiKey } from '@/lib/ai';
+import { platformSettings } from '@/lib/platform-settings';
 
 export const PROVIDERS = ['whatsapp_meta', 'webhook_custom', 'google_sheets', 'lead_capture', 'twilio', 'ai'] as const;
 export type Provider = (typeof PROVIDERS)[number];
@@ -34,7 +34,6 @@ const SECRET_FIELDS: Partial<Record<Provider, string[]>> = {
   ai: ['geminiKey'],
 };
 
-const LEGACY_VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'vortice_verify_token_2024';
 
 type Config = Record<string, unknown>;
 
@@ -54,7 +53,7 @@ async function loadRow(tenantId: string, provider: Provider) {
   return data as { config: Config | null; updated_at: string | null } | null;
 }
 
-function maskConfig(provider: Provider, config: Config) {
+function maskConfig(provider: Provider, config: Config, platformVerifyToken = '') {
   const secrets: Record<string, boolean> = {};
   const visible: Config = { ...config };
   for (const field of SECRET_FIELDS[provider] || []) {
@@ -63,7 +62,7 @@ function maskConfig(provider: Provider, config: Config) {
   }
   if (provider === 'whatsapp_meta') {
     // Configurações antigas usam o token padrão (o mesmo que a Meta já tem cadastrado).
-    visible.webhookVerifyToken = config.webhookVerifyToken || LEGACY_VERIFY_TOKEN;
+    visible.webhookVerifyToken = config.webhookVerifyToken || platformVerifyToken;
   }
   return { visible, secrets };
 }
@@ -75,9 +74,10 @@ export async function listIntegrations(tenantId: string): Promise<IntegrationVie
     .eq('tenant_id', tenantId)
     .in('provider', PROVIDERS as unknown as string[]);
 
+  const { whatsappVerifyToken } = await platformSettings();
   return (data || []).map((row) => {
     const provider = row.provider as Provider;
-    const { visible, secrets } = maskConfig(provider, (row.config || {}) as Config);
+    const { visible, secrets } = maskConfig(provider, (row.config || {}) as Config, whatsappVerifyToken);
     return { provider, config: visible, secrets, updated_at: row.updated_at ?? null };
   });
 }
@@ -272,14 +272,15 @@ export async function integrationsOverview(tenantId: string, options: { isPlatfo
     socialAccounts = count ?? 0;
   }
 
+  const settings = await platformSettings();
+  const hasAi = await aiConfigured();
+  const item = (key: string, label: string, description: string, ok: boolean, missing: string): PlatformService => ({ key, label, description, configured: ok, missing: ok ? [] : [missing] });
   const platform = options.isPlatform
     ? [
-        aiProvider() === 'ollama'
-          ? envStatus('ai', `IA da Vórtice: ${aiLabel()}`, 'IA padrão de todas as empresas que não cadastraram a própria chave do Gemini.', [])
-          : envStatus('ai', 'IA da Vórtice: Google Gemini', 'IA padrão de todas as empresas que não cadastraram a própria chave do Gemini. Para usar uma IA local, configure AI_PROVIDER=ollama.', ['GEMINI_API_KEY']),
-        envStatus('meta-app', 'App da Meta', 'Login com Facebook das empresas: Redes Sociais e WhatsApp oficial.', ['META_APP_ID', 'META_APP_SECRET']),
-        envStatus('meta-wa', 'Cadastro do WhatsApp oficial', 'Botão "Conectar com Facebook" do WhatsApp Business API (configuração de cadastro incorporado do app da Meta).', ['META_WA_CONFIG_ID']),
-        envStatus('scheduler', 'Agendador do servidor', 'Publica os posts agendados e continua as esperas das automações.', [], () => (process.env.CONTENT_SCHEDULER_ENABLED === 'true' ? null : 'CONTENT_SCHEDULER_ENABLED=true')),
+        item('ai', `IA da Vórtice: ${await aiLabel()}`, 'IA padrão de todas as empresas que não cadastraram a própria chave do Gemini.', hasAi, 'Painel Master > Plataforma > IA padrão'),
+        item('meta-app', 'App da Meta', 'Login com Facebook das empresas: Redes Sociais e WhatsApp oficial.', Boolean(settings.metaAppId && settings.metaAppSecret), 'Painel Master > Plataforma > App da Meta'),
+        item('meta-wa', 'Cadastro do WhatsApp oficial', 'Botão "Conectar com Facebook" do WhatsApp Business API.', Boolean(settings.metaWaConfigId), 'Painel Master > Plataforma > ID do cadastro do WhatsApp'),
+        envStatus('scheduler', 'Agendador do servidor', 'Publica os posts agendados e continua as esperas das automações.', [], () => (process.env.CONTENT_SCHEDULER_ENABLED === 'true' ? null : 'CONTENT_SCHEDULER_ENABLED=true no .env')),
       ]
     : null;
 
@@ -289,8 +290,8 @@ export async function integrationsOverview(tenantId: string, options: { isPlatfo
     socialAccounts,
     platform,
     /** IA da Vórtice disponível para quem não tem chave própria. */
-    platformAi: aiConfigured(),
+    platformAi: hasAi,
     /** Botão "Conectar com Facebook" do WhatsApp oficial pronto. */
-    whatsappSignup: embeddedSignupReady(),
+    whatsappSignup: Boolean(settings.metaAppId && settings.metaAppSecret && settings.metaWaConfigId),
   };
 }

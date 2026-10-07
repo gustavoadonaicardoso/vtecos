@@ -15,6 +15,6 @@ export async function GET() {
   return NextResponse.json({
     success: true,
     data: result.data,
-    metaConfigured: isMetaAppConfigured(),
+    metaConfigured: await isMetaAppConfigured(),
   });
 }

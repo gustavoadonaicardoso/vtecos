@@ -813,3 +813,44 @@
 .tenantPick label:hover { background: var(--glass-bg); }
 .imageRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .previewBtn { display: inline-flex; align-self: flex-start; padding: 7px 14px; border-radius: 10px; background: rgba(255, 255, 255, 0.95); color: #111; font-size: 0.8rem; font-weight: 800; }
+
+/* ===== Aba Plataforma ===== */
+.sourceBadge {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  vertical-align: middle;
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--muted);
+}
+.sourceBadge[data-source='painel'] { background: rgba(16, 185, 129, 0.14); color: #10b981; }
+.sourceBadge[data-source='env'] { background: rgba(59, 130, 246, 0.14); color: #3b82f6; }
+.sourceBadge[data-source='vazio'] { background: rgba(245, 158, 11, 0.14); color: #f59e0b; }
+.fieldHint { font-size: 0.76rem; color: var(--muted); line-height: 1.45; }
+.copyRow { display: flex; gap: 8px; align-items: center; }
+.copyRow .input { flex: 1; font-size: 0.82rem; }
+.copyRow .resetBtn { flex: none; }
+.linkButton {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.linkButton:hover { text-decoration: underline; }
+.inlineActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.twoCols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 14px; }
+.testOk,
+.testFail { display: flex; align-items: flex-start; gap: 6px; margin: 10px 0 0; font-size: 0.84rem; line-height: 1.45; }
+.testOk { color: #10b981; }
+.testFail { color: #f59e0b; }
+.testOk svg,
+.testFail svg { flex: none; margin-top: 2px; }
+.saveRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.saveRow p { margin: 0 auto 0 0; }

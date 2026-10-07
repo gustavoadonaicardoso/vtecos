@@ -14,7 +14,7 @@ const GEMINI_MODEL = 'gemini-2.0-flash';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 export interface GeminiCallOptions {
-  /** API key. Defaults to process.env.GEMINI_API_KEY */
+  /** Chave da API. Sem ela, usa a IA padrão da Vórtice (Painel Master > Plataforma). */
   apiKey?: string;
   temperature?: number;
   maxOutputTokens?: number;
@@ -39,12 +39,13 @@ export async function callGemini(
   prompt: string,
   options: GeminiCallOptions = {}
 ): Promise<GeminiResult | GeminiError> {
-  const apiKey = options.apiKey ?? process.env.GEMINI_API_KEY;
+  // Sem chave informada: a IA padrão da Vórtice (Painel Master > Plataforma, ou .env).
+  const apiKey = options.apiKey || (await import('@/lib/platform-settings').then((m) => m.platformSettings())).geminiKey || undefined;
 
   if (!apiKey) {
     return {
       success: false,
-      error: 'Chave GEMINI_API_KEY não configurada no servidor. Adicione-a ao .env.local.',
+      error: 'Nenhuma chave do Gemini configurada. A Vórtice cadastra em Painel Master > Plataforma; a empresa pode usar a própria em Integrações.',
     };
   }
 
@@ -68,7 +69,7 @@ export async function callGemini(
     console.error('[GeminiHelper] HTTP error:', errText);
     return {
       success: false,
-      error: `Erro na API Gemini: ${res.status} — Verifique sua GEMINI_API_KEY.`,
+      error: `Erro na API Gemini: ${res.status}. Confira a chave do Gemini.`,
       status: res.status,
     };
   }

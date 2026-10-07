@@ -12,25 +12,28 @@
  *      "embedded"). As mensagens chegam assinadas com o segredo do app
  *      da Vórtice (META_APP_SECRET), então nada vai para o .env da
  *      empresa.
- * Precisa no .env (uma vez, da Vórtice): META_APP_ID, META_APP_SECRET e
- * META_WA_CONFIG_ID (configuração de cadastro incorporado do app).
+ * Precisa (uma vez, da Vórtice, no Painel Master > Plataforma): ID e
+ * segredo do app da Meta e o ID da configuração de cadastro incorporado.
  * ============================================================
  */
 
 import { randomInt } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { platformSettings } from '@/lib/platform-settings';
 
 const graphVersion = () => process.env.META_GRAPH_VERSION || 'v23.0';
 const graph = (path: string) => `https://graph.facebook.com/${graphVersion()}/${path}`;
 
-export function embeddedSignupReady() {
-  return Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET && process.env.META_WA_CONFIG_ID);
+export async function embeddedSignupReady() {
+  const settings = await platformSettings();
+  return Boolean(settings.metaAppId && settings.metaAppSecret && settings.metaWaConfigId);
 }
 
 /** O que o navegador precisa para abrir o login (nada secreto). */
-export function signupClientConfig() {
-  return embeddedSignupReady()
-    ? { appId: String(process.env.META_APP_ID), configId: String(process.env.META_WA_CONFIG_ID), graphVersion: graphVersion() }
+export async function signupClientConfig() {
+  const settings = await platformSettings();
+  return settings.metaAppId && settings.metaAppSecret && settings.metaWaConfigId
+    ? { appId: settings.metaAppId, configId: settings.metaWaConfigId, graphVersion: graphVersion() }
     : null;
 }
 
@@ -52,7 +55,8 @@ export async function completeEmbeddedSignup(
   tenantId: string,
   input: { code: unknown; phoneNumberId: unknown; wabaId: unknown }
 ): Promise<{ displayPhone: string; verifiedName: string; warning?: string } | Failure> {
-  if (!embeddedSignupReady()) return { error: 'O login do WhatsApp ainda não foi configurado pela Vórtice. Use o formulário manual por enquanto.' };
+  const settings = await platformSettings();
+  if (!(await embeddedSignupReady())) return { error: 'O login do WhatsApp ainda não foi configurado pela Vórtice. Use o formulário manual por enquanto.' };
   const code = String(input.code || '').trim();
   const phoneNumberId = digits(input.phoneNumberId);
   const wabaId = digits(input.wabaId);
@@ -66,7 +70,7 @@ export async function completeEmbeddedSignup(
 
   let token: string;
   try {
-    const params = new URLSearchParams({ client_id: String(process.env.META_APP_ID), client_secret: String(process.env.META_APP_SECRET), code });
+    const params = new URLSearchParams({ client_id: settings.metaAppId, client_secret: settings.metaAppSecret, code });
     const exchanged = await graphCall(`${graph('oauth/access_token')}?${params}`);
     token = String(exchanged.access_token || '');
     if (!token) return { error: 'A Meta não devolveu o token. Tente conectar de novo.' };

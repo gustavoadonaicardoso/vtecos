@@ -8,7 +8,7 @@ import { completeEmbeddedSignup, signupClientConfig } from '@/services/whatsapp-
 export async function GET() {
   const auth = await requireAdminProfile({ module: 'crm' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
-  return NextResponse.json({ data: signupClientConfig() });
+  return NextResponse.json({ data: await signupClientConfig() });
 }
 
 /** Conclui o cadastro incorporado: código + IDs que o Facebook devolveu ao navegador. */

@@ -183,7 +183,7 @@ export default function Dialer({ onClose }: DialerProps) {
             {status === 'Credenciais Inválidas' ? (
               <div className={styles.configAlert}>
                 <p>Configuração Necessária</p>
-                <span>Insira suas chaves no arquivo <code>.env.local</code></span>
+                <span>Um administrador conecta a conta Twilio da empresa em Integrações &gt; Discador.</span>
               </div>
             ) : (
               <input 

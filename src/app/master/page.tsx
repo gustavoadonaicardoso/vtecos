@@ -16,6 +16,7 @@ import BannerEditModal from './components/BannerEditModal';
 import TenantsTab from './components/TenantsTab';
 import HelpTab from './components/HelpTab';
 import BrandingTab from './components/BrandingTab';
+import PlatformTab from './components/PlatformTab';
 
 const IMAGE_LIMITS = { logoUrl: 300 * 1024, faviconUrl: 100 * 1024 };
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -49,7 +50,7 @@ export default function MasterPage() {
     const params = new URLSearchParams(window.location.search);
     return { tab: params.get('tab'), article: params.get('article') };
   });
-  const [activeTab, setActiveTab] = useState<TabId>(() => (deepLink.tab === 'help' ? 'help' : 'modules'));
+  const [activeTab, setActiveTab] = useState<TabId>(() => (deepLink.tab === 'help' || deepLink.tab === 'platform' ? deepLink.tab : 'modules'));
   const [selectedRole, setSelectedRole] = useState<Role>('SELLER');
   const { refreshConfig, config: themeConfig } = useTheme();
   // Enquanto não há edição, a aba mostra o que está salvo.
@@ -331,6 +332,8 @@ export default function MasterPage() {
           <TenantsTab key="tenants" />
         ) : activeTab === 'help' ? (
           <HelpTab key="help" initialArticle={deepLink.article} />
+        ) : activeTab === 'platform' ? (
+          <PlatformTab key="platform" />
         ) : (
           <BrandingTab
             key="branding"

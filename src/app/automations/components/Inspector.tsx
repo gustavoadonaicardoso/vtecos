@@ -897,7 +897,7 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
         {/* ── IA ── */}
         {node.type === 'ai-chat' && (
           <>
-            {options && !options.ai && <div className={styles.banner}>Nenhuma IA configurada no servidor (GEMINI_API_KEY ou AI_PROVIDER=ollama).</div>}
+            {options && !options.ai && <div className={styles.banner}>Nenhuma IA disponível: cadastre a chave do Gemini em Integrações &gt; Inteligência artificial.</div>}
             <Field label="Instruções para a IA" hint="O que a empresa faz, produtos, preços que podem ser ditos, horários, endereço, formas de pagamento e o que a IA não pode prometer.">{tpl('aiInstructions', { rows: 9 })}</Field>
             <div className={styles.formRow}>
               <Field label="Juntar mensagens por (s)" hint="Espera o cliente terminar de digitar e responde tudo de uma vez.">
@@ -930,7 +930,7 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
 
         {node.type === 'ai-reply' && (
           <>
-            {options && !options.ai && <div className={styles.banner}>Nenhuma IA configurada no servidor (GEMINI_API_KEY ou AI_PROVIDER=ollama).</div>}
+            {options && !options.ai && <div className={styles.banner}>Nenhuma IA disponível: cadastre a chave do Gemini em Integrações &gt; Inteligência artificial.</div>}
             <Field label="Instruções para a IA" hint="Diga o que a empresa faz, horários, regras, o que não pode prometer. Quanto mais claro, melhor.">{tpl('aiInstructions', { rows: 6 })}</Field>
             <Field label="Responder a">{tpl('aiInput')}</Field>
             <Check checked={c.aiSend !== false} onChange={(value) => set({ aiSend: value })}>Enviar a resposta para o contato no WhatsApp</Check>
@@ -943,7 +943,7 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
 
         {node.type === 'ai-classify' && (
           <>
-            {options && !options.ai && <div className={styles.banner}>Nenhuma IA configurada no servidor (GEMINI_API_KEY ou AI_PROVIDER=ollama).</div>}
+            {options && !options.ai && <div className={styles.banner}>Nenhuma IA disponível: cadastre a chave do Gemini em Integrações &gt; Inteligência artificial.</div>}
             <Field label="Texto a classificar">{tpl('aiInput')}</Field>
             <span className={styles.sectionLabel}>Categorias (cada uma tem a sua saída)</span>
             {aiCategories(c).map((item, index, list) => (
