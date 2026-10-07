@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireCampaignUser } from '@/lib/disparos/auth';
-
-const GRAPH_VERSION = 'v21.0';
+import { getWhatsAppConfig } from '@/lib/whatsapp';
+import { META_GRAPH_URL } from '@/lib/meta-graph-version';
+import type { MetaWhatsAppConfig } from '@/types';
 
 export interface MetaTemplate {
   id: string;
@@ -23,35 +24,21 @@ export interface MetaTemplateComponent {
 export async function GET() {
   const auth = await requireCampaignUser();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
-  const supabase = supabaseAdmin;
 
-  // Configuração da Meta DESTA empresa.
-  const { data: item, error } = await supabase
-    .from('integrations_config')
-    .select('config')
-    .eq('tenant_id', auth.tenantId)
-    .eq('provider', 'whatsapp_meta')
-    .maybeSingle();
-
-  if (error || !item) {
+  // Configuração da Meta DESTA empresa (a mesma usada no envio).
+  let config: MetaWhatsAppConfig;
+  try {
+    config = await getWhatsAppConfig(supabaseAdmin, auth.tenantId);
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: 'WhatsApp Meta não configurado. Acesse Integrações para configurar.' },
-      { status: 400 }
-    );
-  }
-
-  const { token, wabaId } = item.config as { token: string; wabaId: string; phoneId: string };
-
-  if (!token || !wabaId) {
-    return NextResponse.json(
-      { error: 'Token ou WABA ID ausentes na configuração da integração Meta.' },
+      { error: err instanceof Error ? err.message : 'WhatsApp Meta não configurado. Acesse Integrações para configurar.' },
       { status: 400 }
     );
   }
 
   try {
-    const url = `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates?fields=id,name,status,category,language,components&limit=200&access_token=${token}`;
-    const res = await fetch(url);
+    const url = `${META_GRAPH_URL}/${encodeURIComponent(config.businessAccountId)}/message_templates?fields=id,name,status,category,language,components&limit=200`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${config.accessToken}` }, signal: AbortSignal.timeout(15_000) });
     const data = await res.json();
 
     if (!res.ok) {

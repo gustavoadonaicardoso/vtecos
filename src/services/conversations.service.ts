@@ -12,6 +12,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { insertChatMessage } from '@/lib/chat-messages';
+import { safeContentType } from '@/lib/safe-content-type';
 
 type Row = Record<string, unknown>;
 
@@ -151,7 +152,7 @@ export async function sendMediaToLead(
 
   const safeName = (file.name || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
   const storagePath = `${tenantId}/${lead.id}/${Date.now()}-${safeName}`;
-  const { error: uploadError } = await supabaseAdmin.storage.from('chat-media').upload(storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
+  const { error: uploadError } = await supabaseAdmin.storage.from('chat-media').upload(storagePath, file.buffer, { contentType: safeContentType(file.mimetype), upsert: false });
   if (uploadError) return { ok: false, error: `Falha ao guardar o arquivo: ${uploadError.message}` };
   const mediaUrl = supabaseAdmin.storage.from('chat-media').getPublicUrl(storagePath).data.publicUrl;
 

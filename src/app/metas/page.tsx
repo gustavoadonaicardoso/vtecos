@@ -240,7 +240,7 @@ export default function MetasPage() {
     if (!user) return;
     try {
       await migrateLocalGoalsIfAny(user.id);
-      const serverGoals = await fetchGoalsFromServer(user.id);
+      const serverGoals = await fetchGoalsFromServer();
       setGoals(serverGoals);
       setLoadError('');
     } catch (error) {
@@ -339,7 +339,7 @@ export default function MetasPage() {
 
     try {
       if (editingGoalId) {
-        const updated = await updateGoalOnServer(user.id, editingGoalId, {
+        const updated = await updateGoalOnServer(editingGoalId, {
           title,
           description: form.description.trim(),
           type: form.type,
@@ -369,7 +369,7 @@ export default function MetasPage() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        const created = await createGoalOnServer(user.id, newGoal);
+        const created = await createGoalOnServer(newGoal);
         setGoals(current => [created, ...current]);
         setSelectedGoalId(created.id);
       }
@@ -383,7 +383,7 @@ export default function MetasPage() {
     if (!window.confirm(`Excluir “${goal.title}”?`)) return;
     if (!user) return;
     try {
-      await deleteGoalOnServer(user.id, goal.id);
+      await deleteGoalOnServer(goal.id);
       setGoals(current => current.filter(item => item.id !== goal.id));
       setSelectedGoalId(null);
     } catch (error) {
@@ -395,7 +395,7 @@ export default function MetasPage() {
     if (!user) return;
     const nextTasks = goal.tasks.map(task => task.id === taskId ? { ...task, completed: !task.completed } : task);
     try {
-      const updated = await updateGoalOnServer(user.id, goal.id, { tasks: nextTasks });
+      const updated = await updateGoalOnServer(goal.id, { tasks: nextTasks });
       setGoals(current => current.map(item => item.id === goal.id ? updated : item));
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Não foi possível atualizar a tarefa.');
@@ -408,7 +408,7 @@ export default function MetasPage() {
     const task: GoalTask = { id: makeId('task'), title, completed: false };
     const nextTasks = [...goal.tasks, task];
     try {
-      const updated = await updateGoalOnServer(user.id, goal.id, { tasks: nextTasks });
+      const updated = await updateGoalOnServer(goal.id, { tasks: nextTasks });
       setGoals(current => current.map(item => item.id === goal.id ? updated : item));
       setTaskTitle('');
     } catch (error) {

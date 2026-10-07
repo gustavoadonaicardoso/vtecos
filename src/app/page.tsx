@@ -177,7 +177,7 @@ export default function HomePage() {
     loadSummary();
     let cancelled = false;
     migrateLocalGoalsIfAny(user.id)
-      .then(() => fetchGoalsFromServer(user.id))
+      .then(() => fetchGoalsFromServer())
       .then((data) => { if (!cancelled) setGoals(data); })
       .catch(() => {});
     return () => { cancelled = true; };

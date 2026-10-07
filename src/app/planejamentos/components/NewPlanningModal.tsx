@@ -27,7 +27,7 @@ export default function NewPlanningModal({ onClose }: { onClose: () => void }) {
     // Lista de Projetos é opcional aqui -- se o usuário não tiver acesso a
     // /api/projects (precisa de admin.projects), só escondemos o campo.
     if (!user) return;
-    fetch('/api/projects', { headers: { 'x-user-id': user.id }, cache: 'no-store' })
+    fetch('/api/projects', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((result) => {
         const data = Array.isArray(result?.data) ? result.data : [];

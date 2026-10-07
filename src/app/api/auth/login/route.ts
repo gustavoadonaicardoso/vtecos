@@ -5,6 +5,17 @@ import { signIn } from '@/services/auth.service';
 import { fetchProfileByEmail, fetchProfileById } from '@/services/profile-lookup.server';
 import { setSessionCookies } from '@/lib/session';
 import { withWorkspace } from '@/services/workspace.service';
+import { clientIp, createLimiter } from '@/lib/rate-limit';
+
+// Tentativas erradas: 8 por e-mail e 30 por IP a cada 15 minutos. O
+// Supabase vê todos os logins vindo do IP da VPS, então o limite dele
+// não protege uma senha de quem fica tentando (e, se estourar, trava
+// todo mundo). Este limite é por pessoa e por quem está tentando.
+const WINDOW_MS = 15 * 60 * 1000;
+const byEmail = createLimiter({ windowMs: WINDOW_MS, max: 8 });
+const byIp = createLimiter({ windowMs: WINDOW_MS, max: 30 });
+const tooMany = (retryInMs: number) =>
+  NextResponse.json({ error: `Muitas tentativas erradas. Aguarde ${Math.max(1, Math.ceil(retryInMs / 60000))} minuto(s) e tente de novo.` }, { status: 429 });
 
 /** Mensagens do Supabase Auth (em inglês) para o português da tela de login. */
 function friendlyError(message?: string) {
@@ -25,13 +36,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Informe e-mail e senha.' }, { status: 400 });
     }
 
+    const emailKey = String(email).trim().toLowerCase();
+    const ip = clientIp(request);
+    const emailLimit = byEmail.blocked(emailKey);
+    const ipLimit = byIp.blocked(ip);
+    if (emailLimit.blocked || ipLimit.blocked) return tooMany(Math.max(emailLimit.retryInMs, ipLimit.retryInMs));
+
     const result = await signIn(String(email).trim(), String(password), { byId: fetchProfileById, byEmail: fetchProfileByEmail });
 
     if (!result.success || !result.data) {
       console.error('Erro no login:', result.error);
+      byEmail.hit(emailKey);
+      byIp.hit(ip);
       return NextResponse.json({ error: friendlyError(result.error) }, { status: 401 });
     }
 
+    byEmail.reset(emailKey);
     const { profile, session } = result.data;
     const user = await withWorkspace(profile);
 

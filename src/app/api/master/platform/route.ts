@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requirePlatformAdmin } from '@/lib/session';
 import { checkGeminiKey } from '@/lib/ai';
 import { platformSettings, platformSettingsView, savePlatformSettings } from '@/lib/platform-settings';
+import { META_GRAPH_URL } from '@/lib/meta-graph-version';
 
 /**
  * Painel Master > Plataforma: app da Meta, webhook do WhatsApp e IA
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     if (!settings.metaAppId || !settings.metaAppSecret) return NextResponse.json({ data: { ok: false, message: 'Preencha o ID e a chave secreta do app e salve antes de testar.' } });
     try {
       const params = new URLSearchParams({ client_id: settings.metaAppId, client_secret: settings.metaAppSecret, grant_type: 'client_credentials' });
-      const response = await fetch(`https://graph.facebook.com/${process.env.META_GRAPH_VERSION || 'v23.0'}/oauth/access_token?${params}`, { signal: AbortSignal.timeout(10_000) });
+      const response = await fetch(`${META_GRAPH_URL}/oauth/access_token?${params}`, { signal: AbortSignal.timeout(10_000) });
       const json = await response.json().catch(() => ({}));
       return NextResponse.json({ data: json.access_token ? { ok: true, message: 'A Meta aceitou o ID e a chave secreta do app.' } : { ok: false, message: `A Meta recusou: ${json?.error?.message || `resposta ${response.status}`}` } });
     } catch {

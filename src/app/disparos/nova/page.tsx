@@ -62,6 +62,16 @@ const NAME_HINT = /^(nome|name|cliente)/i;
 /** "2026-10-08T09:00" (relógio do navegador) para ISO. */
 const localToIso = (value: string) => (value ? new Date(value).toISOString() : '');
 
+/** Lê a primeira aba da planilha (CSV, XLSX ou XLS) no navegador. */
+async function readSpreadsheet(picked: File): Promise<{ columns: string[]; rows: Record<string, string>[] }> {
+  const XLSX = await import('xlsx');
+  const workbook = XLSX.read(await picked.arrayBuffer(), { type: 'array', raw: false, cellDates: true });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const raw = sheet ? XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' }) : [];
+  const rows = raw.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, String(value)])));
+  return { columns: rows[0] ? Object.keys(rows[0]) : [], rows };
+}
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -129,16 +139,17 @@ export default function NewCampaignPage() {
   // ── Planilha ──
   const handleFile = async (picked: File) => {
     if (!/\.(csv|xlsx|xls)$/i.test(picked.name)) { setError('Use uma planilha CSV ou Excel (.xlsx, .xls).'); return; }
+    if (picked.size > 10 * 1024 * 1024) { setError('A planilha pode ter no máximo 10 MB.'); return; }
     setUploading(true);
     setError('');
-    const form = new FormData();
-    form.append('file', picked);
-    const response = await fetch('/api/disparos/upload', { method: 'POST', body: form });
-    const json = await response.json().catch(() => ({}));
+    // A planilha é lida aqui no navegador: o arquivo não vai para o servidor.
+    const sheet = await readSpreadsheet(picked).catch(() => null);
     setUploading(false);
-    if (!response.ok) { setError(json.error || 'Não foi possível ler a planilha.'); return; }
-    const columns: string[] = json.columns || [];
-    setFile({ name: picked.name, columns, rows: json.allRows || [] });
+    if (!sheet) { setError('Não foi possível ler a planilha.'); return; }
+    if (sheet.rows.length === 0) { setError('Arquivo vazio ou sem dados.'); return; }
+    if (sheet.rows.length > 20000) { setError(`A planilha tem ${sheet.rows.length} linhas. O limite por campanha é 20.000.`); return; }
+    const columns = sheet.columns;
+    setFile({ name: picked.name, columns, rows: sheet.rows });
     setPhoneColumn(columns.find((column) => PHONE_HINT.test(column)) || '');
     setNameColumn(columns.find((column) => NAME_HINT.test(column)) || '');
     if (!name) setName(picked.name.replace(/\.(csv|xlsx|xls)$/i, '').slice(0, 80));

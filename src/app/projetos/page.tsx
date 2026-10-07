@@ -34,7 +34,6 @@ export default function ProjetosPage() {
     setLoading(true);
     try {
       const response = await fetch('/api/projects', {
-        headers: { 'x-user-id': user.id },
         cache: 'no-store',
       });
       const result = await response.json().catch(() => ({}));

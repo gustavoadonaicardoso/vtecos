@@ -4,8 +4,8 @@ import { GOALS_STORAGE_KEY, type GoalPlan } from './goals';
 
 const MIGRATION_FLAG_KEY = 'vortice_goals_migrated';
 
-export async function fetchGoalsFromServer(userId: string): Promise<GoalPlan[]> {
-  const res = await fetch('/api/goals', { headers: { 'x-user-id': userId }, cache: 'no-store' });
+export async function fetchGoalsFromServer(): Promise<GoalPlan[]> {
+  const res = await fetch('/api/goals', { cache: 'no-store' });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(json.error || 'Não foi possível carregar as metas.');
@@ -13,10 +13,10 @@ export async function fetchGoalsFromServer(userId: string): Promise<GoalPlan[]> 
   return Array.isArray(json.data) ? json.data : [];
 }
 
-export async function createGoalOnServer(userId: string, goal: GoalPlan): Promise<GoalPlan> {
+export async function createGoalOnServer(goal: GoalPlan): Promise<GoalPlan> {
   const res = await fetch('/api/goals', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(goal),
   });
   const json = await res.json().catch(() => ({}));
@@ -24,10 +24,10 @@ export async function createGoalOnServer(userId: string, goal: GoalPlan): Promis
   return json.data;
 }
 
-export async function updateGoalOnServer(userId: string, id: string, updates: Partial<GoalPlan>): Promise<GoalPlan> {
+export async function updateGoalOnServer(id: string, updates: Partial<GoalPlan>): Promise<GoalPlan> {
   const res = await fetch(`/api/goals/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   });
   const json = await res.json().catch(() => ({}));
@@ -35,10 +35,9 @@ export async function updateGoalOnServer(userId: string, id: string, updates: Pa
   return json.data;
 }
 
-export async function deleteGoalOnServer(userId: string, id: string): Promise<void> {
+export async function deleteGoalOnServer(id: string): Promise<void> {
   const res = await fetch(`/api/goals/${id}`, {
     method: 'DELETE',
-    headers: { 'x-user-id': userId },
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || 'Não foi possível excluir o planejamento.');
@@ -61,7 +60,7 @@ export async function migrateLocalGoalsIfAny(userId: string): Promise<void> {
         for (const goal of parsed) {
           if (!goal || goal.ownerId !== userId) continue;
           try {
-            await createGoalOnServer(userId, goal);
+            await createGoalOnServer(goal);
           } catch {
             // Provavelmente já migrada em uma visita anterior, ou falha
             // pontual — não bloqueia o restante da migração.
