@@ -9,7 +9,8 @@
  */
 
 import { NextResponse } from 'next/server';
-import { callGemini, parseGeminiJsonArray } from '@/lib/gemini';
+import { parseGeminiJsonArray } from '@/lib/gemini';
+import { callAI } from '@/lib/ai';
 import { sanitizarNota } from '@/lib/fiscal';
 import type { GerarNotasViaCsvPayload } from '@/types/fiscal';
 import { buildNfeFromCsvPrompt } from '../gerar/prompt';
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       anoAtual,
     });
 
-    const geminiResult = await callGemini(prompt, { temperature: 0.4 });
+    const geminiResult = await callAI(prompt, { temperature: 0.4, maxOutputTokens: 32768, preferCloud: true });
 
     if (!geminiResult.success) {
       return NextResponse.json({ error: geminiResult.error }, { status: 502 });

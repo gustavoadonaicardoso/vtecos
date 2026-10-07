@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto';
 import { cancelWaitingRuns, newWebhookToken } from '@/lib/automations/engine';
 import { DEFAULT_CONFIG, DEFAULT_LABEL, normalizeGraph, TRIGGER_EVENT, triggerOf, validateFlow, type FlowGraph } from '@/lib/automations/flow';
 import type { ServiceResult } from '@/types';
+import { aiConfigured } from '@/lib/ai';
 
 export interface FlowSummary {
   id: string;
@@ -230,7 +231,7 @@ export async function editorOptions(tenantId: string) {
     flows: flows || [],
     whatsapp: { web: getWhatsAppWebStatus(tenantId).connected, api: Boolean(meta) },
     scheduler: process.env.CONTENT_SCHEDULER_ENABLED === 'true',
-    ai: Boolean(process.env.GEMINI_API_KEY),
+    ai: aiConfigured(),
   };
 }
 

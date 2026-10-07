@@ -156,8 +156,8 @@ async function loadContext(tenantId: string, leadId: string, run: Pick<RunRow, '
 // ── IA ───────────────────────────────────────────────────────
 
 async function askAi(prompt: string): Promise<Record<string, unknown>> {
-  const { callGemini } = await import('@/lib/gemini');
-  const result = await callGemini(prompt, { temperature: 0.4, maxOutputTokens: 800 });
+  const { callAI } = await import('@/lib/ai');
+  const result = await callAI(prompt, { temperature: 0.4, maxOutputTokens: 800 });
   if (!result.success) throw new Error(result.error);
   try {
     const parsed = JSON.parse(result.text.replace(/^```(?:json)?\s*|\s*```$/g, ''));

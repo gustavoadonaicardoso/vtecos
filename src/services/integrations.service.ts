@@ -21,6 +21,7 @@ import {
   type DeliveryResult,
 } from '@/lib/integrations/events';
 import type { ServiceResult } from '@/types';
+import { aiLabel, aiProvider } from '@/lib/ai';
 
 export const PROVIDERS = ['whatsapp_meta', 'webhook_custom', 'google_sheets', 'lead_capture'] as const;
 export type Provider = (typeof PROVIDERS)[number];
@@ -239,7 +240,9 @@ export async function integrationsOverview(tenantId: string, options: { isPlatfo
   const platform = options.isPlatform
     ? [
         envStatus('twilio', 'Twilio (Discador)', 'Ligações pelo navegador no Discador e no card do lead.', ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_API_KEY', 'TWILIO_API_SECRET', 'TWILIO_TWIML_APP_SID', 'TWILIO_PHONE_NUMBER']),
-        envStatus('gemini', 'Google Gemini (IA)', 'Legendas com IA nas Redes Sociais e geração de notas fiscais.', ['GEMINI_API_KEY']),
+        aiProvider() === 'ollama'
+          ? envStatus('ai', aiLabel(), 'IA rodando na própria VPS (Ollama): blocos de IA das Automações, legendas das Redes Sociais e, sem Gemini, as notas fiscais.', [])
+          : envStatus('ai', 'Google Gemini (IA)', 'Blocos de IA das Automações, legendas com IA nas Redes Sociais e geração de notas fiscais. Para usar uma IA local, configure AI_PROVIDER=ollama.', ['GEMINI_API_KEY']),
         envStatus('meta-app', 'App da Meta (Redes Sociais)', 'Conectar Instagram/Facebook e publicar posts.', ['META_APP_ID', 'META_APP_SECRET']),
         envStatus('scheduler', 'Agendador do servidor', 'Publica os posts agendados e continua as esperas das automações.', [], () => (process.env.CONTENT_SCHEDULER_ENABLED === 'true' ? null : 'CONTENT_SCHEDULER_ENABLED=true')),
       ]

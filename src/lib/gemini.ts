@@ -85,7 +85,12 @@ export async function callGemini(
  */
 export function parseGeminiJsonArray(rawText: string): any[] {
   try {
-    const parsed = JSON.parse(rawText);
+    let parsed = JSON.parse(rawText);
+    // A IA local devolve um objeto JSON: aceita { "notas": [...] }.
+    if (parsed && !Array.isArray(parsed) && typeof parsed === 'object') {
+      const list = Object.values(parsed).find(Array.isArray);
+      if (list) parsed = list;
+    }
     if (!Array.isArray(parsed)) {
       throw new Error('A resposta da IA não é um array JSON.');
     }

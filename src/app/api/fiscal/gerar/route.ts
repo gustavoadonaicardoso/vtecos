@@ -6,7 +6,8 @@
  */
 
 import { NextResponse } from 'next/server';
-import { callGemini, parseGeminiJsonArray } from '@/lib/gemini';
+import { parseGeminiJsonArray } from '@/lib/gemini';
+import { callAI } from '@/lib/ai';
 import { sanitizarNota } from '@/lib/fiscal';
 import type { GerarNotasPayload } from '@/types/fiscal';
 import { buildNfePrompt } from './prompt';
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
 
     const prompt = buildNfePrompt({ emitente, quantidade, contexto, dataHoje, anoAtual });
 
-    const geminiResult = await callGemini(prompt, { temperature: 0.8 });
+    const geminiResult = await callAI(prompt, { temperature: 0.8, maxOutputTokens: 32768, preferCloud: true });
 
     if (!geminiResult.success) {
       return NextResponse.json({ error: geminiResult.error }, { status: 502 });
