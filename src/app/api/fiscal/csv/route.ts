@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       anoAtual,
     });
 
-    const geminiResult = await callAI(prompt, { temperature: 0.4, maxOutputTokens: 32768, preferCloud: true });
+    const geminiResult = await callAI(prompt, { temperature: 0.4, maxOutputTokens: 32768, preferCloud: true , tenantId: auth.tenantId });
 
     if (!geminiResult.success) {
       return NextResponse.json({ error: geminiResult.error }, { status: 502 });

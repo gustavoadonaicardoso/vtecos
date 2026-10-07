@@ -1,23 +1,19 @@
 import { NextResponse } from 'next/server';
-import { twilioService } from '@/services/twilio.service';
+import { dialNumberTwiml } from '@/lib/twilio-tenant';
 import { verifyTwilioRequest, twilioRejectResponse } from '@/lib/twilio-webhook';
 
 export async function POST(request: Request) {
-  const { valid } = await verifyTwilioRequest(request);
+  const { valid, config } = await verifyTwilioRequest(request);
   if (!valid) return twilioRejectResponse();
 
-  const { searchParams } = new URL(request.url);
-  const to = searchParams.get('to');
-
+  const to = new URL(request.url).searchParams.get('to');
   if (!to) {
     return new NextResponse('<Response><Say>Número não encontrado.</Say></Response>', {
       headers: { 'Content-Type': 'text/xml' },
     });
   }
 
-  const twiml = twilioService.generateDialTwiML(to);
-
-  return new NextResponse(twiml, {
+  return new NextResponse(dialNumberTwiml(to, config?.phoneNumber), {
     headers: { 'Content-Type': 'text/xml' },
   });
 }

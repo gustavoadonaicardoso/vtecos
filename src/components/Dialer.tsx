@@ -27,7 +27,12 @@ export default function Dialer({ onClose }: DialerProps) {
       try {
         const identity = user?.name || 'Agente';
         const response = await fetch(`/api/twilio/token?identity=${encodeURIComponent(identity)}`);
-        
+
+        if (response.status === 409) {
+          // A empresa ainda não conectou a conta Twilio em Integrações.
+          setStatus('Discador não conectado: um administrador conecta em Integrações');
+          return;
+        }
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Server error: ${response.status} - ${errorText.substring(0, 50)}`);
@@ -178,7 +183,7 @@ export default function Dialer({ onClose }: DialerProps) {
             {status === 'Credenciais Inválidas' ? (
               <div className={styles.configAlert}>
                 <p>Configuração Necessária</p>
-                <span>Insira suas chaves no arquivo <code>.env.local</code></span>
+                <span>Um administrador conecta a conta Twilio da empresa em Integrações &gt; Discador.</span>
               </div>
             ) : (
               <input 

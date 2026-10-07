@@ -157,9 +157,9 @@ async function loadContext(tenantId: string, leadId: string, run: Pick<RunRow, '
 
 // ── IA ───────────────────────────────────────────────────────
 
-async function askAi(prompt: string): Promise<Record<string, unknown>> {
+async function askAi(prompt: string, tenantId: string): Promise<Record<string, unknown>> {
   const { callAI } = await import('@/lib/ai');
-  const result = await callAI(prompt, { temperature: 0.4, maxOutputTokens: 800 });
+  const result = await callAI(prompt, { temperature: 0.4, maxOutputTokens: 800, tenantId });
   if (!result.success) throw new Error(result.error);
   try {
     const parsed = JSON.parse(result.text.replace(/^```(?:json)?\s*|\s*```$/g, ''));
@@ -525,7 +525,7 @@ async function runNode(node: FlowNode, run: RunRow, flow: LoadedFlow, ctx: RunCo
           history ? `Conversa até agora:\n${history}` : '',
           `Mensagem a responder:\n${renderTemplate(c.aiInput || '{{message}}', ctx).slice(0, 2000)}`,
           'Responda só com JSON no formato {"reply": "texto da resposta"}. A resposta deve ser curta (até 600 caracteres), em português do Brasil, sem inventar preços, prazos ou dados que não estejam nas instruções.',
-        ].filter(Boolean).join('\n\n'));
+        ].filter(Boolean).join('\n\n'), tenantId);
         const reply = String(answer.reply || '').trim().slice(0, 1200);
         if (!reply) return failOrBranch(graph, node, 'A IA não respondeu nada.');
         if (c.aiSend) await sendToLead(tenantId, leadId, ctx.lead.phone, { text: reply, typingSeconds: 2 }, 'ai');
@@ -551,7 +551,7 @@ async function runNode(node: FlowNode, run: RunRow, flow: LoadedFlow, ctx: RunCo
           categories.map((item) => `- id "${item.id}": ${item.label}${item.description ? ` — ${item.description}` : ''}`).join('\n'),
           `Mensagem:\n${renderTemplate(c.aiInput || '{{message}}', ctx).slice(0, 2000)}`,
           'Responda só com JSON no formato {"category": "id da categoria"}. Se nenhuma servir, use {"category": "none"}.',
-        ].join('\n\n'));
+        ].join('\n\n'), tenantId);
         const match = categories.find((item) => item.id === String(answer.category || '')) || categories.find((item) => fold(item.label) === fold(String(answer.category || '')));
         if (!match) return { kind: 'next', port: 'no', detail: 'A IA não identificou nenhuma categoria.', vars: variable ? { [variable]: '' } : undefined };
         return { kind: 'next', port: match.id, detail: `IA classificou como: ${match.label}`, vars: variable ? { [variable]: match.label } : undefined };
@@ -1098,7 +1098,7 @@ async function aiChatTurn(run: RunRow, flow: LoadedFlow, node: FlowNode) {
         ? 'Responda só com JSON no formato {"reply": "texto da resposta", "handoff": false}. Use "handoff": true (com "reply" vazio) se o cliente pedir para falar com uma pessoa, atendente ou humano, quiser reclamar, ou se a resposta depender de algo importante que não está nas instruções.'
         : 'Responda só com JSON no formato {"reply": "texto da resposta"}.',
       'A resposta deve ser curta (até 600 caracteres), em português do Brasil, sem inventar preços, prazos ou dados que não estejam nas instruções. Não repita a saudação se a conversa já começou.',
-    ].join('\n\n'));
+    ].join('\n\n'), tenantId);
   } catch (error) {
     chat.errors = (chat.errors || 0) + 1;
     step(`A IA falhou (${chat.errors}ª vez): ${error instanceof Error ? error.message : 'erro desconhecido'}`, false);

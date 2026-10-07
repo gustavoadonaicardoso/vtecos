@@ -499,3 +499,41 @@
   .copyRow { flex-direction: column; }
   .copyBtn { padding: 10px 14px; justify-content: center; }
 }
+
+.facebookBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 10px;
+  background: #1877f2;
+  color: #fff;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.facebookBtn:hover:not(:disabled) { background: #166fe5; }
+.facebookBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+.signupBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid rgba(24, 119, 242, 0.35);
+  border-radius: 14px;
+  background: rgba(24, 119, 242, 0.08);
+}
+.signupBox > div { display: flex; flex-direction: column; gap: 4px; }
+.signupBox strong { font-size: 0.95rem; }
+.signupBox span { font-size: 0.85rem; color: var(--muted, #64748b); line-height: 1.45; }
+button.linkBtn { align-self: flex-start; padding: 0; border: none; background: none; font-family: inherit; cursor: pointer; }
+@media (max-width: 640px) {
+  .signupBox { flex-direction: column; align-items: stretch; }
+}

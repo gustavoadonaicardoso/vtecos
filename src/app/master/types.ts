@@ -7,7 +7,7 @@ export interface MasterSettings {
   sidebarBg: string;
 }
 
-export type TabId = 'branding' | 'modules' | 'permissions' | 'tenants' | 'banners' | 'help';
+export type TabId = 'branding' | 'modules' | 'permissions' | 'tenants' | 'banners' | 'help' | 'platform';
 
 export type Role = 'ADMIN' | 'MANAGER' | 'SELLER';
 

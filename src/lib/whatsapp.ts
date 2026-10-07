@@ -15,6 +15,7 @@
  */
 
 import { createHmac } from 'crypto';
+import { platformSettings, type PlatformSettings } from '@/lib/platform-settings';
 import { createClient } from '@supabase/supabase-js';
 import type {
   MetaWhatsAppConfig,
@@ -62,15 +63,17 @@ function configFromEnv(): MetaWhatsAppConfig | null {
   };
 }
 
-function configFromRow(row: ConfigRow | null): MetaWhatsAppConfig | null {
+function configFromRow(row: ConfigRow | null, platform: PlatformSettings): MetaWhatsAppConfig | null {
   const dbConfig = row?.config;
   if (!dbConfig?.token || !dbConfig.phoneId || !dbConfig.wabaId) return null;
   return {
     accessToken: dbConfig.token,
     phoneNumberId: dbConfig.phoneId,
     businessAccountId: dbConfig.wabaId,
-    webhookVerifyToken: dbConfig.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'vortice_verify_token_2024',
-    appSecret: dbConfig.appSecret || process.env.WHATSAPP_APP_SECRET || '',
+    webhookVerifyToken: dbConfig.webhookVerifyToken || platform.whatsappVerifyToken,
+    // Conectado pelo "Conectar com Facebook": as mensagens chegam pelo app da
+    // Vórtice, assinadas com o segredo dele (Painel Master > Plataforma).
+    appSecret: dbConfig.source === 'embedded' ? platform.metaAppSecret : dbConfig.appSecret || process.env.WHATSAPP_APP_SECRET || '',
     apiVersion: API_VERSION,
   };
 }
@@ -97,7 +100,7 @@ export async function getWhatsAppConfig(supabaseClient: any, tenantId: string): 
     .eq('provider', 'whatsapp_meta')
     .maybeSingle();
 
-  const fromDb = configFromRow(item as ConfigRow | null);
+  const fromDb = configFromRow(item as ConfigRow | null, await platformSettings());
   if (fromDb) return fromDb;
 
   const fromEnv = configFromEnv();
@@ -122,8 +125,9 @@ export async function resolveMetaTenant(supabaseClient: any, phoneNumberId: stri
     .eq('provider', 'whatsapp_meta')
     .eq('config->>phoneId', phoneNumberId);
 
+  const platform = await platformSettings();
   for (const row of (data || []) as ConfigRow[]) {
-    const config = configFromRow(row);
+    const config = configFromRow(row, platform);
     if (config) return { tenantId: row.tenant_id, config };
   }
 
@@ -138,8 +142,10 @@ export async function resolveMetaTenant(supabaseClient: any, phoneNumberId: stri
 /** Handshake do webhook: aceita o verify token de qualquer empresa configurada. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function isKnownVerifyToken(supabaseClient: any, token: string): Promise<boolean> {
+  // Token do webhook do app da Vórtice (Painel Master > Plataforma).
+  if ((await platformSettings()).whatsappVerifyToken === token) return true;
   const fromEnv = configFromEnv();
-  if ((fromEnv?.webhookVerifyToken || process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) === token) return true;
+  if (fromEnv?.webhookVerifyToken === token) return true;
   const client = adminClient(supabaseClient);
   // tenant-scope: ok (só confere se o token existe em alguma configuração)
   const { data } = await client

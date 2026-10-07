@@ -457,7 +457,7 @@ export default function FlowEditor({ flow, options, canEdit, onBack, onChanged }
       )}
       {noAi && (
         <div className={styles.banner}>
-          <AlertTriangle size={15} /> <span>A IA não está configurada no servidor (falta a chave <code>GEMINI_API_KEY</code> ou a IA local, <code>AI_PROVIDER=ollama</code>): os blocos de IA vão seguir pela saída &quot;Erro&quot;.</span>
+          <AlertTriangle size={15} /> <span>Nenhuma IA disponível para a empresa (cadastre a chave do Gemini em Integrações &gt; Inteligência artificial): os blocos de IA vão seguir pela saída &quot;Erro&quot;.</span>
         </div>
       )}
       {needsScheduler && (

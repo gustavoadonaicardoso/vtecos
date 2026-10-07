@@ -4,8 +4,8 @@ import { verifyTwilioRequest, twilioRejectResponse } from '@/lib/twilio-webhook'
 
 export async function POST(request: Request) {
   try {
-    const { valid, params } = await verifyTwilioRequest(request);
-    if (!valid) return twilioRejectResponse();
+    const { valid, params, tenantId } = await verifyTwilioRequest(request);
+    if (!valid || !tenantId) return twilioRejectResponse();
 
     const callSid = params.CallSid;
     const recordingUrl = params.RecordingUrl;
@@ -13,8 +13,7 @@ export async function POST(request: Request) {
     const duration = params.RecordingDuration;
 
     if (callSid && recordingUrl) {
-      // Update the call log with the recording URL
-      // tenant-scope: ok (CallSid é único no Twilio e só o Twilio assina esta chamada)
+      // Gravação pronta: guarda no registro da ligação da empresa dona da conta.
       await supabase
         .from('call_logs')
         .update({
@@ -22,6 +21,7 @@ export async function POST(request: Request) {
           duration: duration ? parseInt(duration) : 0,
           status: status || 'completed'
         })
+        .eq('tenant_id', tenantId)
         .eq('call_sid', callSid);
     }
 

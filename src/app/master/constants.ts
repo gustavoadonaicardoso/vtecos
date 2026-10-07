@@ -11,6 +11,7 @@ import {
   MessageSquareText,
   Palette,
   RotateCcw,
+  ServerCog,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -107,6 +108,14 @@ export const MASTER_MODULES: { id: string; title: string; desc: string; icon: ty
     icon: Layout,
     color: '#06b6d4',
     tab: 'banners',
+  },
+  {
+    id: 'platform',
+    title: 'Plataforma',
+    desc: 'App da Meta, webhook do WhatsApp e IA padrão da Vórtice, sem mexer no .env.',
+    icon: ServerCog,
+    color: '#1877f2',
+    tab: 'platform',
   },
   {
     id: 'help',

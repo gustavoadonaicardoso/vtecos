@@ -9,6 +9,7 @@ import { DEFAULT_ARTICLES } from '@/lib/help/defaults';
 import { loadHelp, type HelpArticleView } from '@/lib/help/client';
 import type { CardStatus, CatalogItem, IntegrationView, Overview } from '../constants';
 import { LeadCapturePanel, SheetsPanel, SocialPanel, WebhookPanel, WhatsAppApiPanel, WhatsAppWebPanel } from './panels';
+import { AiPanel, TwilioPanel } from './more-panels';
 
 interface IntegrationModalProps {
   item: CatalogItem;
@@ -47,6 +48,8 @@ const PANELS = {
   webhooks: WebhookPanel,
   'google-sheets': SheetsPanel,
   social: SocialPanel,
+  twilio: TwilioPanel,
+  ai: AiPanel,
 } as const;
 
 export default function IntegrationModal({ item, status, integration, overview, onChanged, onClose }: IntegrationModalProps) {
