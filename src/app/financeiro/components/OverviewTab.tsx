@@ -25,7 +25,8 @@ const compact = (value: number) =>
   Math.abs(value) >= 1000 ? `${(value / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 
 export default function OverviewTab({ workspace, month, onMonthChange, sales, onNavigate }: Props) {
-  const { products, ingredients, settings, channels, fixedCosts } = workspace;
+  const { products, ingredients, settings, channels, fixedCosts, business } = workspace;
+  const terms = business.terms;
 
   const result = useMemo(() => {
     const fixed = fixedCostsForMonth(fixedCosts, month);
@@ -43,7 +44,7 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
     const list: { tone: 'bad' | 'warn' | 'info'; text: string; tab: string }[] = [];
     for (const product of products.filter((item) => item.kind === 'product' && item.active)) {
       const cost = computeProductCost(product, ctx);
-      if (cost.warnings.length > 0) list.push({ tone: 'warn', text: `${product.name}: ficha com pendências (${cost.warnings[0]})`, tab: 'products' });
+      if (cost.warnings.length > 0) list.push({ tone: 'warn', text: `${product.name}: cadastro com pendências (${cost.warnings[0]})`, tab: 'products' });
       if (!main) continue;
       const pricing = priceForChannel(product, cost.unitCost, main, settings, fixedPct);
       const target = product.target_margin_pct ?? settings.target_margin_pct;
@@ -80,6 +81,15 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
 
   return (
     <>
+      {!business.type && workspace.access.canManage && (
+        <div className={styles.setupBanner}>
+          <div>
+            <strong>Qual é o seu ramo?</strong>
+            <span>Escolha o modelo do seu negócio (loja, serviços, restaurante, indústria...) para os nomes, tipos e exemplos ficarem do seu jeito.</span>
+          </div>
+          <button className={styles.primaryButton} onClick={() => onNavigate('business')}>Escolher o ramo</button>
+        </div>
+      )}
       <div className={styles.panelHeader} style={{ marginBottom: 0 }}>
         <h2 style={{ fontSize: '1.2rem' }}>Resultado do mês</h2>
         <MonthPicker month={month} onChange={onMonthChange} />
@@ -166,7 +176,7 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
       <div className={styles.grid2}>
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
-            <h2><Trophy size={18} /> Produtos que mais deram lucro</h2>
+            <h2><Trophy size={18} /> O que mais deu lucro</h2>
           </div>
           {result.byProduct.length === 0 ? (
             <div className={styles.empty}>Sem vendas neste mês.</div>
@@ -217,7 +227,7 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
             <h2><Lightbulb size={18} /> Atenção</h2>
           </div>
           {alerts.length === 0 ? (
-            <p className={styles.muted} style={{ fontSize: '0.88rem', margin: 0 }}>Tudo certo: as fichas estão completas e com margem dentro da meta.</p>
+            <p className={styles.muted} style={{ fontSize: '0.88rem', margin: 0 }}>Tudo certo: {terms.products.toLowerCase()} completos e com margem dentro da meta.</p>
           ) : (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {alerts.map((alert) => (

@@ -6,6 +6,8 @@ import styles from '../financeiro.module.css';
 import { finRequest, toNum } from '../api';
 import type { TabProps } from './shared';
 import type { FinUnit } from '@/lib/finance/types';
+import { presetFor, type FinBusiness } from '@/lib/finance/business';
+import { UNITS as UNIT_INFO_KEYS } from '@/lib/finance/calc';
 
 type Kind = 'ingredients' | 'fixed_costs' | 'sales';
 
@@ -16,19 +18,26 @@ interface FieldDef {
   synonyms: string[];
 }
 
-const KINDS: Record<Kind, { title: string; hint: string; fields: FieldDef[]; example: string[][] }> = {
+type KindDef = { title: string; hint: string; fields: FieldDef[]; example: string[][] };
+
+/** O que dá para importar, com os nomes e exemplos do ramo da empresa. */
+function kindsFor(business: FinBusiness): Record<Kind, KindDef> {
+  const terms = business.terms;
+  const example = presetFor(business.type).examples;
+  const [firstType, secondType] = [business.categories[0]?.label || 'Insumo', business.categories.find((item) => item.group === 'packaging')?.label || business.categories[1]?.label || 'Outro'];
+  return {
   ingredients: {
-    title: 'Insumos',
+    title: terms.ingredients,
     hint: 'Nome, quantidade comprada, unidade e preço. Nomes repetidos atualizam o preço.',
     fields: [
-      { key: 'name', label: 'Nome do insumo', required: true, synonyms: ['nome', 'insumo', 'ingrediente', 'produto', 'item', 'materia prima', 'descricao'] },
+      { key: 'name', label: `Nome (${terms.ingredient})`, required: true, synonyms: ['nome', 'insumo', 'ingrediente', 'material', 'mercadoria', 'produto', 'item', 'materia prima', 'descricao'] },
       { key: 'purchase_qty', label: 'Quantidade comprada', synonyms: ['quantidade', 'qtd', 'qtde', 'peso', 'volume', 'embalagem com'] },
       { key: 'purchase_unit', label: 'Unidade', synonyms: ['unidade', 'un', 'medida', 'unid'] },
       { key: 'purchase_price', label: 'Preço pago', required: true, synonyms: ['preco', 'valor', 'custo', 'preco pago', 'valor pago', 'total'] },
-      { key: 'category', label: 'Tipo (ingrediente/embalagem)', synonyms: ['tipo', 'categoria', 'grupo'] },
+      { key: 'category', label: `Tipo (${business.categories.map((item) => item.label).slice(0, 3).join(' / ')})`, synonyms: ['tipo', 'categoria', 'grupo'] },
       { key: 'supplier', label: 'Fornecedor', synonyms: ['fornecedor', 'marca', 'loja'] },
     ],
-    example: [['Nome', 'Quantidade', 'Unidade', 'Preço', 'Tipo', 'Fornecedor'], ['Farinha de trigo', '5', 'kg', '25,00', 'ingrediente', 'Atacadão'], ['Caixa para bolo', '50', 'un', '60,00', 'embalagem', '']],
+    example: [['Nome', 'Quantidade', 'Unidade', 'Preço', 'Tipo', 'Fornecedor'], [example.ingredient, '5', example.ingredientUnit, '25,00', firstType, 'Fornecedor A'], ['Embalagem', '50', 'un', '60,00', secondType, '']],
   },
   fixed_costs: {
     title: 'Despesas fixas',
@@ -42,7 +51,7 @@ const KINDS: Record<Kind, { title: string; hint: string; fields: FieldDef[]; exa
   },
   sales: {
     title: 'Vendas',
-    hint: 'Data, produto, quantidade e valor. Produtos e canais com o mesmo nome das fichas usam o custo da ficha.',
+    hint: `Data, item vendido, quantidade e valor. Itens com o mesmo nome de ${terms.products.toLowerCase()} usam o custo cadastrado.`,
     fields: [
       { key: 'sold_at', label: 'Data', required: true, synonyms: ['data', 'dia', 'data da venda', 'emissao'] },
       { key: 'product_name', label: 'Produto', required: true, synonyms: ['produto', 'item', 'descricao', 'nome'] },
@@ -51,20 +60,27 @@ const KINDS: Record<Kind, { title: string; hint: string; fields: FieldDef[]; exa
       { key: 'channel_name', label: 'Canal', synonyms: ['canal', 'origem', 'plataforma', 'forma de venda'] },
       { key: 'discount', label: 'Desconto', synonyms: ['desconto'] },
     ],
-    example: [['Data', 'Produto', 'Quantidade', 'Preço unitário', 'Canal'], ['01/10/2026', 'Bolo de chocolate', '2', '90,00', 'Balcão / Loja']],
+    example: [['Data', 'Produto', 'Quantidade', 'Preço unitário', 'Canal'], ['01/10/2026', example.product, '2', '90,00', 'Venda direta / WhatsApp']],
   },
-};
+  };
+}
 
 const plain = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 
-function normalizeUnit(value: unknown): FinUnit {
+function normalizeUnit(value: unknown, fallback: FinUnit): FinUnit {
   const text = plain(String(value || ''));
+  if (['kg', 'kilo', 'quilo', 'quilos', 'kgs'].includes(text)) return 'kg';
+  if (['m', 'mt', 'mts', 'metro', 'metros'].includes(text)) return 'm';
+  if (['cm', 'centimetro', 'centimetros'].includes(text)) return 'cm';
+  if (['m2', 'm 2', 'metro quadrado', 'metros quadrados', 'mq'].includes(text) || String(value || '').includes('²')) return 'm2';
+  if (['h', 'hr', 'hrs', 'hora', 'horas'].includes(text)) return 'h';
+  if (['min', 'mins', 'minuto', 'minutos'].includes(text)) return 'min';
   if (['g', 'gr', 'grama', 'gramas'].includes(text)) return 'g';
   if (['l', 'lt', 'litro', 'litros'].includes(text)) return 'l';
   if (['ml', 'mililitro', 'mililitros'].includes(text)) return 'ml';
   if (['un', 'und', 'unid', 'unidade', 'unidades', 'pc', 'pct', 'pacote', 'cx', 'caixa'].includes(text)) return 'un';
   if (['dz', 'duzia', 'duzias'].includes(text)) return 'dz';
-  return 'kg';
+  return fallback;
 }
 
 /** dd/mm/aaaa, aaaa-mm-dd, data do Excel (número) ou Date. */
@@ -141,7 +157,9 @@ interface Props extends TabProps {
   onSalesImported: () => Promise<void>;
 }
 
-export default function ImportTab({ tenantId, reload, onSalesImported }: Props) {
+export default function ImportTab({ workspace, tenantId, reload, onSalesImported }: Props) {
+  const KINDS = useMemo(() => kindsFor(workspace.business), [workspace.business]);
+  const unitFallback = (UNIT_INFO_KEYS.includes(presetFor(workspace.business.type).examples.ingredientUnit as FinUnit) ? presetFor(workspace.business.type).examples.ingredientUnit : 'un') as FinUnit;
   const [kind, setKind] = useState<Kind>('ingredients');
   const [fileName, setFileName] = useState('');
   const [rows, setRows] = useState<unknown[][]>([]);
@@ -167,7 +185,7 @@ export default function ImportTab({ tenantId, reload, onSalesImported }: Props) 
       return {
         name: text('name'),
         purchase_qty: toNum(text('purchase_qty'), 1) || 1,
-        purchase_unit: normalizeUnit(get('purchase_unit')),
+        purchase_unit: normalizeUnit(get('purchase_unit'), unitFallback),
         purchase_price: typeof get('purchase_price') === 'number' ? get('purchase_price') : toNum(text('purchase_price')),
         category: /embal/.test(plain(text('category'))) ? 'embalagem' : /outro/.test(plain(text('category'))) ? 'outro' : 'ingrediente',
         supplier: text('supplier'),
@@ -189,7 +207,7 @@ export default function ImportTab({ tenantId, reload, onSalesImported }: Props) 
       channel_name: text('channel_name'),
       discount: typeof get('discount') === 'number' ? get('discount') : toNum(text('discount')),
     };
-  }), [body, mapping, kind]);
+  }), [body, mapping, kind, unitFallback]);
 
   const missing = def.fields.filter((field) => field.required && mapping[field.key] === undefined);
 

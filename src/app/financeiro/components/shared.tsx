@@ -12,6 +12,8 @@ export interface TabProps {
   tenantId: string | null;
   setWorkspace: React.Dispatch<React.SetStateAction<FinWorkspace | null>>;
   reload: () => Promise<void>;
+  /** Troca de aba (ex.: atalho para "Meu negócio"). */
+  onNavigate?: (tab: string) => void;
 }
 
 export function MonthPicker({ month, onChange }: { month: string; onChange: (month: string) => void }) {

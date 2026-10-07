@@ -18,17 +18,35 @@
  * ============================================================
  */
 
+import { categoryInfo, type IngredientCategoryDef } from './business';
 import type {
   FinChannel, FinFixedCost, FinIngredient, FinMonthRevenue, FinProduct, FinSale, FinSettings, FinUnit,
 } from './types';
 
-export const UNIT_INFO: Record<FinUnit, { base: 'g' | 'ml' | 'un'; factor: number; label: string }> = {
+export type BaseUnit = 'g' | 'ml' | 'un' | 'cm' | 'm2' | 'min';
+
+export const UNIT_INFO: Record<FinUnit, { base: BaseUnit; factor: number; label: string }> = {
   kg: { base: 'g', factor: 1000, label: 'kg' },
   g: { base: 'g', factor: 1, label: 'g' },
   l: { base: 'ml', factor: 1000, label: 'litro' },
   ml: { base: 'ml', factor: 1, label: 'ml' },
   un: { base: 'un', factor: 1, label: 'unidade' },
   dz: { base: 'un', factor: 12, label: 'dúzia' },
+  m: { base: 'cm', factor: 100, label: 'metro' },
+  cm: { base: 'cm', factor: 1, label: 'cm' },
+  m2: { base: 'm2', factor: 1, label: 'm²' },
+  h: { base: 'min', factor: 60, label: 'hora' },
+  min: { base: 'min', factor: 1, label: 'minuto' },
+};
+
+/** Como mostrar o custo de cada família de unidade ("R$ 4,50 / kg"). */
+export const BASE_DISPLAY: Record<BaseUnit, { per: number; label: string }> = {
+  g: { per: 1000, label: 'kg' },
+  ml: { per: 1000, label: 'litro' },
+  un: { per: 1, label: 'un' },
+  cm: { per: 100, label: 'metro' },
+  m2: { per: 1, label: 'm²' },
+  min: { per: 60, label: 'hora' },
 };
 
 export const UNITS = Object.keys(UNIT_INFO) as FinUnit[];
@@ -62,7 +80,8 @@ export function ingredientCostFor(ingredient: FinIngredient, quantity: number, u
 export interface CostLine {
   key: string;
   name: string;
-  kind: 'ingrediente' | 'embalagem' | 'outro' | 'preparo';
+  /** Chave do tipo do insumo, ou 'preparo' (parte pronta usada no item). */
+  kind: string;
   quantity: number;
   unitLabel: string;
   cost: number;
@@ -87,13 +106,16 @@ export interface CostContext {
   products: Map<string, FinProduct>;
   ingredients: Map<string, FinIngredient>;
   settings: FinSettings;
+  /** Tipos de insumo da empresa (definem o que é material, embalagem ou outros). */
+  categories: IngredientCategoryDef[];
 }
 
-export function buildCostContext(products: FinProduct[], ingredients: FinIngredient[], settings: FinSettings): CostContext {
+export function buildCostContext(products: FinProduct[], ingredients: FinIngredient[], settings: FinSettings, categories: IngredientCategoryDef[] = []): CostContext {
   return {
     products: new Map(products.map((product) => [product.id, product])),
     ingredients: new Map(ingredients.map((ingredient) => [ingredient.id, ingredient])),
     settings,
+    categories,
   };
 }
 
@@ -124,8 +146,9 @@ export function computeProductCost(product: FinProduct, ctx: CostContext, stack:
       }
       if (ingredient.purchase_price <= 0) result.warnings.push(`${ingredient.name}: sem preço de compra.`);
       result.lines.push(line);
-      if (ingredient.category === 'embalagem') result.packaging += line.cost;
-      else if (ingredient.category === 'outro') result.other += line.cost;
+      const group = categoryInfo({ categories: ctx.categories }, ingredient.category).group;
+      if (group === 'packaging') result.packaging += line.cost;
+      else if (group === 'other') result.other += line.cost;
       else result.ingredients += line.cost;
       return;
     }

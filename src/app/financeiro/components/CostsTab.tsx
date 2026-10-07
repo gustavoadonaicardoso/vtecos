@@ -14,7 +14,8 @@ interface CostDraft { id?: string; name: string; category: string; amount: strin
 interface ChannelDraft { id?: string; name: string; fee_pct: string; fixed_fee: string; extra_cost: string }
 
 export default function CostsTab({ workspace, tenantId, setWorkspace }: TabProps) {
-  const { fixedCosts, channels, settings, access } = workspace;
+  const { fixedCosts, channels, settings, access, business } = workspace;
+  const terms = business.terms;
   const month = currentMonth();
   const { fixedMonthly, base, fixedPct } = useMemo(() => pricingBase(workspace, month), [workspace, month]);
   const [costDraft, setCostDraft] = useState<CostDraft | null>(null);
@@ -184,7 +185,7 @@ export default function CostsTab({ workspace, tenantId, setWorkspace }: TabProps
         <div className={styles.kpi} style={{ '--kpi-color': '#8b5cf6' } as React.CSSProperties}>
           <span className={styles.kpiLabel}>Peso das despesas fixas</span>
           <span className={styles.kpiValue}>{base.value > 0 ? formatPct(fixedPct) : '—'}</span>
-          <span className={styles.kpiFoot}>entra no preço de todas as fichas</span>
+          <span className={styles.kpiFoot}>entra no preço de todos os itens</span>
         </div>
         <div className={styles.kpi} style={{ '--kpi-color': '#10b981' } as React.CSSProperties}>
           <span className={styles.kpiLabel}>Margem de lucro desejada</span>
@@ -271,9 +272,9 @@ export default function CostsTab({ workspace, tenantId, setWorkspace }: TabProps
           </div>
           <form onSubmit={saveSettings} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {settingField('tax_pct', 'Impostos sobre a venda', '%', 'Ex.: Simples Nacional 4% a 6%; MEI ≈ 0%.')}
-            {settingField('target_margin_pct', 'Margem de lucro desejada', '%', 'Quanto sobra limpo de cada venda. Cada ficha pode ter a sua.')}
+            {settingField('target_margin_pct', 'Margem de lucro desejada', '%', `Quanto sobra limpo de cada venda. Cada ${terms.product} pode ter a sua.`)}
             {settingField('commission_pct', 'Comissão de vendedor', '%', 'Se alguém ganha % sobre as vendas.')}
-            {settingField('labor_hour_cost', 'Custo da hora de trabalho', 'R$', 'Salários (+ encargos) ÷ horas trabalhadas no mês. Multiplica pelo tempo de preparo de cada ficha.')}
+            {settingField('labor_hour_cost', 'Custo da hora de trabalho', 'R$', `Salários (+ encargos) ÷ horas trabalhadas no mês. Multiplica pelo ${terms.prep.toLowerCase()} de cada ${terms.product}.`)}
             {settingField('expected_monthly_revenue', 'Faturamento esperado por mês', 'R$', 'Usado para ratear as despesas fixas até existirem vendas registradas.')}
             {access.canManage && (
               <button type="submit" className={styles.primaryButton}>{settingsSaved ? <><Check size={16} /> Salvo</> : 'Salvar parâmetros'}</button>
@@ -290,7 +291,7 @@ export default function CostsTab({ workspace, tenantId, setWorkspace }: TabProps
           )}
         </div>
         <p className={styles.panelHint}>
-          Cada canal cobra diferente: maquininha no balcão, comissão do iFood, embalagem extra no delivery. O primeiro canal da lista é o seu preço padrão.
+          Cada canal cobra diferente: maquininha, comissão de marketplace ou aplicativo, frete ou embalagem extra na entrega. O primeiro canal da lista é o seu preço padrão.
         </p>
 
         {channelDraft && (

@@ -115,7 +115,7 @@ export default function SalesTab({ workspace, tenantId, month, onMonthChange, sa
             {flash && <span className={`${styles.tag} ${styles.tagGood}`}>{flash}</span>}
           </div>
           <p className={styles.panelHint}>
-            O custo do produto e as taxas do canal ficam gravados no momento da venda — se o preço de um insumo mudar depois, o resultado deste mês não muda.
+            O custo do produto e as taxas do canal ficam gravados no momento da venda — se o preço de algo que você compra mudar depois, o resultado deste mês não muda.
           </p>
           {error && <div className={styles.errorBanner} style={{ marginBottom: 12 }}>{error}</div>}
           <form className={styles.formRow} style={{ gridTemplateColumns: '1fr 2fr 1.4fr 0.7fr 1fr 0.9fr auto', marginBottom: 0 }} onSubmit={submit}>
@@ -127,7 +127,7 @@ export default function SalesTab({ workspace, tenantId, month, onMonthChange, sa
               Produto
               <select className={styles.input} value={form.product_id} onChange={(event) => setForm({ ...form, product_id: event.target.value, unit_price: '' })}>
                 {sellable.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-                <option value="">Venda avulsa (sem ficha)</option>
+                <option value="">Venda avulsa (sem cadastro)</option>
               </select>
             </label>
             <label className={styles.field}>
