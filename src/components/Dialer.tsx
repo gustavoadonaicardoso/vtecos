@@ -1,154 +1,152 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Device } from '@twilio/voice-sdk';
-import { Phone, PhoneOff, Mic, MicOff, Grid3X3 as DialerIcon, X, History, Download, Play, Clock } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { Call, Device } from '@twilio/voice-sdk';
+import { Phone, PhoneOff, Mic, MicOff, Grid3X3 as DialerIcon, X, History, Download, Clock } from 'lucide-react';
 import styles from './Dialer.module.css';
-import { useAuth } from '@/context/AuthContext';
-import { fetchCallHistory, CallLog } from '@/services/calls.service';
+import { formatPhone, toE164 } from '@/lib/dialer/phone';
 
 interface DialerProps {
   onClose?: () => void;
 }
 
+interface CallItem {
+  id: string;
+  contactNumber: string;
+  status: string;
+  duration: number | null;
+  hasRecording: boolean;
+  createdAt: string;
+}
+
+const STATUS_TEXT: Record<string, string> = {
+  completed: 'Atendida',
+  'in-progress': 'Em andamento',
+  'no-answer': 'Não atendeu',
+  busy: 'Ocupado',
+  failed: 'Falhou',
+  canceled: 'Cancelada',
+  queued: 'Na fila',
+};
+
+async function fetchToken(): Promise<{ token?: string; phoneNumber?: string; notConnected?: boolean; error?: string }> {
+  try {
+    const response = await fetch('/api/twilio/token', { cache: 'no-store' });
+    const json = await response.json().catch(() => ({}));
+    if (response.status === 409) return { notConnected: true };
+    if (!response.ok || !json.token) return { error: json.error || 'Não foi possível ligar o discador.' };
+    return { token: json.token, phoneNumber: json.phoneNumber };
+  } catch {
+    return { error: 'Sem conexão com o servidor.' };
+  }
+}
+
+/**
+ * Discador manual (ícone de telefone no topo): liga pelo número da
+ * empresa, direto do navegador. Não recebe ligações -- quem recebe as
+ * ligações das campanhas é a tela Discador.
+ */
 export default function Dialer({ onClose }: DialerProps) {
-  const { user } = useAuth();
-  const [device, setDevice] = useState<Device | null>(null);
-  const [call, setCall] = useState<any>(null);
+  const deviceRef = useRef<Device | null>(null);
+  const [call, setCall] = useState<Call | null>(null);
   const [number, setNumber] = useState('');
-  const [status, setStatus] = useState('Pronto');
+  const [status, setStatus] = useState('Conectando…');
+  const [ready, setReady] = useState(false);
+  const [notConnected, setNotConnected] = useState(false);
+  const [fromNumber, setFromNumber] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [view, setView] = useState<'dialer' | 'history'>('dialer');
-  const [history, setHistory] = useState<CallLog[]>([]);
+  const [history, setHistory] = useState<CallItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
-    async function initDevice() {
-      try {
-        const identity = user?.name || 'Agente';
-        const response = await fetch(`/api/twilio/token?identity=${encodeURIComponent(identity)}`);
-
-        if (response.status === 409) {
-          // A empresa ainda não conectou a conta Twilio em Integrações.
-          setStatus('Discador não conectado: um administrador conecta em Integrações');
-          return;
-        }
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Server error: ${response.status} - ${errorText.substring(0, 50)}`);
-        }
-        
-        const contentType = response.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Server returned non-JSON response");
-        }
-
-        const { token } = await response.json();
-
-        const newDevice = new Device(token, {
-          logLevel: 1,
-          edge: 'ashburn', // Or appropriate edge
-        });
-
-        newDevice.on('registered', () => setStatus('Conectado'));
-        newDevice.on('error', (error) => {
-          console.error('Twilio Error:', error);
-          if (error.code === 20101) {
-            setStatus('Credenciais Inválidas');
-          } else {
-            setStatus('Erro');
-          }
-        });
-
-        await newDevice.register();
-        setDevice(newDevice);
-      } catch (err) {
-        console.error('Failed to init Twilio device', err);
-        setStatus('Erro de conexão');
+    let cancelled = false;
+    (async () => {
+      const result = await fetchToken();
+      if (cancelled) return;
+      if (result.notConnected) {
+        setNotConnected(true);
+        setStatus('Não conectado');
+        return;
       }
-    }
-
-    initDevice();
-
+      if (!result.token) {
+        setStatus(result.error || 'Erro de conexão');
+        return;
+      }
+      const { Device } = await import('@twilio/voice-sdk');
+      if (cancelled) return;
+      const device = new Device(result.token, { logLevel: 1, codecPreferences: ['opus', 'pcmu'] as never });
+      device.on('tokenWillExpire', () => {
+        fetchToken().then((next) => next.token && device.updateToken(next.token)).catch(() => undefined);
+      });
+      device.on('error', (error: { code?: number }) => setStatus(error?.code === 20101 ? 'Sessão expirada: feche e abra de novo' : 'Erro no discador'));
+      deviceRef.current = device;
+      setFromNumber(result.phoneNumber || '');
+      setReady(true);
+      setStatus('Pronto');
+    })();
     return () => {
-      device?.destroy();
+      cancelled = true;
+      deviceRef.current?.destroy();
+      deviceRef.current = null;
     };
   }, []);
 
   const loadHistory = useCallback(async () => {
-    if (!user) return;
     setLoadingHistory(true);
-    const data = await fetchCallHistory(user.id);
-    setHistory(data);
-    setLoadingHistory(false);
-  }, [user]);
-
-  useEffect(() => {
-    if (view === 'history') {
-      loadHistory();
+    try {
+      const response = await fetch('/api/calls', { cache: 'no-store' });
+      const json = await response.json().catch(() => ({}));
+      setHistory(Array.isArray(json.data) ? json.data : []);
+    } finally {
+      setLoadingHistory(false);
     }
-  }, [view, loadHistory]);
+  }, []);
+
+  const showHistory = () => {
+    setView('history');
+    void loadHistory();
+  };
 
   const handleMakeCall = async () => {
-    if (!device || !number) return;
-
+    const device = deviceRef.current;
+    if (!device || call) return;
+    const to = toE164(number);
+    if (!to) {
+      setStatus('Número inválido: use DDD + número');
+      return;
+    }
     try {
-      setStatus('Chamando...');
-      const params = { To: number };
-      const newCall = await device.connect({ params });
-
+      setStatus('Chamando…');
+      const newCall = await device.connect({ params: { To: to } });
       newCall.on('accept', () => setStatus('Em chamada'));
-      newCall.on('disconnect', () => {
+      const ended = () => {
         setStatus('Chamada encerrada');
         setCall(null);
+        setIsMuted(false);
         setTimeout(() => setStatus('Pronto'), 2000);
-      });
-
+      };
+      newCall.on('disconnect', ended);
+      newCall.on('cancel', ended);
+      newCall.on('error', () => { setStatus('Falha na chamada'); setCall(null); });
       setCall(newCall);
-    } catch (err) {
-      console.error('Call failed', err);
-      setStatus('Falha na chamada');
+    } catch {
+      setStatus('Falha na chamada: libere o microfone');
     }
   };
 
-  const handleHangup = () => {
-    if (call) {
-      call.disconnect();
-    }
-  };
+  const handleHangup = () => call?.disconnect();
 
   const toggleMute = () => {
-    if (call) {
-      const muted = !isMuted;
-      call.mute(muted);
-      setIsMuted(muted);
-    }
+    if (!call) return;
+    call.mute(!call.isMuted());
+    setIsMuted(call.isMuted());
   };
 
-  const appendNumber = (digit: string) => {
-    setNumber(prev => prev + digit);
-  };
-
-  const downloadRecording = async (recordingUrl: string, date: string) => {
-    if (!user) return;
-    
-    try {
-      const response = await fetch(recordingUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      // Format: user_id_date.mp3
-      const formattedDate = new Date(date).toISOString().split('T')[0];
-      a.download = `${user.id}_${formattedDate}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err) {
-      console.error('Download failed', err);
-    }
+  // Durante a ligação, o teclado manda os tons (menus de atendimento).
+  const pressKey = (digit: string) => {
+    if (call) call.sendDigits(digit);
+    else setNumber((current) => current + digit);
   };
 
   return (
@@ -156,53 +154,48 @@ export default function Dialer({ onClose }: DialerProps) {
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.statusIndicator}>
-            <div className={`${styles.dot} ${status === 'Em chamada' ? styles.active : ''}`} />
+            <div className={`${styles.dot} ${status === 'Em chamada' ? styles.active : ''}`} style={!ready ? { background: '#94a3b8' } : undefined} />
             <span>{status}</span>
           </div>
           <div className={styles.tabs}>
-            <button 
-              className={`${styles.tabBtn} ${view === 'dialer' ? styles.tabActive : ''}`}
-              onClick={() => setView('dialer')}
-            >
+            <button className={`${styles.tabBtn} ${view === 'dialer' ? styles.tabActive : ''}`} onClick={() => setView('dialer')} aria-label="Teclado">
               <DialerIcon size={14} />
             </button>
-            <button 
-              className={`${styles.tabBtn} ${view === 'history' ? styles.tabActive : ''}`}
-              onClick={() => setView('history')}
-            >
+            <button className={`${styles.tabBtn} ${view === 'history' ? styles.tabActive : ''}`} onClick={showHistory} aria-label="Histórico">
               <History size={14} />
             </button>
           </div>
         </div>
-        <button onClick={onClose} className={styles.closeBtn}><X size={18} /></button>
+        <button onClick={onClose} className={styles.closeBtn} aria-label="Fechar"><X size={18} /></button>
       </div>
 
       {view === 'dialer' ? (
         <>
           <div className={styles.display}>
-            {status === 'Credenciais Inválidas' ? (
-              <div className={styles.configAlert}>
-                <p>Configuração Necessária</p>
+            {notConnected ? (
+              <div className={styles.notice}>
+                <strong>Discador não conectado</strong>
                 <span>Um administrador conecta a conta Twilio da empresa em Integrações &gt; Discador.</span>
               </div>
             ) : (
-              <input 
-                type="text" 
-                value={number} 
-                onChange={(e) => setNumber(e.target.value)}
-                placeholder="Digite o número"
-                className={styles.numberInput}
-              />
+              <>
+                <input
+                  type="tel"
+                  value={number}
+                  onChange={(e) => setNumber(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleMakeCall(); }}
+                  placeholder="DDD + número"
+                  className={styles.numberInput}
+                  disabled={Boolean(call)}
+                />
+                {fromNumber && <small className={styles.fromNumber}>Saindo de {formatPhone(fromNumber)}</small>}
+              </>
             )}
           </div>
 
           <div className={styles.keypad}>
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
-              <button 
-                key={digit} 
-                onClick={() => appendNumber(digit)}
-                className={styles.key}
-              >
+              <button key={digit} onClick={() => pressKey(digit)} className={styles.key} disabled={notConnected}>
                 {digit}
               </button>
             ))}
@@ -211,15 +204,15 @@ export default function Dialer({ onClose }: DialerProps) {
           <div className={styles.controls}>
             {call ? (
               <>
-                <button onClick={toggleMute} className={`${styles.controlBtn} ${isMuted ? styles.muted : ''}`}>
+                <button onClick={toggleMute} className={`${styles.controlBtn} ${isMuted ? styles.muted : ''}`} aria-label={isMuted ? 'Ativar microfone' : 'Silenciar'}>
                   {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
                 </button>
-                <button onClick={handleHangup} className={`${styles.controlBtn} ${styles.hangup}`}>
+                <button onClick={handleHangup} className={`${styles.controlBtn} ${styles.hangup}`} aria-label="Desligar">
                   <PhoneOff size={20} />
                 </button>
               </>
             ) : (
-              <button onClick={handleMakeCall} className={`${styles.controlBtn} ${styles.call}`}>
+              <button onClick={handleMakeCall} className={`${styles.controlBtn} ${styles.call}`} disabled={!ready || !number.trim()} aria-label="Ligar">
                 <Phone size={20} />
               </button>
             )}
@@ -228,29 +221,26 @@ export default function Dialer({ onClose }: DialerProps) {
       ) : (
         <div className={styles.historyList}>
           {loadingHistory ? (
-            <div className={styles.emptyState}>Carregando...</div>
+            <div className={styles.emptyState}>Carregando…</div>
           ) : history.length === 0 ? (
             <div className={styles.emptyState}>Nenhuma chamada recente</div>
           ) : (
             history.map((item) => (
               <div key={item.id} className={styles.historyItem}>
                 <div className={styles.itemInfo}>
-                  <div className={styles.itemPhone}>{item.contact_number}</div>
+                  <div className={styles.itemPhone}>{formatPhone(item.contactNumber)}</div>
                   <div className={styles.itemMeta}>
                     <Clock size={10} />
-                    <span>{new Date(item.created_at).toLocaleString('pt-BR')}</span>
-                    {item.duration && <span> · {Math.floor(item.duration / 60)}:{(item.duration % 60).toString().padStart(2, '0')}</span>}
+                    <span>{new Date(item.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    <span> · {STATUS_TEXT[item.status] || item.status}</span>
+                    {item.duration ? <span> · {Math.floor(item.duration / 60)}:{(item.duration % 60).toString().padStart(2, '0')}</span> : null}
                   </div>
                 </div>
                 <div className={styles.itemActions}>
-                  {item.recording_url && (
-                    <button 
-                      onClick={() => downloadRecording(item.recording_url!, item.created_at)}
-                      className={styles.actionBtn}
-                      title="Baixar Gravação"
-                    >
+                  {item.hasRecording && (
+                    <a href={`/api/calls/recording?log=${item.id}&download=1`} className={styles.actionBtn} title="Baixar gravação" aria-label="Baixar gravação">
                       <Download size={14} />
-                    </button>
+                    </a>
                   )}
                 </div>
               </div>

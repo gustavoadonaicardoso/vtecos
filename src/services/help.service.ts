@@ -12,6 +12,8 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { DEFAULT_ARTICLES, DEFAULT_CATEGORIES, DEFAULT_FAQS, type HelpSection } from '@/lib/help/defaults';
 import { HELP_ICON_KEYS } from '@/lib/help/icons';
+import { articleHash } from '@/lib/help/hash';
+import { DEFAULT_ARTICLE_HISTORY } from '@/lib/help/default-history';
 import type { ServiceResult } from '@/types';
 
 export interface HelpCategory {
@@ -103,10 +105,14 @@ export async function seedMissingDefaults(): Promise<ServiceResult<{ categories:
     tip: article.tip || '',
     position: DEFAULT_ARTICLES.indexOf(article),
   }));
+  // default_hash só existe depois da migration 202610240002 (sem ela, grava sem).
+  const withHash = newArticles.map((row) => ({ ...row, default_hash: articleHash(row) }));
   if (newArticles.length > 0) {
-    const { error: insertError } = await supabaseAdmin.from('help_articles').insert(newArticles);
+    let { error: insertError } = await supabaseAdmin.from('help_articles').insert(withHash);
+    if (insertError && /default_hash/.test(insertError.message)) ({ error: insertError } = await supabaseAdmin.from('help_articles').insert(newArticles));
     if (insertError) return { success: false, error: insertError.message };
   }
+  await refreshDefaultArticles();
 
   // Perguntas frequentes só entram quando não há nenhuma (não têm slug).
   let faqCount = 0;
@@ -119,6 +125,52 @@ export async function seedMissingDefaults(): Promise<ServiceResult<{ categories:
 
   return { success: true, data: { categories: newCategories.length, articles: newArticles.length, faqs: faqCount } };
 }
+
+/**
+ * Tutoriais padrão atualizam sozinhos: artigo que ninguém editou no
+ * Painel Master (texto igual a uma versão padrão já publicada) recebe o
+ * texto novo; artigo padrão novo (que nunca existiu) é criado. Artigo
+ * editado à mão nunca é tocado. Roda uma vez por processo (ao abrir a
+ * Ajuda depois de um deploy) e no botão do Painel Master.
+ */
+export async function refreshDefaultArticles(): Promise<{ updated: string[]; added: string[] }> {
+  const result = { updated: [] as string[], added: [] as string[] };
+  const { data: rows, error } = await supabaseAdmin.from('help_articles').select('*');
+  if (error || !rows) return result;
+  const bySlug = new Map((rows as Record<string, unknown>[]).map((row) => [String(row.slug), row]));
+  const hasHashColumn = rows.length === 0 || 'default_hash' in rows[0];
+  const { data: categories } = await supabaseAdmin.from('help_categories').select('id, slug');
+  const categoryId = new Map((categories || []).map((row) => [row.slug as string, row.id as string]));
+
+  for (const [index, article] of DEFAULT_ARTICLES.entries()) {
+    const content = { title: article.title, summary: article.summary, sections: article.sections, tip: article.tip || '' };
+    const target = articleHash(content);
+    const row = bySlug.get(article.slug);
+    const history = DEFAULT_ARTICLE_HISTORY[article.slug] || [];
+
+    if (!row) {
+      // Só artigos que nunca existiram: um padrão antigo apagado de propósito não volta.
+      if (history.length > 0) continue;
+      const insert = { ...content, slug: article.slug, category_id: categoryId.get(article.category) ?? null, position: index, ...(hasHashColumn ? { default_hash: target } : {}) };
+      const { error: insertError } = await supabaseAdmin.from('help_articles').insert(insert);
+      if (!insertError) result.added.push(article.slug);
+      continue;
+    }
+
+    const current = articleHash(row as { title: string; summary: string; sections: unknown; tip: string });
+    if (current === target) continue;
+    const untouched = (row.default_hash && row.default_hash === current) || history.includes(current);
+    if (!untouched) continue;
+    const { error: updateError } = await supabaseAdmin
+      .from('help_articles')
+      .update({ ...content, updated_at: new Date().toISOString(), ...(hasHashColumn ? { default_hash: target } : {}) })
+      .eq('id', String(row.id));
+    if (!updateError) result.updated.push(article.slug);
+  }
+  return result;
+}
+
+const refreshHolder = globalThis as typeof globalThis & { __vtecHelpRefresh?: Promise<unknown> };
 
 // Evita gravar o conteúdo padrão duas vezes se várias pessoas abrirem a Ajuda juntas.
 let seeding: Promise<unknown> | null = null;
@@ -141,6 +193,10 @@ export async function fetchHelpContent(options: { includeDrafts?: boolean } = {}
     seeding = seeding || seedMissingDefaults().finally(() => { seeding = null; });
     await seeding;
     [categories, articles, faqs] = await load();
+  } else if (!refreshHolder.__vtecHelpRefresh) {
+    refreshHolder.__vtecHelpRefresh = refreshDefaultArticles().catch(() => undefined);
+    const refreshed = (await refreshHolder.__vtecHelpRefresh) as { updated: string[]; added: string[] } | undefined;
+    if (refreshed && (refreshed.updated.length || refreshed.added.length)) [categories, articles, faqs] = await load();
   }
 
   const keep = <T extends { published: boolean }>(rows: T[] | null) => (rows || []).filter((row) => options.includeDrafts || row.published);

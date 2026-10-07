@@ -3,6 +3,7 @@ import { profileIdFromTwilioIdentity } from '@/services/twilio.service';
 import { dialNumberTwiml } from '@/lib/twilio-tenant';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { verifyTwilioRequest, twilioRejectResponse } from '@/lib/twilio-webhook';
+import { toE164 } from '@/lib/dialer/phone';
 
 /** Ligação feita pelo navegador (TwiML App da empresa): disca com o número da empresa. */
 export async function POST(request: Request) {
@@ -10,7 +11,11 @@ export async function POST(request: Request) {
     const { valid, params, tenantId, config } = await verifyTwilioRequest(request);
     if (!valid || !tenantId) return twilioRejectResponse();
 
-    const to = params.To;
+    // Só número de telefone (nada de SIP ou outro usuário), no formato +55...
+    const to = toE164(params.To);
+    if (!to) {
+      return new NextResponse('<Response><Say language="pt-BR">Número inválido. Confira o DDD e o número.</Say></Response>', { headers: { 'Content-Type': 'text/xml' } });
+    }
     const identity = params.ApplicationSid ? params.From : null;
     const callSid = params.CallSid;
 
