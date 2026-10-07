@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireActiveProfile } from '@/lib/session';
-import { callGemini } from '@/lib/gemini';
+import { callAI } from '@/lib/ai';
 import { INSTAGRAM_CAPTION_LIMIT, INSTAGRAM_HASHTAG_LIMIT } from '@/lib/social/rules';
 
 const TONES: Record<string, string> = {
@@ -59,7 +59,7 @@ ${currentCaption ? `Rascunho atual para melhorar: """${currentCaption}"""` : ''}
 
 Responda só com JSON no formato {"caption": "texto da legenda", "hashtags": ["#exemplo"]}.`;
 
-  const result = await callGemini(prompt, { temperature: 0.8, maxOutputTokens: 2048 });
+  const result = await callAI(prompt, { temperature: 0.8, maxOutputTokens: 2048 });
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 502 });
   }

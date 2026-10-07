@@ -897,7 +897,7 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
         {/* ── IA ── */}
         {node.type === 'ai-reply' && (
           <>
-            {options && !options.ai && <div className={styles.banner}>Falta a chave GEMINI_API_KEY no servidor.</div>}
+            {options && !options.ai && <div className={styles.banner}>Nenhuma IA configurada no servidor (GEMINI_API_KEY ou AI_PROVIDER=ollama).</div>}
             <Field label="Instruções para a IA" hint="Diga o que a empresa faz, horários, regras, o que não pode prometer. Quanto mais claro, melhor.">{tpl('aiInstructions', { rows: 6 })}</Field>
             <Field label="Responder a">{tpl('aiInput')}</Field>
             <Check checked={c.aiSend !== false} onChange={(value) => set({ aiSend: value })}>Enviar a resposta para o contato no WhatsApp</Check>
@@ -910,7 +910,7 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
 
         {node.type === 'ai-classify' && (
           <>
-            {options && !options.ai && <div className={styles.banner}>Falta a chave GEMINI_API_KEY no servidor.</div>}
+            {options && !options.ai && <div className={styles.banner}>Nenhuma IA configurada no servidor (GEMINI_API_KEY ou AI_PROVIDER=ollama).</div>}
             <Field label="Texto a classificar">{tpl('aiInput')}</Field>
             <span className={styles.sectionLabel}>Categorias (cada uma tem a sua saída)</span>
             {aiCategories(c).map((item, index, list) => (

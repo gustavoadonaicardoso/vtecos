@@ -209,7 +209,7 @@ export const isTrigger = (type: NodeType) => TRIGGER_TYPES.includes(type);
 
 /** Blocos que mandam algo para o contato (precisam de WhatsApp conectado). */
 export const SENDS_WHATSAPP: NodeType[] = ['send-message', 'send-media', 'question', 'menu'];
-/** Blocos que usam a IA (precisam da chave GEMINI_API_KEY no servidor). */
+/** Blocos que usam a IA (Gemini ou IA local configurada no servidor). */
 export const USES_AI: NodeType[] = ['ai-reply', 'ai-classify'];
 
 export const NODE_TYPES: NodeType[] = [
