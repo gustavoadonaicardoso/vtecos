@@ -895,6 +895,39 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
         )}
 
         {/* ── IA ── */}
+        {node.type === 'ai-chat' && (
+          <>
+            {options && !options.ai && <div className={styles.banner}>Nenhuma IA configurada no servidor (GEMINI_API_KEY ou AI_PROVIDER=ollama).</div>}
+            <Field label="Instruções para a IA" hint="O que a empresa faz, produtos, preços que podem ser ditos, horários, endereço, formas de pagamento e o que a IA não pode prometer.">{tpl('aiInstructions', { rows: 9 })}</Field>
+            <div className={styles.formRow}>
+              <Field label="Juntar mensagens por (s)" hint="Espera o cliente terminar de digitar e responde tudo de uma vez.">
+                <input className={styles.input} type="number" min={1} max={60} value={c.groupSeconds ?? 8} onChange={(e) => set({ groupSeconds: Math.min(60, Math.max(1, Number(e.target.value) || 1)) })} />
+              </Field>
+              <Field label="Encerrar após (h) sem resposta" hint="Depois disso segue por “Cliente parou de responder”.">
+                <input className={styles.input} type="number" min={1} max={168} value={c.timeoutHours ?? 24} onChange={(e) => set({ timeoutHours: Math.min(168, Math.max(1, Number(e.target.value) || 1)) })} />
+              </Field>
+            </div>
+            <div className={styles.formRow}>
+              <Field label="Ficar quieta quando a equipe responde (h)" hint="0 = a IA continua respondendo junto.">
+                <input className={styles.input} type="number" min={0} max={720} value={c.humanPauseHours ?? 2} onChange={(e) => set({ humanPauseHours: Math.min(720, Math.max(0, Number(e.target.value) || 0)) })} />
+              </Field>
+              <Field label="Máximo de respostas da IA" hint="Passando disso, chama a equipe.">
+                <input className={styles.input} type="number" min={1} max={200} value={c.maxTurns ?? 30} onChange={(e) => set({ maxTurns: Math.min(200, Math.max(1, Number(e.target.value) || 1)) })} />
+              </Field>
+            </div>
+            <Check checked={c.allowHandoff !== false} onChange={(value) => set({ allowHandoff: value })}>Passar para a equipe quando o cliente pedir uma pessoa (ou a IA não souber)</Check>
+            {c.allowHandoff !== false && (
+              <>
+                <Field label="Mensagem ao passar para a equipe">{tpl('handoffMessage', { rows: 2 })}</Field>
+                <Field label="IA em silêncio depois disso (h)" hint="Tempo para a equipe assumir. Em Mensagens dá para retomar antes.">
+                  <input className={styles.input} type="number" min={0} max={720} value={c.handoffPauseHours ?? 24} onChange={(e) => set({ handoffPauseHours: Math.min(720, Math.max(0, Number(e.target.value) || 0)) })} />
+                </Field>
+              </>
+            )}
+            <small className={styles.note}>A conversa fica aberta: cada mensagem do cliente é respondida lendo as últimas 20 da conversa. Mensagens que chegam enquanto a IA pensa entram na próxima resposta. Em Mensagens, o botão &quot;Pausar IA&quot; cala a IA naquela conversa. No gatilho, deixe &quot;Não repetir por&quot; em 0.</small>
+          </>
+        )}
+
         {node.type === 'ai-reply' && (
           <>
             {options && !options.ai && <div className={styles.banner}>Nenhuma IA configurada no servidor (GEMINI_API_KEY ou AI_PROVIDER=ollama).</div>}

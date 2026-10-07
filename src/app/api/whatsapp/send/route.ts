@@ -50,6 +50,7 @@ import { WhatsAppService, getWhatsAppConfig } from '@/lib/whatsapp';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createOutboundMessageRecord, markMessageFailed, markMessageResult } from '@/services/whatsapp-send.service';
 import { requireActiveProfile } from '@/lib/session';
+import { markHumanReply } from '@/services/conversations.service';
 
 export async function POST(request: NextRequest) {
   // Antes esta rota não exigia login: qualquer pessoa enviava WhatsApp pela
@@ -152,6 +153,7 @@ export async function POST(request: NextRequest) {
   // 3. Atualiza status no banco
   if (dbMessageId) {
     await markMessageResult(auth.tenantId, dbMessageId, result.success, (result as any).messageId);
+    if (result.success) await markHumanReply(auth.tenantId, String(leadId)).catch(() => {});
   }
 
   if (!result.success) {

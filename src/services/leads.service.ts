@@ -69,6 +69,7 @@ function mapDbRowToLead(row: Row): Lead {
     lastActivityAt: (row.last_activity_at as string) || null,
     stageChangedAt: (row.stage_changed_at as string) || (row.created_at as string) || null,
     unreadCount: Number(row.unread_count) || 0,
+    aiPausedUntil: (row.ai_paused_until as string) || null,
   };
 }
 

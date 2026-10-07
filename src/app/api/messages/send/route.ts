@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireActiveProfile } from '@/lib/session';
-import { loadChatLead, sendTextToLead } from '@/services/conversations.service';
+import { loadChatLead, markHumanReply, sendTextToLead } from '@/services/conversations.service';
 
 /** Mensagem de texto da equipe para o cliente (WhatsApp Web ou API oficial). */
 export async function POST(request: Request) {
@@ -26,5 +26,6 @@ export async function POST(request: Request) {
 
   const result = await sendTextToLead(auth.tenantId, auth.profile.id, lead, messageText, retryId);
   if (!result.ok) return NextResponse.json({ error: result.error, data: result.message ?? null }, { status: 502 });
+  await markHumanReply(auth.tenantId, lead.id).catch(() => {});
   return NextResponse.json({ data: result.message });
 }

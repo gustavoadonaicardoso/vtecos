@@ -1,5 +1,6 @@
 import {
   Bell,
+  Bot,
   Brain,
   CalendarClock,
   CircleStop,
@@ -107,7 +108,8 @@ export const BLOCK_GROUPS: { title: string; items: BlockDefinition[] }[] = [
   {
     title: 'Inteligência artificial',
     items: [
-      { type: 'ai-reply', description: 'A IA responde o contato com as suas regras', icon: Sparkles, color: '#8b5cf6' },
+      { type: 'ai-chat', description: 'Conversa inteira com o cliente e chama a equipe quando ele pede', icon: Bot, color: '#7c3aed' },
+      { type: 'ai-reply', description: 'A IA responde uma mensagem com as suas regras', icon: Sparkles, color: '#8b5cf6' },
       { type: 'ai-classify', description: 'A IA entende a intenção e escolhe o caminho', icon: Brain, color: '#c026d3' },
     ],
   },
@@ -235,6 +237,10 @@ export function describeNode(node: FlowNode, options: EditorOptions | null): str
       return `${c.aiSend ? 'Responde o contato' : 'Gera um texto'} seguindo: ${c.aiInstructions || '…'}`;
     case 'ai-classify':
       return `Classifica em ${aiCategories(c).map((item) => item.label).join(', ') || '…'}`;
+    case 'ai-chat': {
+      const pause = Number(c.humanPauseHours ?? 2);
+      return `Conversa com o cliente · junta ${Number(c.groupSeconds ?? 8)}s de mensagens${pause > 0 ? ` · cala ${pause}h quando a equipe responde` : ''}${c.allowHandoff !== false ? ' · passa para a equipe quando pedem' : ''}`;
+    }
   }
 }
 
@@ -370,8 +376,22 @@ export const TEMPLATES: { id: string; name: string; description: string; build: 
     },
   },
   {
-    id: 'ai',
+    id: 'ai-chat',
     name: 'Atendente com IA',
+    description: 'A IA conversa com o cliente, junta mensagens seguidas, fica quieta quando a equipe responde e chama alguém quando o cliente pede.',
+    build: () => {
+      const trigger = makeNode('trigger-message', 40, 200);
+      trigger.config = { ...trigger.config, reentryHours: 0, maxRunsPerLead: 0 };
+      const chat = makeNode('ai-chat', 380, 200);
+      const assign = makeNode('assign-lead', 760, 120);
+      const notify = makeNode('notify-team', 1100, 120);
+      notify.config = { ...notify.config, target: 'assigned', message: '{{lead.name}} pediu para falar com uma pessoa: "{{message}}"', alsoWhatsApp: false };
+      return { nodes: [trigger, chat, assign, notify], connections: [link(trigger, chat), link(chat, assign, 'handoff'), link(assign, notify)], variables: [] };
+    },
+  },
+  {
+    id: 'ai',
+    name: 'Triagem com IA',
     description: 'A IA entende o assunto: vendas vai para a equipe, dúvidas a IA responde.',
     build: () => {
       const trigger = makeNode('trigger-message', 40, 200);

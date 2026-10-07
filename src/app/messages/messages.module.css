@@ -58,6 +58,8 @@
 .primaryBtn { border: 1px solid transparent; background: var(--brand); color: #fff; }
 .secondaryBtn { border: 1px solid var(--card-border); background: var(--soft); color: var(--foreground); }
 .secondaryBtn:hover:not(:disabled) { border-color: var(--brand); }
+.aiPausedBtn { border-color: #f59e0b; background: rgba(245, 158, 11, 0.14); color: #fbbf24; }
+:global([data-theme='light']) .aiPausedBtn { color: #b45309; }
 .primaryBtn:disabled, .secondaryBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 .linkBtn { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--brand); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
 

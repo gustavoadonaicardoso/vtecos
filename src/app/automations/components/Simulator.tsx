@@ -193,6 +193,24 @@ function simulate(graph: FlowGraph, options: EditorOptions | null, input: { name
         steps.push({ node, text, tone: c.aiSend === false ? 'info' : 'send' });
         break;
       }
+      case 'ai-chat': {
+        steps.push({ node, text: `(a IA esperaria ${Number(c.groupSeconds ?? 8)}s por mais mensagens e responderia "${ctx.message || '…'}" seguindo as instruções)`, tone: 'send' });
+        steps.push({ node, text: 'A conversa continua: cada nova mensagem do cliente recebe resposta da IA.', tone: 'info' });
+        if ((choices.ai[node.id] || 'no') === 'handoff') {
+          if (c.allowHandoff === false) {
+            steps.push({ node, text: 'Passar para a equipe está desligado neste bloco: a IA continuaria respondendo.', tone: 'info' });
+            port = 'no';
+            break;
+          }
+          steps.push({ node, text: 'Cliente: "quero falar com uma pessoa"', tone: 'reply' });
+          steps.push({ node, text: renderTemplate(c.handoffMessage || '', ctx), tone: 'send' });
+          port = 'handoff';
+        } else {
+          steps.push({ node, text: `Cliente parou de responder por ${c.timeoutHours ?? 24}h: a conversa encerra.`, tone: 'info' });
+          port = 'no';
+        }
+        break;
+      }
       case 'ai-classify': {
         const categories = aiCategories(c);
         const chosen = categories.find((item) => item.id === choices.ai[node.id]) || null;
@@ -220,7 +238,7 @@ export default function Simulator({ graph, options, onClose }: { graph: FlowGrap
   const [choices, setChoices] = useState<Choices>({ answers: {}, ai: {}, webhook: {}, hours: {}, ab: {} });
   const [steps, setSteps] = useState<SimStep[] | null>(null);
   const replyNodes = useMemo(() => graph.nodes.filter((node) => REPLY_TYPES.includes(node.type)), [graph]);
-  const choiceNodes = useMemo(() => graph.nodes.filter((node) => ['ai-classify', 'webhook', 'business-hours', 'split-ab'].includes(node.type)), [graph]);
+  const choiceNodes = useMemo(() => graph.nodes.filter((node) => ['ai-classify', 'ai-chat', 'webhook', 'business-hours', 'split-ab'].includes(node.type)), [graph]);
   const pick = <K extends keyof Choices>(key: K, id: string, value: Choices[K][string]) => setChoices((current) => ({ ...current, [key]: { ...current[key], [id]: value } }));
 
   // No body: o editor cria um contexto de empilhamento abaixo do topo do sistema.
@@ -263,6 +281,12 @@ export default function Simulator({ graph, options, onClose }: { graph: FlowGrap
                 <select className={styles.input} value={choices.ai[node.id] || ''} onChange={(e) => pick('ai', node.id, e.target.value)}>
                   <option value="">Não identificou</option>
                   {aiCategories(node.config).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+              )}
+              {node.type === 'ai-chat' && (
+                <select className={styles.input} value={choices.ai[node.id] || 'no'} onChange={(e) => pick('ai', node.id, e.target.value)}>
+                  <option value="no">Cliente para de responder</option>
+                  <option value="handoff">Cliente pede uma pessoa</option>
                 </select>
               )}
               {node.type === 'webhook' && (

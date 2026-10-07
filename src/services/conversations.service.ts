@@ -66,6 +66,25 @@ async function touchPreview(tenantId: string, leadId: string, preview: string) {
   await supabaseAdmin.from('leads').update({ last_msg: preview.slice(0, 200) }).eq('tenant_id', tenantId).eq('id', leadId);
 }
 
+/**
+ * Alguém da equipe respondeu o cliente: o Atendente com IA fica quieto
+ * pelo tempo configurado no bloco (ver src/lib/automations/engine.ts).
+ */
+export async function markHumanReply(tenantId: string, leadId: string) {
+  await supabaseAdmin.from('leads').update({ human_replied_at: new Date().toISOString() }).eq('tenant_id', tenantId).eq('id', leadId);
+}
+
+/** Botão "Pausar IA" / "Retomar IA" da conversa. Pausa vale até alguém retomar (30 dias, no máximo). */
+export async function setAiPaused(tenantId: string, leadId: string, paused: boolean) {
+  const changes = paused
+    ? { ai_paused_until: new Date(Date.now() + 30 * 24 * 3600_000).toISOString() }
+    : { ai_paused_until: null, human_replied_at: null };
+  const { data, error } = await supabaseAdmin.from('leads').update(changes).eq('tenant_id', tenantId).eq('id', leadId).select('ai_paused_until').maybeSingle();
+  if (error) return { ok: false as const, error: error.message.includes('ai_paused_until') ? 'Falta rodar a migration 202610200001_ai_attendant.sql no Supabase.' : error.message };
+  if (!data) return { ok: false as const, error: 'Conversa não encontrada.' };
+  return { ok: true as const, aiPausedUntil: (data.ai_paused_until as string | null) ?? null };
+}
+
 /** Texto da equipe para o cliente. `retryId`: reenvia uma mensagem que falhou. */
 export async function sendTextToLead(tenantId: string, senderId: string | null, lead: ChatLead, text: string, retryId?: string | null): Promise<SendResult> {
   if (!lead.phone) return { ok: false, error: 'Este contato não tem telefone.' };
