@@ -1,0 +1,110 @@
+/* Faixa de status do sistema (topo do conteúdo, todas as telas). */
+.stack {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 49;
+}
+
+.bar {
+  color: #fff;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.bar + .bar { border-top: 1px solid rgba(255, 255, 255, 0.18); }
+
+.incident { background: #c2410c; }
+.maintenance { background: #1d4ed8; }
+.info { background: #334155; }
+.resolved { background: #047857; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 7px 16px;
+}
+
+.icon { flex: none; }
+
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.text:disabled { cursor: default; }
+.text strong { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
+
+.context {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.9;
+}
+
+.toggle,
+.close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle:hover,
+.close:hover { background: rgba(255, 255, 255, 0.28); }
+.close { padding: 4px 6px; }
+
+.flip { transform: rotate(180deg); }
+
+.details {
+  padding: 0 16px 10px 42px;
+  font-size: 0.82rem;
+}
+
+.details p { margin: 0 0 4px; white-space: pre-line; }
+.update { opacity: 0.92; }
+
+.more {
+  padding: 4px 16px;
+  border: none;
+  background: #1e293b;
+  color: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toggle:focus-visible,
+.close:focus-visible,
+.text:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .text { flex-direction: column; gap: 0; white-space: normal; }
+  .text strong { max-width: 100%; }
+  .toggle span { display: none; }
+}

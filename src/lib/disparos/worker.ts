@@ -16,6 +16,7 @@
  */
 
 import { supabaseAdmin as db } from '@/lib/supabase-admin';
+import { beat } from '@/lib/heartbeat';
 import {
   contextFor,
   insideWindow,
@@ -215,8 +216,10 @@ export function startBlastWorker() {
     worker.running = true;
     try {
       await tick();
+      beat('disparos');
     } catch (error) {
       log('erro no envio', error);
+      beat('disparos', error);
     } finally {
       worker.running = false;
     }
