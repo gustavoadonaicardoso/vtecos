@@ -10,10 +10,11 @@ import {
   Briefcase,
   Calendar,
   CircleDollarSign,
+  Hourglass,
   Kanban,
   Megaphone,
   MessageCircle,
-  Percent,
+  MessageSquare,
   Phone,
   RefreshCw,
   Share2,
@@ -22,10 +23,9 @@ import {
   TrendingUp,
   UserPlus,
   Users,
-  Wallet,
   Workflow,
 } from 'lucide-react';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import styles from './page.module.css';
 import { useLeads } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
@@ -34,16 +34,19 @@ import { usePermissions } from '@/lib/permissions';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { supabase } from '@/lib/supabase';
 import { BannerCarousel, PersonalActivityFeed } from '@/components/home';
-import { buildReport, isWon, leadValue } from './relatorios/report-data';
+import { isWon } from './relatorios/report-data';
+import { useReport } from './relatorios/useReport';
+import { useTheme } from '@/components/ThemeProvider';
+import { change, formatMinutes, seriesColor, type PeriodKey } from '@/lib/reports';
 import { canViewGoal, getGoalPace, getGoalProgress, type GoalPlan } from '@/lib/goals';
 import { fetchGoalsFromServer, migrateLocalGoalsIfAny } from '@/lib/goals-client';
 import type { DashboardSummary } from '@/services/dashboard.service';
 import type { HomeBanner } from '@/lib/banners';
 
-const PERIODS = [
-  { value: 1, label: 'Hoje' },
-  { value: 7, label: '7 dias' },
-  { value: 30, label: '30 dias' },
+const PERIODS: { value: PeriodKey; label: string }[] = [
+  { value: 'today', label: 'Hoje' },
+  { value: '7', label: '7 dias' },
+  { value: '30', label: '30 dias' },
 ];
 
 const currency = (value: number) =>
@@ -56,7 +59,6 @@ const currency = (value: number) =>
 
 const number = (value: number) => new Intl.NumberFormat('pt-BR').format(Math.round(value));
 
-const minutes = (value: number) => (value ? (value < 60 ? `${Math.round(value)} min` : `${Math.floor(value / 60)}h${String(Math.round(value % 60)).padStart(2, '0')}`) : '—');
 
 function greeting() {
   const hour = new Date().getHours();
@@ -139,7 +141,8 @@ export default function HomePage() {
   const unreadChat = useUnreadCount();
 
   const [mounted, setMounted] = useState(false);
-  const [period, setPeriod] = useState(7);
+  const [period, setPeriod] = useState<PeriodKey>('7');
+  const { theme } = useTheme();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [goals, setGoals] = useState<GoalPlan[]>([]);
   const [banners, setBanners] = useState<HomeBanner[]>([]);
@@ -148,6 +151,13 @@ export default function HomePage() {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  // Números do servidor (leads, vendas, conversas, tempo de resposta). O gráfico usa sempre 30 dias.
+  const hasCrm = !user?.workspace?.modules || user.workspace.modules.includes('crm');
+  const main = useReport(period, '', '', Boolean(user?.id) && hasCrm);
+  const monthly = useReport('30', '', '', Boolean(user?.id) && hasCrm && period !== '30');
+  const report = main.data;
+  const chartReport = period === '30' ? main.data : monthly.data;
+  const reloadReport = main.reload;
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -190,9 +200,9 @@ export default function HomePage() {
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refreshDatabase(), loadSummary()]);
+    await Promise.all([refreshDatabase(), loadSummary(), reloadReport()]);
     setRefreshing(false);
-  }, [loadSummary, refreshDatabase]);
+  }, [loadSummary, refreshDatabase, reloadReport]);
 
   // Atualiza sozinho a cada 60s (leads + módulos).
   useEffect(() => {
@@ -200,12 +210,11 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  const report = useMemo(() => buildReport(leads, pipelineStages, period), [leads, pipelineStages, period]);
-  const trend = useMemo(() => buildReport(leads, pipelineStages, 14), [leads, pipelineStages]);
-  const chart = useMemo(() => buildReport(leads, pipelineStages, Math.max(period, 14)), [leads, pipelineStages, period]);
-
+  const chart = useMemo(
+    () => (chartReport?.daily || []).map((day) => ({ ...day, label: day.date.split('-').reverse().slice(0, 2).join('/') })),
+    [chartReport]
+  );
   const openLeads = leads.filter((lead) => !isWon(lead));
-  const pipelineValue = openLeads.reduce((sum, lead) => sum + leadValue(lead), 0);
 
   const goalViews = useMemo(
     () =>
@@ -226,19 +235,32 @@ export default function HomePage() {
     return (presence.lastSeen(b.id, b.last_seen_at) || '').localeCompare(presence.lastSeen(a.id, a.last_seen_at) || '');
   });
   const onlineCount = teamMembers.filter((member) => presence.isOnline(member.id, member.last_seen_at)).length;
-  const nameById = (id: string | null) => (id ? teamMembers.find((member) => member.id === id)?.name || 'Usuário' : 'Sem responsável');
 
   if (!mounted) return null;
 
-  const periodLabel = period === 1 ? 'hoje' : `nos últimos ${period} dias`;
-  const compareLabel = period === 1 ? 'vs. ontem' : `vs. ${period} dias anteriores`;
+  const periodLabel = period === 'today' ? 'hoje' : `nos últimos ${period} dias`;
+  const compareLabel = period === 'today' ? 'comparado com ontem até esta hora' : `comparado com os ${period} dias anteriores`;
+  const trend = (chartReport?.daily || []).slice(-14);
+  const blue = seriesColor(0, theme);
+  const orange = seriesColor(1, theme);
+  const aqua = seriesColor(2, theme);
 
-  const kpis = [
-    { label: 'Novos leads', value: number(report.current.total), icon: UserPlus, color: '#3b82f6', delta: <Delta value={report.deltas.total} />, series: trend.daily.map((point) => point.novos) },
-    { label: 'Taxa de conversão', value: `${report.current.conversion.toFixed(1)}%`, icon: Percent, color: '#8b5cf6', delta: <Delta value={report.deltas.conversion} suffix=" p.p." />, series: trend.daily.map((point) => point.ganhos) },
-    { label: 'Receita ganha', value: currency(report.current.revenue), icon: CircleDollarSign, color: '#10b981', delta: <Delta value={report.deltas.revenue} />, series: trend.daily.map((point) => point.receita) },
-    { label: 'Pipeline em aberto', value: currency(pipelineValue), icon: Wallet, color: '#f59e0b', delta: <span className={`${styles.delta} ${styles.deltaNeutral}`}>{number(openLeads.length)} leads</span>, series: [] as number[] },
-  ];
+  const kpis = report
+    ? [
+        { label: 'Novos leads', value: number(report.leads.new), icon: UserPlus, color: blue, delta: <Delta value={change(report.leads.new, report.leads.newPrev)} />, series: trend.map((day) => day.newLeads), href: '/leads' },
+        { label: `Receita · ${report.sales.won} ${report.sales.won === 1 ? 'venda' : 'vendas'}`, value: currency(report.sales.revenue), icon: CircleDollarSign, color: '#10b981', delta: <Delta value={change(report.sales.revenue, report.sales.revenuePrev)} />, series: trend.map((day) => day.revenue), href: '/pipeline' },
+        { label: `Conversas · 1ª resposta ${formatMinutes(report.responses.medianAny)}`, value: number(report.messages.conversations), icon: MessageSquare, color: orange, delta: <Delta value={change(report.messages.conversations, report.messages.conversationsPrev)} />, series: trend.map((day) => day.received), href: '/messages' },
+        {
+          label: report.waiting.over1h ? `Esperando resposta · ${report.waiting.over1h} há mais de 1h` : 'Esperando resposta agora',
+          value: number(report.waiting.count),
+          icon: Hourglass,
+          color: report.waiting.over1h ? '#ef4444' : aqua,
+          delta: <span className={`${styles.delta} ${styles.deltaNeutral}`}>agora</span>,
+          series: [] as number[],
+          href: '/messages',
+        },
+      ]
+    : [];
 
   // ── Pulso dos módulos ──
   const stageCounts = pipelineStages.map((stage) => ({ ...stage, count: leads.filter((lead) => lead.pipelineStage === stage.id).length }));
@@ -361,7 +383,7 @@ export default function HomePage() {
     });
   }
 
-  const maxStage = Math.max(1, ...report.funnel.map((step) => step.reached));
+  const maxStage = Math.max(1, ...(report?.funnel || []).map((step) => step.count));
 
   return (
     <div className={styles.container}>
@@ -391,48 +413,52 @@ export default function HomePage() {
 
       <BannerCarousel banners={banners} />
 
-      <section className={styles.kpiGrid} aria-label="Indicadores principais">
-        {kpis.map((kpi) => (
-          <div key={kpi.label} className={styles.kpiCard}>
-            <div className={styles.kpiTop}>
-              <span className={styles.kpiIcon} style={{ '--kpi-color': kpi.color } as React.CSSProperties}><kpi.icon size={18} /></span>
-              {kpi.delta}
-            </div>
-            <span className={styles.kpiLabel}>{kpi.label}</span>
-            <strong className={styles.kpiValue}>{kpi.value}</strong>
-            {kpi.series.length > 1 ? <Sparkline values={kpi.series} color={kpi.color} /> : <div className={styles.sparkSpacer} />}
-          </div>
-        ))}
-      </section>
-      <p className={styles.periodNote}>Leads que entraram {periodLabel}, {compareLabel}. Linhas: tendência dos últimos 14 dias.</p>
+      {hasCrm && (
+        <>
+          <section className={`${styles.kpiGrid} ${main.loading && report ? styles.reloading : ''}`} aria-label="Indicadores principais">
+            {kpis.map((kpi) => (
+              <Link key={kpi.label} href={kpi.href} className={styles.kpiCard}>
+                <div className={styles.kpiTop}>
+                  <span className={styles.kpiIcon} style={{ '--kpi-color': kpi.color } as React.CSSProperties}><kpi.icon size={18} /></span>
+                  {kpi.delta}
+                </div>
+                <span className={styles.kpiLabel}>{kpi.label}</span>
+                <strong className={styles.kpiValue}>{kpi.value}</strong>
+                {kpi.series.length > 1 ? <Sparkline values={kpi.series} color={kpi.color} /> : <div className={styles.sparkSpacer} />}
+              </Link>
+            ))}
+            {!report && <div className={`${styles.kpiCard} ${styles.kpiLoading}`}>{main.error || 'Calculando os números…'}</div>}
+          </section>
+          <p className={styles.periodNote}>
+            {report?.scope === 'mine' ? 'Seus leads e conversas' : 'Números da empresa'} {periodLabel}, {compareLabel}. Linhas: últimos 14 dias.{' '}
+            <Link href="/relatorios">Ver relatórios completos</Link>
+          </p>
+        </>
+      )}
 
       <div className={styles.rowWide}>
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
-            <h2><TrendingUp size={18} /> Entradas e ganhos</h2>
+            <h2><TrendingUp size={18} /> Últimos 30 dias</h2>
             <Link href="/relatorios" className={styles.panelLink}>Relatórios <ArrowRight size={14} /></Link>
           </div>
           <div className={styles.chartBox}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chart.daily} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="dashNovos" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="dashGanhos" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.2)" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="currentColor" opacity={0.55} minTickGap={16} />
-                <YAxis tick={{ fontSize: 12 }} stroke="currentColor" opacity={0.55} allowDecimals={false} />
-                <Tooltip contentStyle={{ borderRadius: 12, fontSize: 13 }} />
-                <Area type="monotone" name="Novos leads" dataKey="novos" stroke="#3b82f6" strokeWidth={2} fill="url(#dashNovos)" />
-                <Area type="monotone" name="Ganhos" dataKey="ganhos" stroke="#10b981" strokeWidth={2} fill="url(#dashGanhos)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chart.length === 0 ? (
+              <p className={styles.mutedText}>{hasCrm ? 'Calculando…' : 'Disponível com o módulo CRM e Atendimento.'}</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chart} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.2)" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="currentColor" opacity={0.55} minTickGap={16} />
+                  <YAxis tick={{ fontSize: 12 }} stroke="currentColor" opacity={0.55} allowDecimals={false} />
+                  <Tooltip contentStyle={{ borderRadius: 12, fontSize: 13, background: 'var(--tooltip-bg)', border: '1px solid var(--glass-border)', color: 'var(--foreground)' }} />
+                  <Legend wrapperStyle={{ fontSize: 13 }} />
+                  <Area type="monotone" name="Mensagens recebidas" dataKey="received" stroke={orange} strokeWidth={2} fill={orange} fillOpacity={0.1} />
+                  <Area type="monotone" name="Novos leads" dataKey="newLeads" stroke={blue} strokeWidth={2} fill={blue} fillOpacity={0.12} />
+                  <Area type="monotone" name="Vendas" dataKey="won" stroke={aqua} strokeWidth={2} fill={aqua} fillOpacity={0.14} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </section>
 
@@ -504,62 +530,59 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className={styles.rowHalf}>
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <h2><Kanban size={18} /> Funil {periodLabel}</h2>
-            <span className={styles.mutedText}>{number(report.current.total)} leads</span>
-          </div>
-          <div className={styles.funnel}>
-            {report.funnel.map((step, index) => (
-              <div key={step.id} className={styles.funnelRow}>
-                <span className={styles.funnelName}>{step.name}</span>
-                <div className={styles.funnelTrack}>
-                  <span style={{ width: `${Math.max(3, (step.reached / maxStage) * 100)}%`, background: step.color }} />
-                </div>
-                <span className={styles.funnelValue}>
-                  {number(step.reached)}
-                  {index > 0 && step.stepConversion !== null && <small>{step.stepConversion.toFixed(0)}%</small>}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className={styles.serviceRow}>
-            <span>TMA <b>{minutes(report.service.handling)}</b></span>
-            <span>TME <b>{minutes(report.service.wait)}</b></span>
-            <span>Ticket médio <b>{report.current.ticket ? currency(report.current.ticket) : '—'}</b></span>
-          </div>
-        </section>
-
-        {canManage ? (
+      {report && (
+        <div className={styles.rowHalf}>
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
-              <h2>Atualizações recentes</h2>
+              <h2><Kanban size={18} /> Funil agora</h2>
+              <span className={styles.mutedText}>{number(report.leads.open)} em aberto</span>
             </div>
-            {updates.length === 0 ? (
-              <p className={styles.mutedText}>Nenhuma atualização registrada ainda.</p>
+            <div className={styles.funnel}>
+              {report.funnel.map((step) => (
+                <div key={step.id} className={styles.funnelRow}>
+                  <span className={styles.funnelName}>{step.name}</span>
+                  <div className={styles.funnelTrack}>
+                    <span style={{ width: `${Math.max(3, (step.count / maxStage) * 100)}%`, background: step.color }} />
+                  </div>
+                  <span className={styles.funnelValue}>
+                    {number(step.count)}
+                    {step.value > 0 && <small>{currency(step.value)}</small>}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className={styles.serviceRow}>
+              <span>1ª resposta <b>{formatMinutes(report.responses.medianAny)}</b></span>
+              <span>Respondidas <b>{report.responses.turns ? `${Math.round((report.responses.answered / report.responses.turns) * 100)}%` : '—'}</b></span>
+              <span>Ticket médio <b>{report.sales.won ? currency(report.sales.revenue / report.sales.won) : '—'}</b></span>
+            </div>
+          </section>
+
+          <section className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <h2><Hourglass size={18} /> Clientes esperando resposta</h2>
+              <Link href="/messages" className={styles.panelLink}>Mensagens <ArrowRight size={14} /></Link>
+            </div>
+            {report.waiting.oldest.length === 0 ? (
+              <p className={styles.mutedText}>Nenhum cliente esperando resposta agora. 🎉</p>
             ) : (
-              <ul className={styles.updateList}>
-                {updates.map((update, index) => (
-                  <li key={index}>
-                    <span className={styles.updateDot} />
-                    <div>
-                      <p><strong>{update.user_name}</strong> {update.action} {update.target || ''}</p>
-                      <small>
-                        {new Date(update.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      </small>
-                    </div>
+              <ul className={styles.waitList}>
+                {report.waiting.oldest.slice(0, 6).map((item) => (
+                  <li key={item.id}>
+                    <Link href={`/messages?chatId=${item.id}`}>
+                      <strong>{item.name}</strong>
+                      <span>{item.assignedName ? `com ${item.assignedName}` : 'sem responsável'}</span>
+                      <em data-late={item.waitMinutes > 60 ? 'true' : undefined}>há {formatMinutes(item.waitMinutes)}</em>
+                    </Link>
                   </li>
                 ))}
               </ul>
             )}
           </section>
-        ) : (
-          user && <PersonalActivityFeed userId={user.id} userName={user.name} />
-        )}
-      </div>
+        </div>
+      )}
 
-      {canManage && report.team.length > 0 && (
+      {canManage && report?.team && report.team.length > 0 && (
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
             <h2>Desempenho da equipe {periodLabel}</h2>
@@ -571,32 +594,30 @@ export default function HomePage() {
                 <tr>
                   <th>Usuário</th>
                   <th>Status</th>
-                  <th>Leads</th>
-                  <th>Ganhos</th>
-                  <th>Conversão</th>
+                  <th>Conversas</th>
+                  <th>1ª resposta</th>
+                  <th>Novos leads</th>
+                  <th>Vendas</th>
                   <th>Receita</th>
-                  <th>TMA</th>
                 </tr>
               </thead>
               <tbody>
                 {report.team.map((member) => {
                   const profile = teamMembers.find((item) => item.id === member.id);
-                  const online = member.id ? presence.isOnline(member.id, profile?.last_seen_at) : false;
+                  const online = presence.isOnline(member.id, profile?.last_seen_at);
                   return (
-                    <tr key={member.id || 'none'}>
-                      <td><strong>{nameById(member.id)}</strong></td>
+                    <tr key={member.id}>
+                      <td><strong>{member.name}</strong></td>
                       <td>
-                        {member.id ? (
-                          <span className={`${styles.statusPill} ${online ? styles.statusOnline : styles.statusOffline}`}>
-                            <i /> {presence.statusLabel(member.id, profile?.last_seen_at)}
-                          </span>
-                        ) : '—'}
+                        <span className={`${styles.statusPill} ${online ? styles.statusOnline : styles.statusOffline}`}>
+                          <i /> {presence.statusLabel(member.id, profile?.last_seen_at)}
+                        </span>
                       </td>
-                      <td>{member.total}</td>
-                      <td>{member.won}</td>
-                      <td>{member.conversion.toFixed(0)}%</td>
+                      <td>{number(member.conversations)}</td>
+                      <td>{formatMinutes(member.medianResponse)}</td>
+                      <td>{number(member.newLeads)}</td>
+                      <td>{number(member.won)}</td>
                       <td><strong>{currency(member.revenue)}</strong></td>
-                      <td>{minutes(member.handling)}</td>
                     </tr>
                   );
                 })}
@@ -604,6 +625,33 @@ export default function HomePage() {
             </table>
           </div>
         </section>
+      )}
+
+      {canManage ? (
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2>Atualizações recentes</h2>
+          </div>
+          {updates.length === 0 ? (
+            <p className={styles.mutedText}>Nenhuma atualização registrada ainda.</p>
+          ) : (
+            <ul className={styles.updateList}>
+              {updates.map((update, index) => (
+                <li key={index}>
+                  <span className={styles.updateDot} />
+                  <div>
+                    <p><strong>{update.user_name}</strong> {update.action} {update.target || ''}</p>
+                    <small>
+                      {new Date(update.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </small>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : (
+        user && <PersonalActivityFeed userId={user.id} userName={user.name} />
       )}
     </div>
   );

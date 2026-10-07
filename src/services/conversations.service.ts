@@ -11,6 +11,7 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { insertChatMessage } from '@/lib/chat-messages';
 
 type Row = Record<string, unknown>;
 
@@ -86,7 +87,7 @@ export async function setAiPaused(tenantId: string, leadId: string, paused: bool
 }
 
 /** Texto da equipe para o cliente. `retryId`: reenvia uma mensagem que falhou. */
-export async function sendTextToLead(tenantId: string, senderId: string | null, lead: ChatLead, text: string, retryId?: string | null): Promise<SendResult> {
+export async function sendTextToLead(tenantId: string, senderId: string | null, lead: ChatLead, text: string, retryId?: string | null, origin: 'team' | 'scheduled' = 'team'): Promise<SendResult> {
   if (!lead.phone) return { ok: false, error: 'Este contato não tem telefone.' };
   const channels = await whatsappChannels(tenantId);
   if (!channels.web && !channels.api) return { ok: false, error: 'Nenhum WhatsApp conectado. Conecte o WhatsApp Web ou a API oficial em Integrações.' };
@@ -98,13 +99,9 @@ export async function sendTextToLead(tenantId: string, senderId: string | null, 
     if (!data) return { ok: false, error: 'Essa mensagem já foi reenviada.' };
     messageId = data.id;
   } else {
-    const { data, error } = await supabaseAdmin
-      .from('chat_messages')
-      .insert({ tenant_id: tenantId, lead_id: lead.id, text, type: 'text', sent_by_me: true, status: 'sending', provider, sent_by: senderId })
-      .select('id')
-      .single();
+    const { data, error } = await insertChatMessage({ tenant_id: tenantId, lead_id: lead.id, text, type: 'text', sent_by_me: true, status: 'sending', provider, sent_by: senderId, origin }, 'id');
     if (error || !data) return { ok: false, error: error?.message || 'Não foi possível registrar a mensagem.' };
-    messageId = data.id;
+    messageId = String(data.id);
   }
 
   try {
@@ -158,12 +155,9 @@ export async function sendMediaToLead(
   if (uploadError) return { ok: false, error: `Falha ao guardar o arquivo: ${uploadError.message}` };
   const mediaUrl = supabaseAdmin.storage.from('chat-media').getPublicUrl(storagePath).data.publicUrl;
 
-  const { data: row, error } = await supabaseAdmin
-    .from('chat_messages')
-    .insert({ tenant_id: tenantId, lead_id: lead.id, text: kind === 'document' ? caption || file.name : caption, type: kind, audio_url: mediaUrl, sent_by_me: true, status: 'sending', provider, sent_by: senderId })
-    .select('id')
-    .single();
-  if (error || !row) return { ok: false, error: error?.message || 'Não foi possível registrar a mensagem.' };
+  const { data: inserted, error } = await insertChatMessage({ tenant_id: tenantId, lead_id: lead.id, text: kind === 'document' ? caption || file.name : caption, type: kind, audio_url: mediaUrl, sent_by_me: true, status: 'sending', provider, sent_by: senderId, origin: 'team' }, 'id');
+  if (error || !inserted) return { ok: false, error: error?.message || 'Não foi possível registrar a mensagem.' };
+  const row = { id: String(inserted.id) };
 
   try {
     let externalId: string | null = null;

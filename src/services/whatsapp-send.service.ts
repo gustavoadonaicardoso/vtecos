@@ -8,6 +8,7 @@
  */
 
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { insertChatMessage } from '@/lib/chat-messages';
 
 export async function createOutboundMessageRecord(tenantId: string, params: {
   leadId: string;
@@ -18,22 +19,19 @@ export async function createOutboundMessageRecord(tenantId: string, params: {
   const { data: lead } = await supabase.from('leads').select('id').eq('tenant_id', tenantId).eq('id', params.leadId).maybeSingle();
   if (!lead) return null;
 
-  const { data: msg, error } = await supabase
-    .from('chat_messages')
-    .insert([{
-      tenant_id: tenantId,
-      lead_id: params.leadId,
-      text: params.text,
-      sent_by_me: true,
-      type: params.type === 'text' ? 'text' : (params.type === 'audio' ? 'audio' : params.type),
-      status: 'sending',
-      provider: 'meta',
-    }])
-    .select('id')
-    .single();
+  const { data: msg, error } = await insertChatMessage({
+    tenant_id: tenantId,
+    lead_id: params.leadId,
+    text: params.text,
+    sent_by_me: true,
+    type: params.type === 'text' ? 'text' : (params.type === 'audio' ? 'audio' : params.type),
+    status: 'sending',
+    provider: 'meta',
+    origin: 'team',
+  }, 'id');
 
   if (error || !msg) return null;
-  return msg.id;
+  return String(msg.id);
 }
 
 export async function markMessageFailed(tenantId: string, dbMessageId: string) {

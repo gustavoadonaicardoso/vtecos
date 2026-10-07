@@ -62,6 +62,8 @@ async function sendOne(row: Row) {
     (row.created_by as string) || null,
     { id: lead.id, name: lead.name || '', phone: lead.phone || '', assigned_to: lead.assigned_to || null, blocked: false },
     String(row.message || ''),
+    null,
+    'scheduled',
   );
   return finishSend(row, result.ok, result.ok ? undefined : result.error);
 }

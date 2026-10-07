@@ -11,6 +11,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { assertPublicHttpsUrl } from '@/lib/integrations/safe-url';
+import { insertChatMessage, type MessageOrigin } from '@/lib/chat-messages';
 
 export type MediaKind = 'image' | 'document' | 'audio' | 'video';
 
@@ -112,10 +113,10 @@ export async function deliverWhatsApp(tenantId: string, phone: string, payload: 
 const MEDIA_LABEL: Record<MediaKind, string> = { image: '📷 Imagem', video: '🎬 Vídeo', audio: '🎧 Áudio', document: '📎 Arquivo' };
 
 /** Registra na conversa do lead uma mensagem que a empresa enviou (robô, campanha). */
-export async function recordOutbound(tenantId: string, leadId: string, sent: { provider: string; text: string }, payload: Pick<WhatsAppPayload, 'mediaUrl' | 'mediaKind'>, prefix = '🤖') {
+export async function recordOutbound(tenantId: string, leadId: string, sent: { provider: string; text: string }, payload: Pick<WhatsAppPayload, 'mediaUrl' | 'mediaKind'>, prefix = '🤖', origin: MessageOrigin = 'automation') {
   const label = MEDIA_LABEL[payload.mediaKind || 'document'];
   const preview = payload.mediaUrl ? `${sent.text ? `${sent.text}\n` : `${label}\n`}${payload.mediaUrl}` : sent.text;
-  await supabaseAdmin.from('chat_messages').insert({
+  await insertChatMessage({
     tenant_id: tenantId,
     lead_id: leadId,
     text: preview,
@@ -123,12 +124,13 @@ export async function recordOutbound(tenantId: string, leadId: string, sent: { p
     type: 'text',
     status: 'sent',
     provider: sent.provider,
+    origin,
   });
   await supabaseAdmin.from('leads').update({ last_msg: `${prefix} ${(sent.text || label).split('\n')[0]}`.slice(0, 200) }).eq('tenant_id', tenantId).eq('id', leadId);
 }
 
 /** Envia para o lead e registra na conversa (aparece em Mensagens, como as respostas da equipe). */
-export async function sendToLead(tenantId: string, leadId: string, phone: string, payload: WhatsAppPayload) {
+export async function sendToLead(tenantId: string, leadId: string, phone: string, payload: WhatsAppPayload, origin: MessageOrigin = 'automation') {
   const sent = await deliverWhatsApp(tenantId, phone, payload);
-  await recordOutbound(tenantId, leadId, sent, payload);
+  await recordOutbound(tenantId, leadId, sent, payload, '🤖', origin);
 }

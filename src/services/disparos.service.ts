@@ -613,7 +613,7 @@ export async function handleCampaignReply(tenantId: string, leadId: string, phon
     try {
       const { deliverWhatsApp, recordOutbound } = await import('@/lib/whatsapp-outbound');
       const sent = await deliverWhatsApp(tenantId, phoneRaw, { text: 'Pronto! Você não vai mais receber nossas campanhas. Se precisar de algo, é só mandar uma mensagem por aqui.' });
-      await recordOutbound(tenantId, leadId, sent, {}, '📣');
+      await recordOutbound(tenantId, leadId, sent, {}, '📣', 'campaign');
     } catch (error) {
       console.error('[disparos] confirmação de descadastro falhou', error instanceof Error ? error.message : error);
     }
