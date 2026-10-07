@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, Info, Shuffle } from 'lucide-react';
+import { ArrowLeft, Ban, Bot, BotOff, Info, Shuffle } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import styles from '../messages.module.css';
 import type { Lead } from '@/types';
@@ -13,10 +13,14 @@ interface ChatHeaderProps {
   onBack: () => void;
   onTransfer: () => void;
   onInfo: () => void;
+  /** IA pausada nesta conversa (botão "Pausar IA" / "Retomar IA"). */
+  aiPaused: boolean;
+  aiBusy: boolean;
+  onToggleAi: () => void;
   tools: ComponentProps<typeof SystemToolsBar>;
 }
 
-export default function ChatHeader({ lead, ownerName, canTransfer, channelLabel, onBack, onTransfer, onInfo, tools }: ChatHeaderProps) {
+export default function ChatHeader({ lead, ownerName, canTransfer, channelLabel, onBack, onTransfer, onInfo, aiPaused, aiBusy, onToggleAi, tools }: ChatHeaderProps) {
   return (
     <header className={styles.chatHead}>
       <button type="button" className={`${styles.iconBtn} ${styles.backBtn}`} onClick={onBack} aria-label="Voltar para as conversas"><ArrowLeft size={18} /></button>
@@ -28,6 +32,18 @@ export default function ChatHeader({ lead, ownerName, canTransfer, channelLabel,
         </span>
       </button>
       <div className={styles.chatActions}>
+        <button
+          type="button"
+          className={`${styles.secondaryBtn} ${aiPaused ? styles.aiPausedBtn : ''}`}
+          onClick={onToggleAi}
+          disabled={aiBusy}
+          aria-pressed={aiPaused}
+          title={aiPaused
+            ? 'O Atendente com IA está pausado nesta conversa. Clique para ele voltar a responder.'
+            : 'Pausa o Atendente com IA nesta conversa até você retomar. Quando alguém da equipe responde, ele também pausa sozinho por um tempo.'}
+        >
+          {aiPaused ? <BotOff size={15} /> : <Bot size={15} />} <span className={styles.hideSm}>{aiPaused ? 'Retomar IA' : 'Pausar IA'}</span>
+        </button>
         {canTransfer && (
           <button type="button" className={styles.secondaryBtn} onClick={onTransfer} title="Passar a conversa para outra pessoa">
             <Shuffle size={15} /> <span className={styles.hideSm}>Transferir</span>

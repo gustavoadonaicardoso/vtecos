@@ -30,6 +30,8 @@ export type Lead = {
   stageChangedAt?: string | null;
   /** Mensagens do cliente que a equipe ainda não viu. */
   unreadCount?: number;
+  /** Atendente com IA pausado nesta conversa até esta data (ISO). */
+  aiPausedUntil?: string | null;
 };
 
 /** Etiqueta cadastrada pela empresa. */

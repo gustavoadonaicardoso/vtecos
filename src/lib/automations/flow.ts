@@ -46,7 +46,8 @@ export type NodeType =
   | 'webhook'
   // Inteligência artificial
   | 'ai-reply'
-  | 'ai-classify';
+  | 'ai-classify'
+  | 'ai-chat';
 
 /** Nome da saída de um bloco ("default", "yes", "no", "invalid", "a", "b" ou o id de uma opção). */
 export type PortName = string;
@@ -163,6 +164,17 @@ export interface NodeConfig {
   aiSend?: boolean;
   aiInput?: string;
   categories?: AiCategory[];
+  /** Atendente com IA: espera X segundos depois da última mensagem para responder tudo junto. */
+  groupSeconds?: number;
+  /** Atendente com IA: quantas respostas, no máximo, antes de passar para a equipe. */
+  maxTurns?: number;
+  /** Atendente com IA: horas em silêncio depois que alguém da equipe responde (0 = não pausa). */
+  humanPauseHours?: number;
+  /** Atendente com IA: o cliente pode pedir uma pessoa (sai por "Pediu atendente"). */
+  allowHandoff?: boolean;
+  handoffMessage?: string;
+  /** Atendente com IA: horas em silêncio depois de passar para a equipe. */
+  handoffPauseHours?: number;
 }
 
 export interface FlowNode {
@@ -208,16 +220,16 @@ export const TRIGGER_TYPES = Object.keys(TRIGGER_EVENT) as NodeType[];
 export const isTrigger = (type: NodeType) => TRIGGER_TYPES.includes(type);
 
 /** Blocos que mandam algo para o contato (precisam de WhatsApp conectado). */
-export const SENDS_WHATSAPP: NodeType[] = ['send-message', 'send-media', 'question', 'menu'];
+export const SENDS_WHATSAPP: NodeType[] = ['send-message', 'send-media', 'question', 'menu', 'ai-chat'];
 /** Blocos que usam a IA (Gemini ou IA local configurada no servidor). */
-export const USES_AI: NodeType[] = ['ai-reply', 'ai-classify'];
+export const USES_AI: NodeType[] = ['ai-reply', 'ai-classify', 'ai-chat'];
 
 export const NODE_TYPES: NodeType[] = [
   ...TRIGGER_TYPES,
   'send-message', 'send-media', 'question', 'menu', 'wait-reply',
   'condition', 'switch', 'business-hours', 'split-ab', 'delay', 'set-variable', 'start-flow', 'end',
   'update-lead', 'tag-lead', 'assign-lead', 'add-note', 'create-task', 'notify-team', 'webhook',
-  'ai-reply', 'ai-classify',
+  'ai-reply', 'ai-classify', 'ai-chat',
 ];
 
 export const DEFAULT_HOURS: BusinessHour[] = [1, 2, 3, 4, 5].map((day) => ({ day, start: '08:00', end: '18:00' })).concat([{ day: 6, start: '08:00', end: '12:00' }]);
@@ -281,6 +293,16 @@ export const DEFAULT_CONFIG: Record<NodeType, NodeConfig> = {
       { id: 'cat_3', label: 'Outro', description: 'Qualquer outro assunto' },
     ],
   },
+  'ai-chat': {
+    aiInstructions: 'Você é o atendente da {{empresa}} no WhatsApp. Responda de forma curta, educada e em português.\n\nSobre a empresa: (descreva o que vocês fazem, produtos/serviços, horários, endereço e formas de pagamento)\n\nRegras: não invente preços, prazos ou condições que não estejam aqui. Se não souber, diga que vai chamar alguém da equipe.',
+    groupSeconds: 8,
+    timeoutHours: 24,
+    maxTurns: 30,
+    humanPauseHours: 2,
+    allowHandoff: true,
+    handoffMessage: 'Certo, {{lead.first_name|}}! Vou chamar alguém da nossa equipe para continuar com você. 😊',
+    handoffPauseHours: 24,
+  },
 };
 
 export const DEFAULT_LABEL: Record<NodeType, string> = {
@@ -314,6 +336,7 @@ export const DEFAULT_LABEL: Record<NodeType, string> = {
   webhook: 'Chamar webhook',
   'ai-reply': 'Resposta com IA',
   'ai-classify': 'Classificar com IA',
+  'ai-chat': 'Atendente com IA',
 };
 
 // ── Listas da configuração ───────────────────────────────────
@@ -405,6 +428,8 @@ export function portsFor(node: Pick<FlowNode, 'type' | 'config'>): Port[] {
       return [{ id: 'default', label: 'Pronto', tone: 'default' }, NO('Erro')];
     case 'ai-classify':
       return [...aiCategories(c).map((item): Port => ({ id: item.id, label: item.label || 'Categoria', tone: 'option' })), NO('Não identificou')];
+    case 'ai-chat':
+      return [{ id: 'handoff', label: 'Pediu atendente', tone: 'option' }, NO('Cliente parou de responder')];
     default:
       return [{ id: 'default', label: '', tone: 'default' }];
   }
@@ -552,7 +577,7 @@ export function validateFlow(graph: FlowGraph): { errors: string[]; warnings: st
     if (trigger && !reachable.has(node.id)) warnings.push(`${name} não está ligado ao fluxo e nunca vai rodar.`);
 
     // Variáveis usadas nos textos que não existem em lugar nenhum.
-    const texts = [c.message, c.question, c.caption, c.fieldValue, c.note, c.taskTitle, c.taskDescription, c.body, c.value, c.aiInstructions, c.aiInput, ...(c.variants || [])];
+    const texts = [c.message, c.question, c.caption, c.fieldValue, c.note, c.taskTitle, c.taskDescription, c.body, c.value, c.aiInstructions, c.aiInput, c.handoffMessage, ...(c.variants || [])];
     for (const text of texts) {
       for (const match of String(text || '').matchAll(/\{\{\s*([\w.]+)\s*(\|[^}]*)?\}\}/g)) {
         const variable = match[1];
@@ -666,6 +691,12 @@ export function validateFlow(graph: FlowGraph): { errors: string[]; warnings: st
       case 'ai-classify':
         if (aiCategories(c).length < 2) errors.push(`${name}: a IA precisa de pelo menos 2 categorias.`);
         if (aiCategories(c).some((item) => !item.label.trim())) errors.push(`${name}: todas as categorias precisam de um nome.`);
+        break;
+      case 'ai-chat':
+        if (!(c.aiInstructions || '').trim()) errors.push(`${name}: escreva as instruções para a IA.`);
+        if (c.allowHandoff !== false && !(c.handoffMessage || '').trim()) errors.push(`${name}: escreva a mensagem de quando o cliente pede uma pessoa.`);
+        if (c.allowHandoff !== false && !nextNodeId(graph, node.id, 'handoff')) warnings.push(`${name}: ligue a saída "Pediu atendente" a um aviso para a equipe (senão ninguém fica sabendo).`);
+        if (trigger?.type === 'trigger-message' && Number(trigger.config.reentryHours ?? 24) > 0) warnings.push(`${name}: no gatilho, "Não repetir por" está em ${Number(trigger.config.reentryHours ?? 24)}h. Depois que uma conversa termina, o cliente fica esse tempo sem a IA. Use 0.`);
         break;
     }
   }

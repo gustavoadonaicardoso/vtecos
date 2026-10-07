@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireActiveProfile } from '@/lib/session';
-import { loadChatLead, sendMediaToLead } from '@/services/conversations.service';
+import { loadChatLead, markHumanReply, sendMediaToLead } from '@/services/conversations.service';
 
 export const runtime = 'nodejs';
 
@@ -26,5 +26,6 @@ export async function POST(request: Request) {
     typeof caption === 'string' ? caption.trim().slice(0, 1024) : ''
   );
   if (!result.ok) return NextResponse.json({ error: result.error, data: result.message ?? null }, { status: 502 });
+  await markHumanReply(auth.tenantId, lead.id).catch(() => {});
   return NextResponse.json({ data: result.message });
 }

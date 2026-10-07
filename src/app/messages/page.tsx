@@ -51,6 +51,8 @@ function MessagesContent() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const [aiPause, setAiPause] = useState<Record<string, string | null>>({});
+  const [aiBusy, setAiBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const seenCreated = useRef(lastCreatedLeadId);
 
@@ -229,6 +231,24 @@ function MessagesContent() {
     return null;
   };
 
+  const aiPausedUntil = lead ? (lead.id in aiPause ? aiPause[lead.id] : lead.aiPausedUntil ?? null) : null;
+  const aiPaused = Boolean(aiPausedUntil && new Date(aiPausedUntil).getTime() > now);
+
+  const toggleAi = async () => {
+    if (!lead || aiBusy) return;
+    setAiBusy(true);
+    const response = await fetch(`/api/leads/${lead.id}/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paused: !aiPaused }) }).catch(() => null);
+    const json = response ? await response.json().catch(() => ({})) : {};
+    setAiBusy(false);
+    if (!response?.ok) {
+      setNotice({ type: 'error', text: json.error || 'Não foi possível mudar a IA desta conversa.' });
+      return;
+    }
+    setAiPause((current) => ({ ...current, [lead.id]: json.data?.aiPausedUntil ?? null }));
+    setNow(Date.now());
+    setNotice({ type: 'ok', text: aiPaused ? 'A IA voltou a responder esta conversa.' : 'IA pausada nesta conversa: só a equipe responde até você retomar.' });
+  };
+
   const channelLabel = channels ? (channels.web ? 'WhatsApp Web' : channels.api ? 'API oficial' : null) : null;
   const disabledReason = !lead
     ? null
@@ -278,6 +298,9 @@ function MessagesContent() {
               onBack={() => selectChat(null)}
               onTransfer={() => setShowTransfer(true)}
               onInfo={() => setShowInfo(true)}
+              aiPaused={aiPaused}
+              aiBusy={aiBusy}
+              onToggleAi={toggleAi}
               tools={tools}
             />
             {channels && !channels.web && !channels.api && (

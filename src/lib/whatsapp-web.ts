@@ -172,7 +172,12 @@ export async function startWhatsAppWeb(tenantId: string) {
       const { supabaseAdmin } = await import('@/lib/supabase-admin');
 
       for (const item of messages) {
-        if (item.key.fromMe || !item.key.remoteJid || item.key.remoteJid.endsWith('@g.us')) continue;
+        if (!item.key.remoteJid || item.key.remoteJid.endsWith('@g.us')) continue;
+        if (item.key.fromMe) {
+          // Mandada pelo celular da empresa (as do sistema chegam como "append").
+          await recordPhoneReply(tenantId, socket, item as WAMessage).catch((error) => console.error('[whatsapp-web] resposta pelo celular', error));
+          continue;
+        }
 
         const content = item.message;
         if (!content) continue;
@@ -373,6 +378,43 @@ function toWhatsAppJid(phone: string) {
   const digits = phone.replace(/\D/g, '');
   const normalized = digits.startsWith('55') ? digits : `55${digits}`;
   return `${normalized}@s.whatsapp.net`;
+}
+
+/** Telefone do contato de uma mensagem (resolve o LID quando dá). */
+async function contactPhone(socket: WASocket, item: WAMessage) {
+  let jid = item.key.remoteJidAlt || item.key.remoteJid || '';
+  if (jid.endsWith('@lid')) {
+    const resolved = await socket.signalRepository.lidMapping.getPNForLID(jid).catch(() => null);
+    if (resolved) jid = resolved;
+  }
+  return jid.endsWith('@lid') ? '' : jid.replace(/@.*$/, '');
+}
+
+/**
+ * Alguém respondeu o cliente direto pelo celular conectado: registra na
+ * conversa (para a equipe e a IA verem) e marca que um humano respondeu,
+ * para o Atendente com IA ficar quieto.
+ */
+async function recordPhoneReply(tenantId: string, socket: WASocket, item: WAMessage) {
+  const content = item.message;
+  if (!content) return;
+  const text = content.conversation || content.extendedTextMessage?.text
+    || content.imageMessage?.caption || content.videoMessage?.caption || content.documentMessage?.caption
+    || (content.imageMessage ? '📷 Imagem' : content.audioMessage ? '🎧 Áudio' : content.videoMessage ? '🎬 Vídeo' : content.documentMessage ? `📎 ${content.documentMessage.fileName || 'Arquivo'}` : '');
+  if (!text) return;
+  const phone = await contactPhone(socket, item);
+  if (!phone) return;
+  const { findLeadByPhone } = await import('@/services/leads.service');
+  const lead = await findLeadByPhone(tenantId, phone);
+  if (!lead) return;
+  const { supabaseAdmin } = await import('@/lib/supabase-admin');
+  const externalId = item.key.id || null;
+  if (externalId) {
+    const { data: known } = await supabaseAdmin.from('chat_messages').select('id').eq('tenant_id', tenantId).eq('external_id', externalId).limit(1);
+    if (known?.length) return;
+  }
+  await supabaseAdmin.from('chat_messages').insert({ tenant_id: tenantId, lead_id: lead.id, text: text.slice(0, 4096), sent_by_me: true, type: 'text', status: 'sent', provider: 'whatsapp_web', external_id: externalId });
+  await supabaseAdmin.from('leads').update({ last_msg: text.split('\n')[0].slice(0, 200), human_replied_at: new Date().toISOString() }).eq('tenant_id', tenantId).eq('id', lead.id);
 }
 
 /**

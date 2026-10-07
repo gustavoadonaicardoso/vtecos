@@ -62,7 +62,9 @@ import {
 
 type FlowRow = { id: string; tenant_id: string; name: string; status: string; graph: unknown; trigger_event: string | null; state?: Record<string, unknown> | null };
 type LoadedFlow = FlowRow & { graphParsed: FlowGraph };
-type StoredContext = { vars?: Record<string, string>; message?: string; input?: Record<string, string>; attempts?: number; depth?: number };
+/** Atendente com IA: resposta pendente, quantas respostas deu, falhas seguidas e a última mensagem do cliente já vista. */
+type AiChatState = { pending?: boolean; turns?: number; errors?: number; lastSeenAt?: string };
+type StoredContext = { vars?: Record<string, string>; message?: string; input?: Record<string, string>; attempts?: number; depth?: number; aiChat?: AiChatState };
 type RunRow = {
   id: string;
   tenant_id: string;
@@ -182,7 +184,7 @@ async function conversationFor(tenantId: string, leadId: string) {
 
 type StepResult =
   | { kind: 'next'; port: PortName; detail: string; vars?: Record<string, string> }
-  | { kind: 'wait'; waitingFor: 'delay' | 'reply'; resumeAt: Date; detail: string }
+  | { kind: 'wait'; waitingFor: 'delay' | 'reply'; resumeAt: Date; detail: string; wakeInMs?: number }
   | { kind: 'fail'; detail: string }
   | { kind: 'end'; detail: string };
 
@@ -533,6 +535,13 @@ async function runNode(node: FlowNode, run: RunRow, flow: LoadedFlow, ctx: RunCo
       }
     }
 
+    case 'ai-chat': {
+      // A conversa abre aqui; a resposta sai depois de juntar as mensagens.
+      const ms = groupMs(c);
+      run.context.aiChat = { pending: true, turns: 0, errors: 0 };
+      return { kind: 'wait', waitingFor: 'reply', resumeAt: new Date(Date.now() + ms), wakeInMs: ms, detail: 'Atendente com IA: conversa aberta.' };
+    }
+
     case 'ai-classify': {
       const categories = aiCategories(c);
       const variable = cleanVariableName(c.variable || '');
@@ -623,6 +632,7 @@ async function advance(run: RunRow, startNodeId: string | null, preloaded?: Load
     }
     if (result.kind === 'wait') {
       await saveRun(run, { status: 'waiting', steps, current_node_id: node.id, waiting_for: result.waitingFor, resume_at: result.resumeAt.toISOString(), context: run.context });
+      if (result.wakeInMs !== undefined) scheduleWake(run, result.wakeInMs);
       return;
     }
     nodeId = nextNodeId(graph, node.id, result.port);
@@ -633,15 +643,16 @@ async function advance(run: RunRow, startNodeId: string | null, preloaded?: Load
 }
 
 /** Reivindica uma execução em espera (só um processo continua cada uma). */
-async function claim(run: Pick<RunRow, 'id' | 'tenant_id'>): Promise<RunRow | null> {
-  const { data } = await supabaseAdmin
+async function claim(run: Pick<RunRow, 'id' | 'tenant_id'>, options: { dueBy?: Date } = {}): Promise<RunRow | null> {
+  let query = supabaseAdmin
     .from('automation_runs')
     .update({ status: 'running', updated_at: nowIso() })
     .eq('tenant_id', run.tenant_id)
     .eq('id', run.id)
-    .eq('status', 'waiting')
-    .select()
-    .maybeSingle();
+    .eq('status', 'waiting');
+  // Só se a espera já venceu (outra mensagem pode ter adiado a resposta).
+  if (options.dueBy) query = query.lte('resume_at', options.dueBy.toISOString());
+  const { data } = await query.select().maybeSingle();
   return (data as RunRow) || null;
 }
 
@@ -819,6 +830,16 @@ async function handleReply(run: RunRow, text: string) {
   }
   const c = node.config;
   run.context = { ...(run.context || {}), message: text, vars: { ...(run.context?.vars || {}) } };
+
+  if (node.type === 'ai-chat') {
+    // Junta as mensagens: cada nova adia a resposta mais um pouco.
+    const ms = groupMs(c);
+    run.context.aiChat = { ...(run.context.aiChat || {}), pending: true };
+    await saveRun(run, { status: 'waiting', waiting_for: 'reply', resume_at: new Date(Date.now() + ms).toISOString(), context: run.context });
+    scheduleWake(run, ms);
+    return;
+  }
+
   const steps = [...(run.steps || [])];
   const step = (detail: string, ok = true) => steps.push({ node_id: node.id, label: node.label, at: nowIso(), ok, detail: detail.slice(0, 400) });
 
@@ -888,6 +909,231 @@ async function handleReply(run: RunRow, text: string) {
   step(`Contato respondeu: "${text.slice(0, 120)}"`);
   run.steps = steps;
   await advance(run, nextNodeId(graph, node.id, 'yes'), flow);
+}
+
+// ── Atendente com IA ─────────────────────────────────────────
+// O bloco fica "esperando resposta" enquanto a conversa está aberta.
+// Cada mensagem do cliente adia a resposta alguns segundos (junta
+// mensagens seguidas); quando o tempo vence, a IA lê o que chegou desde
+// a última resposta e responde tudo de uma vez. Mensagens que chegam
+// enquanto a IA pensa entram na próxima resposta. A IA fica quieta se
+// a equipe pausou ou respondeu há pouco, e passa a conversa para uma
+// pessoa quando o cliente pede.
+
+const groupMs = (c: NodeConfig) => Math.max(1, Math.min(60, Number(c.groupSeconds ?? 8))) * 1000;
+const time = (value?: string | null) => (value ? new Date(value).getTime() || 0 : 0);
+/** Passos guardados de uma conversa longa (o limite da execução é 80). */
+const KEEP_STEPS = 70;
+
+type WakeTimers = Map<string, ReturnType<typeof setTimeout>>;
+const wakeTimers = (): WakeTimers => {
+  const holder = globalThis as typeof globalThis & { __vtecAiChatWakes?: WakeTimers };
+  holder.__vtecAiChatWakes ??= new Map();
+  return holder.__vtecAiChatWakes;
+};
+
+/** Acorda a execução daqui a `ms` (se o servidor reiniciar, o agendador pega em até 1 min). */
+function scheduleWake(run: Pick<RunRow, 'id' | 'tenant_id'>, ms: number) {
+  const timers = wakeTimers();
+  const previous = timers.get(run.id);
+  if (previous) clearTimeout(previous);
+  const timer = setTimeout(() => {
+    timers.delete(run.id);
+    void wakeAiChat({ id: run.id, tenant_id: run.tenant_id }).catch((error) => log('atendente com IA', error));
+  }, Math.max(500, ms));
+  timer.unref?.();
+  timers.set(run.id, timer);
+}
+
+async function wakeAiChat(row: Pick<RunRow, 'id' | 'tenant_id'>) {
+  const run = await claim(row, { dueBy: new Date(Date.now() + 1000) });
+  if (!run) return;
+  const flow = await loadFlow(run.flow_id);
+  if (!flow || flow.status !== 'active') {
+    await finish(run, 'cancelled', { error: 'O fluxo foi pausado ou excluído.' });
+    return;
+  }
+  const node = flow.graphParsed.nodes.find((item) => item.id === run.current_node_id);
+  if (node?.type !== 'ai-chat' || !run.context?.aiChat?.pending) {
+    await saveRun(run, { status: 'waiting' });
+    return;
+  }
+  await aiChatTurn(run, flow, node);
+}
+
+/** Por que a IA deve ficar quieta agora (ou null). */
+function aiPauseReason(lead: Record<string, unknown>, c: NodeConfig): string | null {
+  const now = Date.now();
+  const until = time(lead.ai_paused_until as string | null);
+  if (until > now) return `IA pausada até ${new Date(until).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+  const hours = Math.max(0, Number(c.humanPauseHours ?? 2));
+  if (hours > 0 && time(lead.human_replied_at as string | null) > now - hours * 3600_000) return `alguém da equipe respondeu há menos de ${hours}h`;
+  return null;
+}
+
+/** Chegou mensagem do cliente depois de `since`? */
+async function newerInbound(tenantId: string, leadId: string, since: string) {
+  const { count } = await supabaseAdmin
+    .from('chat_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('lead_id', leadId)
+    .eq('sent_by_me', false)
+    .gt('created_at', since);
+  return (count || 0) > 0;
+}
+
+/**
+ * Já salvou a execução esperando o cliente: se uma mensagem chegou no
+ * meio do caminho (com a execução ocupada), marca para responder.
+ */
+async function catchLateMessages(run: RunRow, c: NodeConfig, since: string) {
+  if (!(await newerInbound(run.tenant_id, run.lead_id!, since))) return;
+  const ms = groupMs(c);
+  const context = { ...run.context, aiChat: { ...(run.context.aiChat || {}), pending: true } };
+  const { count } = await supabaseAdmin
+    .from('automation_runs')
+    .update({ context, resume_at: new Date(Date.now() + ms).toISOString(), updated_at: nowIso() }, { count: 'exact' })
+    .eq('tenant_id', run.tenant_id)
+    .eq('id', run.id)
+    .eq('status', 'waiting');
+  if (count) {
+    run.context = context;
+    scheduleWake(run, ms);
+  }
+}
+
+/** Uma vez do Atendente com IA: lê as mensagens novas e responde (ou passa para a equipe). */
+async function aiChatTurn(run: RunRow, flow: LoadedFlow, node: FlowNode) {
+  const c = node.config;
+  const tenantId = run.tenant_id;
+  const leadId = run.lead_id!;
+  run.context = { ...(run.context || {}) };
+  const previousSeen = run.context.aiChat?.lastSeenAt;
+  const chat: AiChatState = { turns: 0, errors: 0, ...(run.context.aiChat || {}), pending: false };
+  run.context.aiChat = chat;
+  const steps = [...(run.steps || [])];
+  const step = (detail: string, ok = true) => steps.push({ node_id: node.id, label: node.label, at: nowIso(), ok, detail: detail.slice(0, 400) });
+  const allowHandoff = c.allowHandoff !== false;
+
+  const waitForCustomer = async () => {
+    await saveRun(run, { status: 'waiting', waiting_for: 'reply', resume_at: replyTimeout(c).toISOString(), steps: steps.slice(-KEEP_STEPS), context: run.context });
+    await catchLateMessages(run, c, chat.lastSeenAt || run.started_at || nowIso());
+  };
+  const retryLater = async () => {
+    chat.pending = true;
+    chat.lastSeenAt = previousSeen;
+    await saveRun(run, { status: 'waiting', waiting_for: 'reply', resume_at: new Date(Date.now() + 60_000).toISOString(), steps: steps.slice(-KEEP_STEPS), context: run.context });
+    scheduleWake(run, 60_000);
+  };
+
+  const loaded = await loadContext(tenantId, leadId, run, flow);
+  if (!loaded) {
+    await finish(run, 'failed', { steps, error: 'O lead foi excluído.' });
+    return;
+  }
+
+  const handoff = async (reason: string) => {
+    const text = renderTemplate(c.handoffMessage || '', loaded.ctx).trim();
+    if (text) await sendToLead(tenantId, leadId, loaded.ctx.lead.phone, { text, typingSeconds: 1 }).catch((error) => log('atendente com IA: aviso de passagem', error));
+    const hours = Math.max(0, Math.min(720, Number(c.handoffPauseHours ?? 24)));
+    if (hours > 0) await supabaseAdmin.from('leads').update({ ai_paused_until: new Date(Date.now() + hours * 3600_000).toISOString() }).eq('tenant_id', tenantId).eq('id', leadId);
+    step(`Passou para a equipe: ${reason}.`);
+    run.steps = steps.slice(-KEEP_STEPS);
+    const next = nextNodeId(flow.graphParsed, node.id, 'handoff');
+    if (!next) {
+      await finish(run, 'completed', { steps: run.steps, current_node_id: node.id });
+      return;
+    }
+    await advance(run, next, flow);
+  };
+
+  // O que o cliente mandou depois da última mensagem que a IA já leu
+  // (na primeira vez, depois da última resposta da empresa).
+  const { data } = await supabaseAdmin
+    .from('chat_messages')
+    .select('text, sent_by_me, created_at')
+    .eq('tenant_id', tenantId)
+    .eq('lead_id', leadId)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  const history = (data || []).reverse() as { text: string | null; sent_by_me: boolean; created_at: string }[];
+  const inbound = history.filter((row) => !row.sent_by_me);
+  const lastOutbound = [...history].reverse().find((row) => row.sent_by_me)?.created_at;
+  const floor = previousSeen ? time(previousSeen) : Math.max(time(lastOutbound), run.started_at ? time(run.started_at) - 120_000 : 0);
+  const fresh = inbound.filter((row) => time(row.created_at) > floor && String(row.text || '').trim());
+  if (inbound.length) chat.lastSeenAt = inbound[inbound.length - 1].created_at;
+
+  const paused = aiPauseReason(loaded.lead, c);
+  if (paused) {
+    if (fresh.length) step(`Ficou em silêncio: ${paused}.`);
+    await waitForCustomer();
+    return;
+  }
+  if (fresh.length === 0) {
+    await waitForCustomer();
+    return;
+  }
+
+  const customerText = fresh.map((row) => String(row.text).slice(0, 800)).join('\n');
+  run.context.message = customerText.slice(0, 2000);
+  const maxTurns = Math.max(1, Math.min(200, Number(c.maxTurns) || 30));
+  if ((chat.turns || 0) >= maxTurns) {
+    await handoff(`a IA já respondeu ${chat.turns} vezes nesta conversa`);
+    return;
+  }
+
+  let answer: Record<string, unknown>;
+  try {
+    const ctx = loaded.ctx;
+    answer = await askAi([
+      'Você é o atendente virtual de uma empresa no WhatsApp. Siga as instruções da empresa.',
+      `Instruções da empresa:\n${renderTemplate(c.aiInstructions || '', ctx).slice(0, 6000)}`,
+      `Empresa: ${ctx.company.name}${ctx.company.phone ? ` · telefone ${ctx.company.phone}` : ''}${ctx.company.website ? ` · site ${ctx.company.website}` : ''}${ctx.company.address ? ` · endereço ${ctx.company.address}` : ''}`,
+      `Contato: ${ctx.lead.name || 'sem nome'}`,
+      `Conversa até agora (mais antigas primeiro):\n${history.slice(-20).map((row) => `${row.sent_by_me ? 'Empresa' : 'Cliente'}: ${String(row.text || '').slice(0, 400)}`).join('\n')}`,
+      `Mensagens novas do cliente (responda todas numa só resposta):\n${customerText.slice(0, 2000)}`,
+      allowHandoff
+        ? 'Responda só com JSON no formato {"reply": "texto da resposta", "handoff": false}. Use "handoff": true (com "reply" vazio) se o cliente pedir para falar com uma pessoa, atendente ou humano, quiser reclamar, ou se a resposta depender de algo importante que não está nas instruções.'
+        : 'Responda só com JSON no formato {"reply": "texto da resposta"}.',
+      'A resposta deve ser curta (até 600 caracteres), em português do Brasil, sem inventar preços, prazos ou dados que não estejam nas instruções. Não repita a saudação se a conversa já começou.',
+    ].join('\n\n'));
+  } catch (error) {
+    chat.errors = (chat.errors || 0) + 1;
+    step(`A IA falhou (${chat.errors}ª vez): ${error instanceof Error ? error.message : 'erro desconhecido'}`, false);
+    if (chat.errors >= 2 && allowHandoff) {
+      await handoff('a IA não conseguiu responder');
+      return;
+    }
+    if (chat.errors >= 3) {
+      await waitForCustomer();
+      return;
+    }
+    await retryLater();
+    return;
+  }
+
+  chat.errors = 0;
+  if (allowHandoff && (answer.handoff === true || answer.handoff === 'true')) {
+    await handoff('o cliente pediu uma pessoa');
+    return;
+  }
+  const reply = String(answer.reply || '').trim().slice(0, 1500);
+  if (!reply) {
+    step('A IA não escreveu nenhuma resposta.', false);
+    await waitForCustomer();
+    return;
+  }
+  try {
+    await sendToLead(tenantId, leadId, loaded.ctx.lead.phone, { text: reply, typingSeconds: 2 });
+  } catch (error) {
+    step(`Não conseguiu enviar a resposta: ${error instanceof Error ? error.message : 'erro no WhatsApp'}`, false);
+    await waitForCustomer();
+    return;
+  }
+  chat.turns = (chat.turns || 0) + 1;
+  step(`Cliente: "${customerText.replace(/\s+/g, ' ').slice(0, 120)}" → IA: ${reply.slice(0, 220)}`);
+  await waitForCustomer();
 }
 
 // ── Gatilhos (chamados pelo resto do sistema) ────────────────
@@ -1169,9 +1415,14 @@ async function tick() {
       continue;
     }
     if (row.waiting_for === 'reply') {
+      const node = flow.graphParsed.nodes.find((item) => item.id === row.current_node_id);
+      // Atendente com IA com resposta pendente (o servidor reiniciou antes do horário).
+      if (node?.type === 'ai-chat' && run.context?.aiChat?.pending) {
+        await aiChatTurn(run, flow, node);
+        continue;
+      }
       // Sem resposta no prazo: segue pela saída "Sem resposta" (se houver).
       const next = row.current_node_id ? nextNodeId(flow.graphParsed, row.current_node_id, 'no') : null;
-      const node = flow.graphParsed.nodes.find((item) => item.id === row.current_node_id);
       run.steps = [...(run.steps || []), { node_id: row.current_node_id || '', label: node?.label || 'Resposta', at: nowIso(), ok: true, detail: 'O contato não respondeu no prazo.' }];
       if (!next) {
         await finish(run, 'expired', { steps: run.steps, error: 'O contato não respondeu no prazo.' });
