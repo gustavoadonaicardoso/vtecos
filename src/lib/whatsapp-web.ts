@@ -413,7 +413,8 @@ async function recordPhoneReply(tenantId: string, socket: WASocket, item: WAMess
     const { data: known } = await supabaseAdmin.from('chat_messages').select('id').eq('tenant_id', tenantId).eq('external_id', externalId).limit(1);
     if (known?.length) return;
   }
-  await supabaseAdmin.from('chat_messages').insert({ tenant_id: tenantId, lead_id: lead.id, text: text.slice(0, 4096), sent_by_me: true, type: 'text', status: 'sent', provider: 'whatsapp_web', external_id: externalId });
+  const { insertChatMessage } = await import('@/lib/chat-messages');
+  await insertChatMessage({ tenant_id: tenantId, lead_id: lead.id, text: text.slice(0, 4096), sent_by_me: true, type: 'text', status: 'sent', provider: 'whatsapp_web', external_id: externalId, origin: 'phone' });
   await supabaseAdmin.from('leads').update({ last_msg: text.split('\n')[0].slice(0, 200), human_replied_at: new Date().toISOString() }).eq('tenant_id', tenantId).eq('id', lead.id);
 }
 

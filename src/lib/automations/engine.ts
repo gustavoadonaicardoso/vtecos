@@ -63,7 +63,7 @@ import {
 type FlowRow = { id: string; tenant_id: string; name: string; status: string; graph: unknown; trigger_event: string | null; state?: Record<string, unknown> | null };
 type LoadedFlow = FlowRow & { graphParsed: FlowGraph };
 /** Atendente com IA: resposta pendente, quantas respostas deu, falhas seguidas e a última mensagem do cliente já vista. */
-type AiChatState = { pending?: boolean; turns?: number; errors?: number; lastSeenAt?: string };
+type AiChatState = { pending?: boolean; turns?: number; errors?: number; lastSeenAt?: string; handedOff?: boolean };
 type StoredContext = { vars?: Record<string, string>; message?: string; input?: Record<string, string>; attempts?: number; depth?: number; aiChat?: AiChatState };
 type RunRow = {
   id: string;
@@ -528,7 +528,7 @@ async function runNode(node: FlowNode, run: RunRow, flow: LoadedFlow, ctx: RunCo
         ].filter(Boolean).join('\n\n'));
         const reply = String(answer.reply || '').trim().slice(0, 1200);
         if (!reply) return failOrBranch(graph, node, 'A IA não respondeu nada.');
-        if (c.aiSend) await sendToLead(tenantId, leadId, ctx.lead.phone, { text: reply, typingSeconds: 2 });
+        if (c.aiSend) await sendToLead(tenantId, leadId, ctx.lead.phone, { text: reply, typingSeconds: 2 }, 'ai');
         return { kind: 'next', port: 'default', detail: `${c.aiSend ? 'IA respondeu' : 'IA gerou'}: ${reply.slice(0, 160)}`, vars: variable ? { [variable]: reply } : undefined };
       } catch (error) {
         return failOrBranch(graph, node, error instanceof Error ? error.message : 'Falha na IA.');
@@ -1035,7 +1035,8 @@ async function aiChatTurn(run: RunRow, flow: LoadedFlow, node: FlowNode) {
 
   const handoff = async (reason: string) => {
     const text = renderTemplate(c.handoffMessage || '', loaded.ctx).trim();
-    if (text) await sendToLead(tenantId, leadId, loaded.ctx.lead.phone, { text, typingSeconds: 1 }).catch((error) => log('atendente com IA: aviso de passagem', error));
+    chat.handedOff = true;
+    if (text) await sendToLead(tenantId, leadId, loaded.ctx.lead.phone, { text, typingSeconds: 1 }, 'ai').catch((error) => log('atendente com IA: aviso de passagem', error));
     const hours = Math.max(0, Math.min(720, Number(c.handoffPauseHours ?? 24)));
     if (hours > 0) await supabaseAdmin.from('leads').update({ ai_paused_until: new Date(Date.now() + hours * 3600_000).toISOString() }).eq('tenant_id', tenantId).eq('id', leadId);
     step(`Passou para a equipe: ${reason}.`);
@@ -1125,7 +1126,7 @@ async function aiChatTurn(run: RunRow, flow: LoadedFlow, node: FlowNode) {
     return;
   }
   try {
-    await sendToLead(tenantId, leadId, loaded.ctx.lead.phone, { text: reply, typingSeconds: 2 });
+    await sendToLead(tenantId, leadId, loaded.ctx.lead.phone, { text: reply, typingSeconds: 2 }, 'ai');
   } catch (error) {
     step(`Não conseguiu enviar a resposta: ${error instanceof Error ? error.message : 'erro no WhatsApp'}`, false);
     await waitForCustomer();

@@ -84,7 +84,7 @@ async function sendContact(campaign: Row, contact: Row, company: Awaited<ReturnT
       ? { mediaUrl: campaign.media_url, mediaKind: campaign.media_kind || 'document', caption: rendered.text, fileName: campaign.media_name || undefined }
       : { text: rendered.text };
   const sent = await deliverWhatsApp(campaign.tenant_id, contact.phone, payload, channel);
-  if (lead) await recordOutbound(campaign.tenant_id, String(lead.id), sent, payload, '📣').catch((error) => log('registro na conversa falhou', error));
+  if (lead) await recordOutbound(campaign.tenant_id, String(lead.id), sent, payload, '📣', 'campaign').catch((error) => log('registro na conversa falhou', error));
   return { text: rendered.text, leadId: lead ? String(lead.id) : null };
 }
 
