@@ -32,6 +32,10 @@ export type Lead = {
   unreadCount?: number;
   /** Atendente com IA pausado nesta conversa até esta data (ISO). */
   aiPausedUntil?: string | null;
+  /** Canal da conversa: a resposta sai por ele (sem valor = WhatsApp). */
+  chatChannel?: 'whatsapp' | 'instagram' | 'messenger';
+  /** @ do Instagram de quem mandou Direct. */
+  instagramUsername?: string | null;
 };
 
 /** Etiqueta cadastrada pela empresa. */

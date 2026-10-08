@@ -70,6 +70,8 @@ function mapDbRowToLead(row: Row): Lead {
     stageChangedAt: (row.stage_changed_at as string) || (row.created_at as string) || null,
     unreadCount: Number(row.unread_count) || 0,
     aiPausedUntil: (row.ai_paused_until as string) || null,
+    chatChannel: row.chat_channel === 'instagram' || row.chat_channel === 'messenger' ? row.chat_channel : 'whatsapp',
+    instagramUsername: (row.instagram_username as string) || null,
   };
 }
 

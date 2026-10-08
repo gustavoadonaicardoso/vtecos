@@ -315,7 +315,7 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
                 <input className={styles.input} value={c.keywords || ''} placeholder="orçamento, preço, valor" onChange={(e) => set({ keywords: e.target.value })} />
               </Field>
             )}
-            <Check checked={Boolean(c.onlyNewContacts)} onChange={(value) => set({ onlyNewContacts: value })}>Só no primeiro contato (número que ainda não era lead)</Check>
+            <Check checked={Boolean(c.onlyNewContacts)} onChange={(value) => set({ onlyNewContacts: value })}>Só no primeiro contato (quem ainda não era lead)</Check>
           </>
         )}
 
@@ -324,6 +324,8 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
             <select className={styles.input} value={c.source || 'any'} onChange={(e) => set({ source: e.target.value as NodeConfig['source'] })}>
               <option value="any">Qualquer origem</option>
               <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Direct do Instagram</option>
+              <option value="messenger">Messenger (Página do Facebook)</option>
               <option value="form">Formulário do site / captura de leads</option>
               <option value="manual">Cadastro manual</option>
               <option value="totem">Totem de senhas</option>

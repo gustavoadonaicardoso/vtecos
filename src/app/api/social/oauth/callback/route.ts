@@ -4,6 +4,7 @@ import { requireAdminProfile } from '@/lib/session';
 import { exchangeCodeForLongLivedToken, listPagesWithInstagram } from '@/lib/social/meta-graph';
 import { OAUTH_STATE_COOKIE, getOAuthRedirectUri, getPublicOrigin } from '@/lib/social/oauth';
 import { saveConnectedPages } from '@/services/social.service';
+import { enablePageMessaging } from '@/lib/social/inbox';
 
 export const runtime = 'nodejs';
 
@@ -48,6 +49,10 @@ export async function GET(request: Request) {
 
     const saved = await saveConnectedPages(auth.tenantId, pages, auth.profile.id);
     if (!saved.success) return backToAccounts(request, { oauth_error: saved.error || 'Falha ao salvar as contas.' });
+
+    // Liga o recebimento do Direct/Messenger em cada Página. Se faltar
+    // permissão, a conta mostra o aviso em Redes Sociais > Contas.
+    for (const page of pages) await enablePageMessaging(auth.tenantId, page.pageId).catch(() => null);
 
     return backToAccounts(request, { connected: String(saved.data ?? 0) });
   } catch (err) {

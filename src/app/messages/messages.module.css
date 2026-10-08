@@ -91,6 +91,19 @@
   font-size: 0.82rem;
   font-weight: 700;
 }
+.avatarWrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.channelBadge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: 0 0 0 2px var(--background);
+}
 .blockedIcon { margin-left: 5px; color: var(--bad); vertical-align: -1px; }
 
 /* ── Lista de conversas ── */

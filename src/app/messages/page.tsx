@@ -83,7 +83,9 @@ function MessagesContent() {
         if (tab === 'mine' && item.assignedTo !== user?.id) return false;
         if (tab === 'unassigned' && item.assignedTo) return false;
         if (!text) return true;
-        return item.name.toLowerCase().includes(text) || (digits.length >= 3 && item.phone.replace(/\D/g, '').includes(digits));
+        return item.name.toLowerCase().includes(text)
+          || (digits.length >= 3 && item.phone.replace(/\D/g, '').includes(digits))
+          || Boolean(item.instagramUsername && item.instagramUsername.toLowerCase().includes(text.replace(/^@/, '')));
       })
       .sort((a, b) => time(b) - time(a));
   }, [leads, query, tab, selectedId, user?.id]);
@@ -249,14 +251,26 @@ function MessagesContent() {
     setNotice({ type: 'ok', text: aiPaused ? 'A IA voltou a responder esta conversa.' : 'IA pausada nesta conversa: só a equipe responde até você retomar.' });
   };
 
-  const channelLabel = channels ? (channels.web ? 'WhatsApp Web' : channels.api ? 'API oficial' : null) : null;
+  // Conversa do Direct/Messenger: responde por lá, sem precisar de telefone.
+  const socialChannel = lead?.chatChannel === 'instagram' || lead?.chatChannel === 'messenger' ? lead.chatChannel : null;
+  const channelLabel = socialChannel
+    ? (socialChannel === 'instagram' ? 'Instagram Direct' : 'Messenger')
+    : channels ? (channels.web ? 'WhatsApp Web' : channels.api ? 'API oficial' : null) : null;
+  const noWhatsApp = !socialChannel && Boolean(channels && !channels.web && !channels.api);
+  // Instagram e Messenger só deixam responder até 24 h depois da última mensagem do cliente.
+  const lastFromCustomer = messages ? [...messages].reverse().find((item) => !item.sent) : undefined;
+  const windowClosed = Boolean(socialChannel && messages && (!lastFromCustomer || now - new Date(lastFromCustomer.createdAt).getTime() > 24 * 3600_000));
   const disabledReason = !lead
     ? null
-    : !lead.phone
-      ? 'Este contato não tem telefone. Abra os dados do lead (ícone ⓘ) e cadastre o WhatsApp para conversar.'
-      : channels && !channels.web && !channels.api
-        ? 'Nenhum WhatsApp conectado. Conecte o WhatsApp Web ou a API oficial em Integrações para responder por aqui.'
-        : null;
+    : socialChannel
+      ? windowClosed
+        ? `Passaram 24 h desde a última mensagem do cliente: o ${socialChannel === 'instagram' ? 'Instagram' : 'Messenger'} só deixa responder dentro desse prazo. Quando ele escrever de novo, você pode responder.`
+        : null
+      : !lead.phone
+        ? 'Este contato não tem telefone. Abra os dados do lead (ícone ⓘ) e cadastre o WhatsApp para conversar.'
+        : noWhatsApp
+          ? 'Nenhum WhatsApp conectado. Conecte o WhatsApp Web ou a API oficial em Integrações para responder por aqui.'
+          : null;
 
   const tools = {
     userName: user?.name,
@@ -303,7 +317,7 @@ function MessagesContent() {
               onToggleAi={toggleAi}
               tools={tools}
             />
-            {channels && !channels.web && !channels.api && (
+            {noWhatsApp && (
               <div className={styles.banner}>
                 <AlertTriangle size={15} /> Nenhum WhatsApp conectado: as mensagens não saem. <Link href="/integrations">Conectar em Integrações</Link>
               </div>
@@ -331,7 +345,7 @@ function MessagesContent() {
             <p>
               {selectedId && loaded
                 ? 'Esse contato não existe mais ou está com outra pessoa da equipe.'
-                : 'As mensagens do WhatsApp da empresa chegam aqui. As não lidas ficam em destaque e as mais recentes no topo.'}
+                : 'As mensagens do WhatsApp, do Direct do Instagram e do Messenger da empresa chegam aqui. As não lidas ficam em destaque e as mais recentes no topo.'}
             </p>
             {channels && !channels.web && !channels.api && <Link href="/integrations" className={styles.primaryBtn}>Conectar o WhatsApp</Link>}
           </div>

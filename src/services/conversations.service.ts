@@ -3,7 +3,8 @@
  * VTEC OS — Conversas (tela Mensagens), server-only
  * ============================================================
  * Envia pelo WhatsApp da empresa: WhatsApp Web (QR Code) quando está
- * conectado, senão a API oficial da Meta. Grava a mensagem antes de
+ * conectado, senão a API oficial da Meta. Conversa que veio do Direct do
+ * Instagram ou do Messenger é respondida por lá (src/lib/social/inbox.ts). Grava a mensagem antes de
  * enviar (status "sending") e atualiza para "sent" ou "failed" -- a tela
  * acompanha pelo Realtime. O gatilho do banco cuida de "não lidas" e da
  * última atividade do lead.
@@ -13,6 +14,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { insertChatMessage } from '@/lib/chat-messages';
 import { safeContentType } from '@/lib/safe-content-type';
+import type { SocialTarget } from '@/lib/social/inbox';
 
 type Row = Record<string, unknown>;
 
@@ -49,7 +51,7 @@ export async function loadChatLead(tenantId: string, leadId: string, profile: { 
 function friendlyError(error: unknown) {
   const text = error instanceof Error ? error.message : String(error || '');
   if (/131047|24 hours|re-engagement/i.test(text)) return 'Passaram 24 h desde a última mensagem do cliente: pela API oficial, só dá para enviar um modelo aprovado pela Meta.';
-  if (/not connected|desconectad|Connection Closed/i.test(text)) return 'O WhatsApp Web desconectou. Reconecte em Integrações.';
+  if (/not connected|desconectad|Connection Closed/i.test(text) && !/Redes Sociais/.test(text)) return 'O WhatsApp Web desconectou. Reconecte em Integrações.';
   return text || 'Falha ao enviar.';
 }
 
@@ -87,12 +89,29 @@ export async function setAiPaused(tenantId: string, leadId: string, paused: bool
   return { ok: true as const, aiPausedUntil: (data.ai_paused_until as string | null) ?? null };
 }
 
+/**
+ * Por onde responder: Direct/Messenger (conversa que veio de lá) ou o
+ * WhatsApp da empresa.
+ */
+async function routeFor(tenantId: string, lead: ChatLead): Promise<{ social: SocialTarget; provider: string } | { social: null; provider: string } | { error: string }> {
+  const { socialTargetForLead } = await import('@/lib/social/inbox');
+  try {
+    const social = await socialTargetForLead(tenantId, lead.id);
+    if (social) return { social, provider: social.channel };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'A conta desta conversa está desconectada.' };
+  }
+  if (!lead.phone) return { error: 'Este contato não tem telefone.' };
+  const channels = await whatsappChannels(tenantId);
+  if (!channels.web && !channels.api) return { error: 'Nenhum WhatsApp conectado. Conecte o WhatsApp Web ou a API oficial em Integrações.' };
+  return { social: null, provider: channels.web ? 'whatsapp_web' : 'meta' };
+}
+
 /** Texto da equipe para o cliente. `retryId`: reenvia uma mensagem que falhou. */
 export async function sendTextToLead(tenantId: string, senderId: string | null, lead: ChatLead, text: string, retryId?: string | null, origin: 'team' | 'scheduled' = 'team'): Promise<SendResult> {
-  if (!lead.phone) return { ok: false, error: 'Este contato não tem telefone.' };
-  const channels = await whatsappChannels(tenantId);
-  if (!channels.web && !channels.api) return { ok: false, error: 'Nenhum WhatsApp conectado. Conecte o WhatsApp Web ou a API oficial em Integrações.' };
-  const provider = channels.web ? 'whatsapp_web' : 'meta';
+  const route = await routeFor(tenantId, lead);
+  if ('error' in route) return { ok: false, error: route.error };
+  const provider = route.provider;
 
   let messageId: string;
   if (retryId) {
@@ -107,7 +126,10 @@ export async function sendTextToLead(tenantId: string, senderId: string | null, 
 
   try {
     let externalId: string | null = null;
-    if (provider === 'whatsapp_web') {
+    if (route.social) {
+      const { sendSocialMessage } = await import('@/lib/social/inbox');
+      externalId = (await sendSocialMessage(route.social, { text })).externalId;
+    } else if (provider === 'whatsapp_web') {
       const { sendWhatsAppWebMessage } = await import('@/lib/whatsapp-web');
       const sent = await sendWhatsAppWebMessage(tenantId, lead.phone, text);
       externalId = sent?.key?.id ?? null;
@@ -143,11 +165,10 @@ export async function sendMediaToLead(
   file: { buffer: Buffer; name: string; mimetype: string },
   caption: string
 ): Promise<SendResult> {
-  if (!lead.phone) return { ok: false, error: 'Este contato não tem telefone.' };
-  if (file.buffer.length > 16 * 1024 * 1024) return { ok: false, error: 'Arquivo acima de 16 MB (limite do WhatsApp).' };
-  const channels = await whatsappChannels(tenantId);
-  if (!channels.web && !channels.api) return { ok: false, error: 'Nenhum WhatsApp conectado. Conecte o WhatsApp Web ou a API oficial em Integrações.' };
-  const provider = channels.web ? 'whatsapp_web' : 'meta';
+  if (file.buffer.length > 16 * 1024 * 1024) return { ok: false, error: 'Arquivo acima de 16 MB.' };
+  const route = await routeFor(tenantId, lead);
+  if ('error' in route) return { ok: false, error: route.error };
+  const provider = route.provider;
   const kind = mediaKind(file.mimetype);
 
   const safeName = (file.name || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
@@ -162,7 +183,10 @@ export async function sendMediaToLead(
 
   try {
     let externalId: string | null = null;
-    if (provider === 'whatsapp_web') {
+    if (route.social) {
+      const { sendSocialMessage } = await import('@/lib/social/inbox');
+      externalId = (await sendSocialMessage(route.social, { mediaUrl, mediaKind: kind, caption })).externalId;
+    } else if (provider === 'whatsapp_web') {
       const { sendWhatsAppWebMedia } = await import('@/lib/whatsapp-web');
       const sent = await sendWhatsAppWebMedia(tenantId, lead.phone, file.buffer, kind, { caption: caption || undefined, fileName: file.name, mimetype: file.mimetype });
       externalId = sent?.key?.id ?? null;

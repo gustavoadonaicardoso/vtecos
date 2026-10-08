@@ -3,6 +3,7 @@ import styles from '../messages.module.css';
 import type { Lead } from '@/types';
 import type { InboxTab } from '../types';
 import { initials, listTime } from '../format';
+import ChannelAvatar from './ChannelBadge';
 
 interface ConversationListProps {
   hidden: boolean;
@@ -69,7 +70,7 @@ export default function ConversationList(props: ConversationListProps) {
           const owner = canAssign ? ownerName(lead.assignedTo) : null;
           return (
             <button key={lead.id} type="button" className={`${styles.item} ${selectedId === lead.id ? styles.itemOn : ''} ${unread > 0 ? styles.itemUnread : ''}`} onClick={() => onSelect(lead.id)}>
-              <span className={styles.avatar}>{initials(lead.name)}</span>
+              <ChannelAvatar lead={lead} initials={initials(lead.name)} />
               <span className={styles.itemBody}>
                 <span className={styles.itemTop}>
                   <strong>{lead.name}</strong>

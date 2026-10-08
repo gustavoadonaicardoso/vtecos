@@ -80,7 +80,7 @@ export interface NodeConfig {
   matchMode?: 'any' | 'keywords' | 'exact';
   keywords?: string;
   onlyNewContacts?: boolean;
-  source?: 'any' | 'whatsapp' | 'form' | 'manual' | 'totem' | 'webhook';
+  source?: 'any' | 'whatsapp' | 'instagram' | 'messenger' | 'form' | 'manual' | 'totem' | 'webhook';
   stageId?: string;
   reentryHours?: number;
   /** Quantas vezes, no máximo, o mesmo lead passa por este fluxo (0 = sem limite). */
