@@ -4,6 +4,14 @@ import styles from '../messages.module.css';
 import type { Lead } from '@/types';
 import { initials } from '../format';
 import SystemToolsBar from './SystemToolsBar';
+import ChannelAvatar from './ChannelBadge';
+
+/** Telefone, ou o @ do Instagram / "Messenger" nas conversas de lá. */
+function contactLine(lead: Lead) {
+  if (lead.chatChannel === 'instagram') return lead.instagramUsername ? `@${lead.instagramUsername}` : 'Instagram';
+  if (lead.chatChannel === 'messenger') return lead.phone || 'Messenger';
+  return lead.phone || 'Sem telefone';
+}
 
 interface ChatHeaderProps {
   lead: Lead;
@@ -25,10 +33,10 @@ export default function ChatHeader({ lead, ownerName, canTransfer, channelLabel,
     <header className={styles.chatHead}>
       <button type="button" className={`${styles.iconBtn} ${styles.backBtn}`} onClick={onBack} aria-label="Voltar para as conversas"><ArrowLeft size={18} /></button>
       <button type="button" className={styles.chatWho} onClick={onInfo} title="Ver dados do lead">
-        <span className={styles.avatar}>{initials(lead.name)}</span>
+        <ChannelAvatar lead={lead} initials={initials(lead.name)} />
         <span>
           <strong>{lead.name}{lead.status === 'Bloqueado' && <Ban size={13} className={styles.blockedIcon} aria-label="Bloqueado" />}</strong>
-          <small>{lead.phone || 'Sem telefone'}{ownerName ? ` · com ${ownerName}` : ' · sem responsável'}{channelLabel ? ` · ${channelLabel}` : ''}</small>
+          <small>{contactLine(lead)}{ownerName ? ` · com ${ownerName}` : ' · sem responsável'}{channelLabel ? ` · ${channelLabel}` : ''}</small>
         </span>
       </button>
       <div className={styles.chatActions}>

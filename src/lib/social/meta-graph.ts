@@ -23,6 +23,10 @@ export const META_OAUTH_SCOPES = [
   'instagram_manage_insights',
   'read_insights',
   'business_management',
+  // Direct do Instagram e Messenger em Mensagens.
+  'pages_messaging',
+  'pages_manage_metadata',
+  'instagram_manage_messages',
 ];
 
 export class MetaGraphError extends Error {

@@ -157,7 +157,8 @@ export default function PlatformTab() {
         <p className={styles.hint}>Cole estes valores no painel do app da Meta uma vez.</p>
         <CopyLine label="URI de redirecionamento do login (Login do Facebook > Configurações)" value={`${origin()}/api/social/oauth/callback`} />
         <CopyLine label="URL do webhook do WhatsApp (WhatsApp > Configuração > Webhook)" value={`${origin()}/api/webhooks/meta`} />
-        {input("whatsappVerifyToken", "Token de verificação do webhook", undefined, "O mesmo texto no campo Verificar token da Meta. Depois de verificar, assine o campo messages.")}
+        <CopyLine label="URL do webhook do Instagram e do Messenger (Webhooks > Instagram e Página) — a mesma" value={`${origin()}/api/webhooks/meta`} />
+        {input("whatsappVerifyToken", "Token de verificação do webhook", undefined, "O mesmo texto no campo Verificar token da Meta (vale para WhatsApp, Instagram e Página). Depois de verificar, assine o campo messages; na Página, também message_echoes.")}
         <CopyLine label="Política de privacidade" value={`${origin()}/politica-de-privacidade`} />
       </div>
 

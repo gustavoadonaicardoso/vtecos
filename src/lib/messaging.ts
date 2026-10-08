@@ -92,6 +92,9 @@ export async function processInboundWhatsAppMessage(payload: any, db: any, tenan
                 await db.from('leads').update({
                     last_msg: lastMsgPreview
                 }).eq('tenant_id', tenantId).eq('id', leadId);
+                // Escreveu pelo WhatsApp: a resposta volta a sair pelo WhatsApp
+                // (antes podia estar no Direct/Messenger).
+                await db.from('leads').update({ chat_channel: 'whatsapp' }).eq('tenant_id', tenantId).eq('id', leadId).in('chat_channel', ['instagram', 'messenger']);
 
                 // 5. Webhooks da empresa (Integrações)
                 events.messageReceived?.({

@@ -1176,8 +1176,8 @@ export async function onInboundMessage(tenantId: string, leadId: string, text: s
   }
 }
 
-/** Lead novo (manual, WhatsApp, formulário, totem, outro sistema). */
-export async function onLeadCreated(tenantId: string, leadId: string, source: 'manual' | 'whatsapp' | 'form' | 'totem' | 'webhook') {
+/** Lead novo (manual, WhatsApp, Instagram, Messenger, formulário, totem, outro sistema). */
+export async function onLeadCreated(tenantId: string, leadId: string, source: 'manual' | 'whatsapp' | 'form' | 'totem' | 'webhook' | 'instagram' | 'messenger') {
   try {
     for (const flow of await activeFlows(tenantId, 'lead_created')) {
       const wanted = triggerOf(flow.graphParsed)?.config.source || 'any';

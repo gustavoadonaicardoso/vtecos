@@ -15,6 +15,9 @@ export interface SocialAccount {
   status: SocialAccountStatus;
   last_error: string | null;
   created_at: string;
+  /** Recebimento de mensagens (Direct/Messenger) ligado na Página: 'on', 'error' ou null (nunca ligado). */
+  messaging_status?: 'on' | 'error' | null;
+  messaging_error?: string | null;
 }
 
 export type SocialPostStatus =

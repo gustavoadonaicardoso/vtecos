@@ -16,6 +16,10 @@
  *   - Verificação de Verify Token no handshake GET
  *   - Resposta 200 imediata (a Meta requer resposta em < 20s)
  *
+ * TAMBÉM RECEBE (mesma URL, app da Vórtice):
+ *   - Direct do Instagram (object "instagram") e Messenger (object "page"),
+ *     tratados em src/lib/social/inbox.ts.
+ *
  * EVENTOS TRATADOS:
  *   - Mensagem de texto recebida
  *   - Áudio recebido
@@ -36,6 +40,7 @@ import { phoneNumberIdsOf, processWebhookEntries, resolveMetaTenant } from '@/se
 import { isKnownVerifyToken } from '@/lib/whatsapp';
 import type { WhatsAppWebhookPayload } from '@/types';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isSocialObject, processSocialWebhook, validSocialSignature, type SocialWebhookPayload } from '@/lib/social/inbox';
 
 // ─────────────────────────────────────────────────────────────
 // GET — Verificação/Handshake do Webhook (Meta Challenge)
@@ -88,6 +93,18 @@ export async function POST(request: NextRequest) {
     payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: 'Payload inválido.' }, { status: 400 });
+  }
+
+  // Direct do Instagram e Messenger: vêm do app da Vórtice (Redes Sociais).
+  const object: unknown = (payload as { object?: unknown }).object;
+  if (isSocialObject(object)) {
+    if (!(await validSocialSignature(rawBody, signature))) {
+      console.warn('[Webhook Meta] ❌ Assinatura inválida (Instagram/Messenger).');
+      return NextResponse.json({ error: 'Assinatura inválida.' }, { status: 401 });
+    }
+    // A Meta espera 200 em até 20s: processa em segundo plano.
+    processSocialWebhook(payload as unknown as SocialWebhookPayload).catch((err) => console.error('[Webhook Meta] Erro no processamento (Instagram/Messenger):', err));
+    return NextResponse.json({ success: true }, { status: 200 });
   }
 
   if (payload.object !== 'whatsapp_business_account') {

@@ -188,6 +188,9 @@ async function handleInboundMessage(
       .eq('tenant_id', tenantId)
       .eq('id', leadId);
 
+    // Escreveu pelo WhatsApp: a resposta volta a sair pelo WhatsApp (antes podia estar no Direct/Messenger).
+    await supabase.from('leads').update({ chat_channel: 'whatsapp' }).eq('tenant_id', tenantId).eq('id', leadId).in('chat_channel', ['instagram', 'messenger']);
+
     // Automações depois do last_msg, para a resposta do robô não ser sobrescrita.
     if (!msgError) fireAutomation(onInboundMessage, tenantId, String(leadId), messageText || '', { isNewContact: isNewLead });
 

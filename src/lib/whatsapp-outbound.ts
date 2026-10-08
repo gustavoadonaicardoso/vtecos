@@ -129,8 +129,24 @@ export async function recordOutbound(tenantId: string, leadId: string, sent: { p
   await supabaseAdmin.from('leads').update({ last_msg: `${prefix} ${(sent.text || label).split('\n')[0]}`.slice(0, 200) }).eq('tenant_id', tenantId).eq('id', leadId);
 }
 
-/** Envia para o lead e registra na conversa (aparece em Mensagens, como as respostas da equipe). */
+/**
+ * Envia para o lead e registra na conversa (aparece em Mensagens, como as
+ * respostas da equipe). Conversa do Direct/Messenger responde por lá.
+ */
 export async function sendToLead(tenantId: string, leadId: string, phone: string, payload: WhatsAppPayload, origin: MessageOrigin = 'automation') {
+  const { socialTargetForLead, sendSocialMessage, SocialChannelError } = await import('@/lib/social/inbox');
+  const social = await socialTargetForLead(tenantId, leadId).catch((error) => {
+    throw error instanceof SocialChannelError ? new ChannelError(error.message) : error;
+  });
+  if (social) {
+    if (payload.template) throw new ChannelError('Modelos aprovados da Meta só existem no WhatsApp: esta conversa é do Instagram/Messenger.');
+    const text = payload.menu ? withOptions(payload.menu) : payload.text || '';
+    const sent = await sendSocialMessage(social, payload.mediaUrl
+      ? { mediaUrl: payload.mediaUrl, mediaKind: payload.mediaKind, caption: payload.caption, typingSeconds: payload.typingSeconds }
+      : { text, typingSeconds: payload.typingSeconds });
+    await recordOutbound(tenantId, leadId, { provider: social.channel, text: payload.mediaUrl ? sent.text : text }, payload, '🤖', origin);
+    return;
+  }
   const sent = await deliverWhatsApp(tenantId, phone, payload);
   await recordOutbound(tenantId, leadId, sent, payload, '🤖', origin);
 }

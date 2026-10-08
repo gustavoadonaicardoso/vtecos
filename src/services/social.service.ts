@@ -31,16 +31,20 @@ const POST_WITH_TARGETS =
 // ── Contas ─────────────────────────────────────────────────────
 
 export async function listAccounts(tenantId: string): Promise<ServiceResult<SocialAccount[]>> {
-  const { data, error } = await supabaseAdmin
+  const query = (columns: string) => supabaseAdmin
     .from('social_accounts')
-    .select(ACCOUNT_PUBLIC_COLUMNS)
+    .select(columns)
     .eq('tenant_id', tenantId)
     .neq('status', 'disconnected')
     .order('platform')
     .order('name');
 
+  let { data, error } = await query(`${ACCOUNT_PUBLIC_COLUMNS}, messaging_status, messaging_error`);
+  // Banco sem a migration 202610270001_social_inbox.sql: lista sem o status das mensagens.
+  if (error && /messaging_/.test(error.message)) ({ data, error } = await query(ACCOUNT_PUBLIC_COLUMNS));
+
   if (error) return { success: false, error: error.message };
-  return { success: true, data: (data || []) as SocialAccount[] };
+  return { success: true, data: (data || []) as unknown as SocialAccount[] };
 }
 
 export interface AccountWithToken {

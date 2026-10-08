@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Link2, Unlink } from 'lucide-react';
+import { Link2, MessageCircle, Unlink } from 'lucide-react';
 import styles from '../social.module.css';
 import PlatformIcon from './PlatformIcon';
 import type { SocialAccount, SocialProjectOption } from '@/types';
@@ -46,6 +46,18 @@ export default function AccountsPanel({ accounts, projects, metaConfigured, isAd
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
       setError(result.error || 'Não foi possível vincular o projeto.');
+    }
+    onChanged();
+  };
+
+  const enableMessaging = async (account: SocialAccount) => {
+    setBusyId(account.id);
+    setError('');
+    const response = await fetch(`/api/social/accounts/${account.id}/messaging`, { method: 'POST' });
+    setBusyId(null);
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      setError(result.error || 'Não foi possível ligar as mensagens.');
     }
     onChanged();
   };
@@ -119,6 +131,24 @@ export default function AccountsPanel({ accounts, projects, metaConfigured, isAd
                 </span>
                 {account.status === 'error' && account.last_error && (
                   <p className={styles.targetError} title={account.last_error}>{account.last_error}</p>
+                )}
+                {'messaging_status' in account && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 4, fontSize: '0.78rem', color: account.messaging_status === 'on' ? '#10b981' : account.messaging_status === 'error' ? '#ef4444' : 'var(--text-secondary)' }}>
+                    <MessageCircle size={12} />
+                    {account.messaging_status === 'on'
+                      ? `${account.platform === 'instagram' ? 'Direct' : 'Messenger'} chegando em Mensagens`
+                      : account.messaging_status === 'error'
+                        ? 'Mensagens desligadas'
+                        : 'Mensagens ainda não ligadas'}
+                  </span>
+                )}
+                {account.messaging_status === 'error' && account.messaging_error && (
+                  <p className={styles.targetError} title={account.messaging_error}>{account.messaging_error}</p>
+                )}
+                {isAdmin && 'messaging_status' in account && account.messaging_status !== 'on' && (
+                  <button type="button" className={styles.secondaryButton} style={{ marginTop: 8 }} disabled={busyId === account.id} onClick={() => enableMessaging(account)}>
+                    <MessageCircle size={14} /> Ligar mensagens
+                  </button>
                 )}
                 {isAdmin ? (
                   <select

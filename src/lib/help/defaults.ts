@@ -114,6 +114,7 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
       { title: 'Assinatura', text: 'O botão de caneta coloca seu nome em negrito no topo de cada mensagem, para o cliente saber quem está atendendo. A escolha fica salva no seu navegador.' },
       { title: 'Transferir atendimento', text: 'O botão **Transferir** passa a conversa para outra pessoa da equipe, com um recado opcional. Ela recebe um aviso no sino com o link da conversa.' },
       { title: 'Janela de 24 horas (API oficial)', text: 'Na WhatsApp Business API, a Meta só deixa enviar mensagem livre até 24 horas depois da última mensagem do cliente. Fora disso, use um **template aprovado** (em Disparos).' },
+      { title: 'Instagram e Messenger', text: 'Com o Direct do Instagram e o Messenger ligados (veja **Conectar Instagram e Facebook**), essas conversas também chegam aqui, com o ícone da rede no canto da foto. A resposta sai pela mesma rede em que o cliente escreveu por último. Nelas, só dá para responder até **24 horas** depois da última mensagem do cliente, e não existe template: depois desse prazo, espere ele escrever de novo.' },
     ],
   },
   {
@@ -266,13 +267,15 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     slug: 'conectar-redes-sociais',
     category: 'redes-sociais',
     title: 'Conectar Instagram e Facebook',
-    summary: 'Conectar o Instagram e o Facebook da empresa e agendar posts.',
+    summary: 'Conectar o Instagram e o Facebook da empresa, agendar posts e receber o Direct e o Messenger em Mensagens.',
     sections: [
       { title: '1. Prepare as contas', text: 'O Instagram precisa ser uma conta profissional (Empresa ou Criador de conteúdo) e estar vinculado a uma Página do Facebook. No app do Instagram: **Configurações > Tipo de conta e ferramentas**, e depois **Central de Contas** para vincular à Página.' },
       { title: '2. O app da Meta é da Vórtice', text: 'A conexão usa o app da Meta da Vórtice: a sua empresa não precisa criar app nem mexer em configuração. (Para a Vórtice: o ID e a chave secreta do app ficam em **Painel Master > Plataforma**; o endereço de retorno do app é `{{APP_URL}}/api/social/oauth/callback` e a política de privacidade `{{APP_URL}}/politica-de-privacidade`.)' },
       { title: '3. Conecte as contas', text: 'Em **Redes Sociais > Contas**, clique em **Conectar com Facebook**, entre com um perfil que administra a Página e marque a Página e o Instagram vinculado.' },
       { title: 'Aprovação de posts', text: 'Em **Redes Sociais > Configurações**, o administrador pode exigir aprovação para vendedores. O post vai para "Aguardando aprovação" e admins e gerentes recebem um aviso. Ao reprovar, é obrigatório explicar o motivo.' },
       { title: 'Legenda com IA', text: 'No criador de post, clique em **Gerar com IA**, descreva o assunto e escolha o tom. Nada é aplicado sem você clicar em "Usar esta legenda".' },
+      { title: 'Direct e Messenger em Mensagens', text: 'Quem manda mensagem no Direct do Instagram ou na Página do Facebook vira lead e aparece em **Mensagens**, junto com o WhatsApp. Você responde pelo sistema, e as automações e o Atendente com IA funcionam também nessas conversas.\n\nPara ligar:\n\n- No Instagram (app do celular): **Configurações > Mensagens e respostas aos stories > Ferramentas conectadas** (ou **Controles de mensagem**) e ative **Permitir acesso às mensagens**.\n- Em **Redes Sociais > Contas**, clique em **Reconectar / adicionar contas** e aceite as permissões de mensagens. Cada conta deve mostrar "Direct chegando em Mensagens" ou "Messenger chegando em Mensagens". Se aparecer "Mensagens desligadas", leia o aviso e clique em **Ligar mensagens**.\n\nRegras da Meta: só dá para responder até **24 horas** depois da última mensagem do cliente, e a empresa não pode iniciar conversa (não há disparos pelo Direct).' },
+      { title: 'Para a Vórtice: app da Meta e mensagens', text: 'No app da Meta: adicione as permissões `pages_messaging`, `pages_manage_metadata` e `instagram_manage_messages` (nos casos de uso da Página e do Instagram e na configuração do Login do Facebook para Empresas). Em **Webhooks**, escolha **Página** e depois **Instagram**: URL de callback `{{APP_URL}}/api/webhooks/meta` e o mesmo token de verificação do Painel Master > Plataforma. Assine `messages` (e `message_echoes` na Página). Para atender contas de clientes, a Meta exige verificação da empresa e análise do app.' },
     ],
   },
 

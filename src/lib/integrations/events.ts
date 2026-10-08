@@ -19,7 +19,7 @@ export type IntegrationEvent = 'lead.created' | 'message.received' | 'test';
 
 export const WEBHOOK_EVENTS: { key: Exclude<IntegrationEvent, 'test'>; label: string }[] = [
   { key: 'lead.created', label: 'Lead novo' },
-  { key: 'message.received', label: 'Mensagem recebida no WhatsApp' },
+  { key: 'message.received', label: 'Mensagem recebida (WhatsApp, Instagram ou Messenger)' },
 ];
 
 export interface LeadEventData {
