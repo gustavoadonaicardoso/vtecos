@@ -10,9 +10,11 @@ import { getNotificationPrefs } from '@/lib/notificationPrefs';
 
 /**
  * Toca som + mostra pop-up sempre que chega uma mensagem nova de
- * WhatsApp (chat_messages, sent_by_me = false) -- igual ao WhatsApp
- * Web de verdade, independente de qual tela o usuário está vendo.
+ * WhatsApp, Instagram ou Messenger (chat_messages, sent_by_me = false)
+ * -- igual ao WhatsApp Web de verdade, independente de qual tela o
+ * usuário está vendo.
  */
+const CHANNEL_NAME: Record<string, string> = { instagram: 'Instagram', messenger: 'Messenger' };
 export default function WhatsAppNotificationListener() {
   const { user } = useAuth();
   const { leads } = useLeads();
@@ -34,6 +36,7 @@ export default function WhatsAppNotificationListener() {
             text: string | null;
             sent_by_me: boolean;
             type: string;
+            provider?: string | null;
           };
 
           if (message.sent_by_me) return;
@@ -43,17 +46,24 @@ export default function WhatsAppNotificationListener() {
           if (prefs.whatsappSound) playNotificationSound();
           if (!prefs.whatsappPopup) return;
 
-          const lead = leadsRef.current.find((l) => l.id === message.lead_id);
+          const channelName = CHANNEL_NAME[message.provider || ''] || 'WhatsApp';
           const preview =
             message.text?.trim() ||
             (message.type === 'audio' ? '🎵 Áudio' : message.type === 'image' ? '📷 Imagem' : message.type === 'document' ? '📎 Arquivo' : 'Nova mensagem');
+          const show = () => {
+            const lead = leadsRef.current.find((l) => l.id === message.lead_id);
+            showBrowserNotification({
+              id: message.id,
+              title: lead ? `${lead.name} • ${channelName}` : `Novo contato no ${channelName}`,
+              content: preview,
+              link: `/messages?chatId=${message.lead_id}`,
+            });
+          };
 
-          showBrowserNotification({
-            id: message.id,
-            title: lead ? `${lead.name} • WhatsApp` : 'Nova mensagem no WhatsApp',
-            content: preview,
-            link: `/messages?chatId=${message.lead_id}`,
-          });
+          // Contato novo: a lista de leads chega em instantes (tempo real);
+          // espera um pouco para o aviso já vir com o nome.
+          if (leadsRef.current.some((l) => l.id === message.lead_id)) show();
+          else setTimeout(show, 1500);
         }
       )
       .subscribe();

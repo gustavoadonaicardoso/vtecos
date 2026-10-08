@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { updateLeadInDb, deleteLeadFromDb, moveLeadToStage, fetchLeadOwner, fetchLeadStage, fetchLeadName } from '@/services/leads.service';
+import { updateLeadInDb, deleteLeadFromDb, moveLeadToStage, fetchLeadOwner, fetchLeadStage, fetchLeadName, fetchLeadById } from '@/services/leads.service';
 import { requireActiveProfile } from '@/lib/session';
 import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
@@ -28,6 +28,18 @@ async function authorizeLeadAccess(leadId: string, permission: string[]) {
   }
 
   return auth;
+}
+
+/** Um lead só: a tela atualiza ao vivo o que mudou (lead novo, mensagem nova). */
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // permission: open (mesma regra da lista /api/leads: vendedor só recebe os próprios leads)
+  const auth = await requireActiveProfile({ module: 'crm' });
+  if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
+
+  const { id } = await params;
+  const lead = await fetchLeadById(auth.tenantId, id, { userId: auth.profile.id, role: auth.profile.role });
+  if (!lead) return NextResponse.json({ error: 'Lead não encontrado.' }, { status: 404 });
+  return NextResponse.json({ data: lead });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -10,7 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { usePermissions } from '@/lib/permissions';
 import { useSidebar } from '@/components/SidebarProvider';
 import { supabase } from '@/lib/supabase';
-import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
+import { useNotificationCount } from '@/hooks/useNotificationCount';
 import { useTeam } from '@/components/leads/useTeam';
 import LeadPanel from '@/app/leads/components/LeadPanel';
 import type { Lead } from '@/types';
@@ -49,7 +49,7 @@ function MessagesContent() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showQuick, setShowQuick] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const unreadNotifications = useNotificationCount(user);
   const [now, setNow] = useState(() => Date.now());
   const [aiPause, setAiPause] = useState<Record<string, string | null>>({});
   const [aiBusy, setAiBusy] = useState(false);
@@ -104,13 +104,9 @@ function MessagesContent() {
       fetch('/api/messages/channel', { cache: 'no-store' }).then((r) => r.json()).then((json) => setChannels(json.data || null)).catch(() => {});
     }, 0);
     const clock = window.setInterval(() => setNow(Date.now()), 60_000);
-    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((count) => setUnreadNotifications(count ?? 0));
-    fetchCount();
-    const poll = window.setInterval(fetchCount, 30_000);
     return () => {
       window.clearTimeout(timer);
       window.clearInterval(clock);
-      window.clearInterval(poll);
     };
   }, [user, loadQuickReplies]);
 
