@@ -17,8 +17,9 @@ import {
 } from '@/services/notifications.service';
 import { SystemNotification } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { announceNotificationsChanged, watchNotifications } from '@/lib/notifications-live';
 
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = 60_000;
 
 export function useNotifications(isOpen: boolean) {
   const { user } = useAuth();
@@ -37,14 +38,17 @@ export function useNotifications(isOpen: boolean) {
   useEffect(() => {
     if (!isOpen || !user) return;
 
-    refresh();
-
-    // Antes usava Realtime direto na tabela; a leitura agora passa por
-    // uma API autenticada (não dá pra assinar Realtime nela), então o
-    // dropdown atualiza por polling enquanto está aberto.
+    const first = setTimeout(refresh, 0);
+    // Aberto: notificação nova aparece na hora (o RLS só entrega as do
+    // usuário); a busca de tempos em tempos fica de reserva.
+    const stop = watchNotifications(user.id, refresh);
     const interval = setInterval(refresh, POLL_INTERVAL_MS);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(first);
+      clearInterval(interval);
+      stop();
+    };
   }, [isOpen, user, refresh]);
 
   const markAsRead = async (id: string) => {
@@ -52,12 +56,14 @@ export function useNotifications(isOpen: boolean) {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
+    announceNotificationsChanged();
   };
 
   const clearAll = async () => {
     if (!user) return;
     await clearUserNotifications(user.id);
     setNotifications([]);
+    announceNotificationsChanged();
   };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;

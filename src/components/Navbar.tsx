@@ -17,10 +17,8 @@ import Link from 'next/link';
 import NotificationDropdown from './NotificationDropdown';
 import { useLeads } from '@/context/LeadContext';
 import { useAuth } from '@/context/AuthContext';
-import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
+import { useNotificationCount } from '@/hooks/useNotificationCount';
 import { useTwilio } from '@/context/TwilioContext';
-
-const NOTIFICATIONS_POLL_MS = 20_000;
 
 const Navbar = () => {
   const { isMobileOpen, toggleMobileMenu } = useSidebar();
@@ -28,23 +26,10 @@ const Navbar = () => {
   const { user } = useAuth();
   const { toggleDialer } = useTwilio();
   const [showNotifications, setShowNotifications] = React.useState(false);
-  const [unreadCount, setUnreadCount] = React.useState(0);
+  const unreadCount = useNotificationCount(user);
 
   const toggleNotifications = () => setShowNotifications(!showNotifications);
   const closeNotifications = () => setShowNotifications(false);
-
-  React.useEffect(() => {
-    if (!user) return;
-
-    const refreshCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
-
-    refreshCount();
-    // A leitura passa por uma API autenticada (não dá pra assinar
-    // Realtime nela), então o badge atualiza por polling.
-    const interval = setInterval(refreshCount, NOTIFICATIONS_POLL_MS);
-
-    return () => clearInterval(interval);
-  }, [user]);
 
   return (
     <header className={styles.header}>

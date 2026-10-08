@@ -120,31 +120,92 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
   // Empresa sem o módulo de CRM no plano: nada de leads/pipeline.
   const hasCrm = !user?.workspace || user.workspace.modules.includes('crm');
 
+  // Busca só os leads que mudaram e encaixa na lista (mais rápido que
+  // baixar tudo de novo a cada mensagem). Muitos de uma vez: lista inteira.
+  const refreshLeads = useCallback(async (ids: string[]) => {
+    const results = await Promise.all(ids.map(async (id) => ({ id, ...(await send(`/api/leads/${id}`, 'GET')) })));
+    let next = leadsRef.current;
+    for (const result of results) {
+      if (result.ok && result.json.data) {
+        const lead = result.json.data as Lead;
+        next = next.some((item) => item.id === lead.id) ? next.map((item) => (item.id === lead.id ? lead : item)) : [lead, ...next];
+      } else if (result.status === 404) {
+        // Excluído, ou passou para outra pessoa (vendedor só vê os dele).
+        next = next.filter((item) => item.id !== result.id);
+      }
+    }
+    if (next === leadsRef.current) return;
+    leadsRef.current = next;
+    setLeads(next);
+    setPipelineStages((stages) => stages.map((stage) => ({ ...stage, leads: next.filter((lead) => lead.pipelineStage === stage.id).map((lead) => lead.id) })));
+  }, []);
+
   useEffect(() => {
     if (!user || !hasCrm) return;
+    let lastFull = 0;
+    const full = () => {
+      lastFull = Date.now();
+      return fetchDatabase();
+    };
     // Primeira carga logo depois de montar (fora do corpo do efeito).
     let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      fetchDatabase();
+      full();
       refreshTags();
     }, 0);
     if (!supabase) return () => { if (timer) clearTimeout(timer); };
 
-    // Realtime: mudanças em leads ou etapas refazem a busca (agrupadas).
-    const schedule = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(fetchDatabase, 400);
+    // Ao vivo: lead novo, mensagem nova, mudança de etapa ou de responsável
+    // feita por outra pessoa. As mudanças são agrupadas por 300 ms.
+    const pending = { ids: new Set<string>(), all: false };
+    const flush = () => {
+      timer = null;
+      const ids = Array.from(pending.ids);
+      const all = pending.all || ids.length > 15;
+      pending.ids.clear();
+      pending.all = false;
+      if (all) full();
+      else if (ids.length) refreshLeads(ids);
     };
+    const schedule = (id?: unknown, all = false) => {
+      if (all) pending.all = true;
+      else if (typeof id === 'string' && id) pending.ids.add(id);
+      else return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(flush, 300);
+    };
+    const leadId = (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => payload.new?.id ?? payload.old?.id;
+
+    let live = false;
     const channel = supabase
       .channel('leads_realtime_changes')
-      .on('postgres_changes', { event: '*', table: 'leads', schema: 'public' }, schedule)
-      .on('postgres_changes', { event: '*', table: 'pipeline_stages', schema: 'public' }, schedule)
-      .subscribe();
+      .on('postgres_changes', { event: '*', table: 'leads', schema: 'public' }, (payload) => schedule(leadId(payload)))
+      .on('postgres_changes', { event: '*', table: 'pipeline_stages', schema: 'public' }, () => schedule(undefined, true))
+      // Mensagem nova também atualiza o lead dela (e traz o lead que acabou de chegar).
+      .on('postgres_changes', { event: 'INSERT', table: 'chat_messages', schema: 'public' }, (payload) => schedule(payload.new?.lead_id))
+      .subscribe((status) => {
+        const wasLive = live;
+        live = status === 'SUBSCRIBED';
+        // Reconectou (internet caiu, computador dormiu): pode ter perdido algo.
+        if (live && !wasLive && lastFull && Date.now() - lastFull > 5_000) full();
+      });
+
+    // Rede de segurança: ao voltar para a aba, e de tempos em tempos se o
+    // tempo real estiver fora, confere a lista inteira.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastFull > 30_000) full();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const safety = setInterval(() => {
+      if (document.visibilityState === 'visible' && !live && Date.now() - lastFull > 45_000) full();
+    }, 15_000);
 
     return () => {
       if (timer) clearTimeout(timer);
+      clearInterval(safety);
+      document.removeEventListener('visibilitychange', onVisible);
       supabase?.removeChannel(channel);
     };
-  }, [fetchDatabase, refreshTags, hasCrm, user]);
+  }, [fetchDatabase, refreshLeads, refreshTags, hasCrm, user]);
 
   const openModal = (defaults?: { pipelineStage?: string }) => {
     // Também é usado direto como onClick (recebe o evento): só aceita o objeto de opções.

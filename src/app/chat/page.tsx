@@ -6,7 +6,7 @@ import { AnimatePresence } from 'framer-motion';
 import { Users as UsersIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { fetchUnreadNotificationsCount } from '@/services/notifications.service';
+import { useNotificationCount } from '@/hooks/useNotificationCount';
 import styles from './chat.module.css';
 import type { Profile, InternalMessage, GroupMember, ConversationMeta } from './types';
 import ChatHeader from './components/ChatHeader';
@@ -27,7 +27,7 @@ function ChatContent() {
   const [messages, setMessages] = useState<InternalMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const unreadCount = useNotificationCount(user);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
   const [hiddenMsgIds, setHiddenMsgIds] = useState<Set<string>>(new Set());
@@ -286,18 +286,6 @@ function ChatContent() {
     };
   }, [selectedProfileId, user, profiles]);
 
-  // Notificações não lidas -- a leitura passa pela API autenticada
-  // (/api/notifications), então atualiza por polling.
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchCount = () => fetchUnreadNotificationsCount(user.id).then((c) => setUnreadCount(c ?? 0));
-
-    fetchCount();
-    const interval = setInterval(fetchCount, 20_000);
-
-    return () => clearInterval(interval);
-  }, [user]);
 
   // Scroll to bottom
   useEffect(() => {

@@ -171,6 +171,18 @@ export async function fetchLeadsAndStages(tenantId: string, filters?: {
   }
 }
 
+/**
+ * Um lead só (a tela atualiza o que mudou sem baixar a lista inteira).
+ * Vendedor só recebe os próprios, como na lista.
+ */
+export async function fetchLeadById(tenantId: string, leadId: string, filters?: { userId?: string; role?: string }): Promise<Lead | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(leadId)) return null;
+  let query = supabase.from('leads').select('*').eq('tenant_id', tenantId).eq('id', leadId);
+  if (filters?.role === 'SELLER' && filters?.userId) query = query.eq('assigned_to', filters.userId);
+  const { data } = await query.maybeSingle();
+  return data ? mapDbRowToLead(data as Row) : null;
+}
+
 /** Lead desta empresa com o mesmo telefone (compara os últimos 8 números). */
 export async function findLeadByPhone(tenantId: string, phone: string) {
   const suffix = digits(phone).slice(-8);
