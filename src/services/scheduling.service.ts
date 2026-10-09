@@ -15,6 +15,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { loadChatLead } from '@/services/conversations.service';
+import { renderMessageTemplate, unknownMessageVariables } from '@/lib/message-variables';
 
 type Row = Record<string, unknown>;
 type Profile = { id: string; role: string };
@@ -258,6 +259,37 @@ export async function listSends(tenantId: string, profile: Profile) {
   return (data || []).map((row) => mapSend(row as Row));
 }
 
+/** Variável com erro de digitação: avisa antes de agendar (senão sairia em branco). */
+function variablesProblem(message: string): Failure | null {
+  const unknown = unknownMessageVariables(message);
+  if (!unknown.length) return null;
+  return { error: `Variável desconhecida: ${unknown.map((name) => `{{${name}}}`).join(', ')}. Use os botões de variáveis abaixo da mensagem.`, status: 400 };
+}
+
+/**
+ * Mensagem com as variáveis trocadas pelos dados do lead ({{primeiro_nome}},
+ * {{protocolo}}...). Usada na prévia da tela e na hora do envio.
+ */
+export async function renderSendMessage(tenantId: string, leadId: string, message: string, agentName = ''): Promise<string | null> {
+  if (!/\{\{/.test(message)) return message;
+  const { leadTemplateContext } = await import('@/lib/automations/engine');
+  const ctx = await leadTemplateContext(tenantId, leadId);
+  if (!ctx) return null;
+  return renderMessageTemplate(message, ctx, { agentName: agentName.trim().split(/\s+/)[0] || '' });
+}
+
+/** Prévia da tela: como a mensagem vai chegar para este lead. */
+export async function previewSend(tenantId: string, profile: Profile & { name?: string }, body: Row): Promise<{ text: string; unknown: string[] } | Failure> {
+  const leadId = typeof body.leadId === 'string' ? body.leadId : '';
+  const message = typeof body.message === 'string' ? body.message.slice(0, 4096) : '';
+  if (!leadId) return { error: 'Escolha o lead.', status: 400 };
+  const lead = await loadChatLead(tenantId, leadId, profile);
+  if ('error' in lead) return { error: lead.error, status: lead.status };
+  const text = await renderSendMessage(tenantId, lead.id, message, profile.name || '');
+  if (text === null) return { error: 'Lead não encontrado.', status: 404 };
+  return { text, unknown: unknownMessageVariables(message) };
+}
+
 /** Data/hora e texto conferidos. O horário precisa estar pelo menos 1 min à frente. */
 function sendTiming(body: Row): { date: string; time: string; sendAt: Date } | Failure {
   const date = String(body.date || '');
@@ -274,6 +306,8 @@ export async function createSend(tenantId: string, profile: Profile, body: Row):
   if (!leadId) return { error: 'Escolha o lead.', status: 400 };
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, 4096) : '';
   if (!message) return { error: 'Escreva a mensagem.', status: 400 };
+  const badVariables = variablesProblem(message);
+  if (badVariables) return badVariables;
   const timing = sendTiming(body);
   if (isFailure(timing)) return timing;
 
@@ -320,6 +354,8 @@ export async function updateSend(tenantId: string, profile: Profile, id: string,
   if (isFailure(timing)) return timing;
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, 4096) : String(current.message || '');
   if (!message) return { error: 'Escreva a mensagem.', status: 400 };
+  const badVariables = variablesProblem(message);
+  if (badVariables) return badVariables;
 
   const { data, error } = await supabaseAdmin
     .from('scheduled_messages')

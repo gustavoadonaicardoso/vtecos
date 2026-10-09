@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { fetchProjects, replaceProjects } from '@/services/projects.service';
+import { createProject, fetchProjects } from '@/services/projects.service';
 import { requireActiveProfile } from '@/lib/session';
+import { logAudit } from '@/lib/audit';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // Usuário e empresa vêm da sessão (antes: cabeçalho x-user-id, forjável).
 
@@ -20,34 +22,21 @@ export async function GET() {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
-  return NextResponse.json({ data: result.data }, { status: 200 });
+  return NextResponse.json({ data: result.data, canEdit: ['ADMIN', 'MANAGER'].includes(auth.profile.role) }, { status: 200 });
 }
 
-export async function PUT(request: Request) {
-  const auth = await requireActiveProfile({ module: 'planejamentos', permission: ['admin.projects', 'planejamentos.view', 'social.view'] });
+/** Novo projeto (administrador ou gerente). */
+export async function POST(request: Request) {
+  const auth = await requireActiveProfile({ module: 'planejamentos', permission: 'admin.projects' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
-
-  if (auth.profile.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Apenas administradores podem alterar projetos.' }, { status: 403 });
+  if (!['ADMIN', 'MANAGER'].includes(auth.profile.role)) {
+    return NextResponse.json({ error: 'Só administradores e gerentes criam projetos.' }, { status: 403 });
   }
 
-  try {
-    const body = await request.json();
-    if (!Array.isArray(body.projects)) {
-      return NextResponse.json({ error: 'Lista de projetos inválida.' }, { status: 400 });
-    }
+  const body = await request.json().catch(() => ({}));
+  const result = await createProject(auth.tenantId, body && typeof body === 'object' ? body : {});
+  if (!result.success || !result.data) return NextResponse.json({ error: result.error || 'Não foi possível criar o projeto.' }, { status: 400 });
 
-    const result = await replaceProjects(auth.tenantId, body.projects);
-    if (!result.success) {
-      console.error('Save projects error:', result.error);
-      return NextResponse.json({ error: result.error }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true }, { status: 200 });
-  } catch (error: unknown) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erro ao salvar projetos.' },
-      { status: 500 }
-    );
-  }
+  logAudit({ id: auth.profile.id, name: auth.profile.name }, 'PROJECT', `Projeto "${result.data.project_name}" criado.`, 'project', String(result.data.id), supabaseAdmin, auth.tenantId).catch(() => {});
+  return NextResponse.json({ data: result.data }, { status: 201 });
 }

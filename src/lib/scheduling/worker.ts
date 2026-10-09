@@ -57,12 +57,20 @@ async function sendOne(row: Row) {
   if (!lead) return finishSend(row, false, 'O lead foi excluído.');
   if (lead.blocked) return finishSend(row, false, 'O contato está bloqueado.');
 
+  // Variáveis ({{primeiro_nome}}, {{protocolo}}...) com os dados de agora.
+  const { renderSendMessage } = await import('@/services/scheduling.service');
+  const { data: author } = row.created_by
+    ? await supabaseAdmin.from('profiles').select('name').eq('tenant_id', tenantId).eq('id', row.created_by as string).maybeSingle()
+    : { data: null };
+  const text = await renderSendMessage(tenantId, lead.id, String(row.message || ''), String(author?.name || ''));
+  if (!text?.trim()) return finishSend(row, false, 'A mensagem ficou vazia depois de trocar as variáveis.');
+
   const { sendTextToLead } = await import('@/services/conversations.service');
   const result = await sendTextToLead(
     tenantId,
     (row.created_by as string) || null,
     { id: lead.id, name: lead.name || '', phone: lead.phone || '', assigned_to: lead.assigned_to || null, blocked: false },
-    String(row.message || ''),
+    text,
     null,
     'scheduled',
   );

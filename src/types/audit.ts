@@ -11,7 +11,8 @@ export type AuditAction =
   | 'TICKET_COMPLETE'
   | 'SETTINGS_UPDATE'
   | 'SUPPORT_ACCESS'
-  | 'CAMPAIGN';
+  | 'CAMPAIGN'
+  | 'PROJECT';
 
 export interface AuditLog {
   user_id: string;

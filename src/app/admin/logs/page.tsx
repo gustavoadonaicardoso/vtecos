@@ -17,7 +17,8 @@ import {
   Edit,
   Trash2,
   ChevronDown,
-  Megaphone
+  Megaphone,
+  ClipboardList
 } from 'lucide-react';
 import styles from './logs.module.css';
 import { supabase } from '@/lib/supabase';
@@ -45,6 +46,7 @@ const ACTION_ICONS: Record<string, any> = {
   'SETTINGS_UPDATE': Settings,
   'SUPPORT_ACCESS': Shield,
   'CAMPAIGN': Megaphone,
+  'PROJECT': ClipboardList,
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -59,6 +61,7 @@ const ACTION_COLORS: Record<string, string> = {
   'SETTINGS_UPDATE': '#6366f1',
   'SUPPORT_ACCESS': '#f59e0b',
   'CAMPAIGN': '#22c55e',
+  'PROJECT': '#6366f1',
 };
 
 export default function AuditLogsPage() {
@@ -141,6 +144,7 @@ export default function AuditLogsPage() {
               <option value="TICKET_CALL">Chamadas de Senha</option>
               <option value="SUPPORT_ACCESS">Acesso da equipe Vórtice</option>
               <option value="CAMPAIGN">Disparos</option>
+              <option value="PROJECT">Projetos</option>
             </select>
           </div>
         </div>

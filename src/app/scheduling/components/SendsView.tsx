@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Ban, CalendarClock, CheckCheck, Clock, Loader2, Pencil, RotateCcw, Search, Send, X } from 'lucide-react';
+import { AlertTriangle, Ban, Braces, CalendarClock, CheckCheck, Clock, Eye, Loader2, Pencil, RotateCcw, Search, Send, X } from 'lucide-react';
 import styles from '../scheduling.module.css';
-import { fillTemplate } from '@/app/messages/format';
 import type { QuickReply } from '@/app/messages/types';
 import { SEND_STATUS_LABEL, dayTitle, ymd, type ScheduledSend } from '../format';
+import { MESSAGE_VARIABLES } from '@/lib/message-variables';
 
 export interface SendLead {
   id: string;
@@ -47,7 +47,7 @@ const STATUS_ICON: Record<ScheduledSend['status'], React.ReactNode> = {
 };
 
 export default function SendsView(props: SendsViewProps) {
-  const { sends, leads, loaded, todayKey, workerEnabled, whatsappReady, isAdmin, quickReplies, agentName, initialLeadId, onCreate, onUpdate, onCancel } = props;
+  const { sends, leads, loaded, todayKey, workerEnabled, whatsappReady, isAdmin, quickReplies, initialLeadId, onCreate, onUpdate, onCancel } = props;
   const [slot] = useState(nextSlot);
   const [editing, setEditing] = useState<ScheduledSend | null>(null);
   const [leadId, setLeadId] = useState(initialLeadId && leads.some((lead) => lead.id === initialLeadId) ? initialLeadId : '');
@@ -60,6 +60,8 @@ export default function SendsView(props: SendsViewProps) {
   const [error, setError] = useState('');
   const [view, setView] = useState<'upcoming' | 'history'>('upcoming');
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ key: string; text: string; unknown: string[] } | null>(null);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
 
   const lead = leads.find((item) => item.id === leadId);
   const filtered = useMemo(() => {
@@ -96,12 +98,51 @@ export default function SendsView(props: SendsViewProps) {
     if (typeof window !== 'undefined' && window.innerWidth < 900) window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // As variáveis ficam no texto e viram os dados do lead na hora do envio.
   const applyReply = (id: string) => {
     const reply = quickReplies.find((item) => item.id === id);
     if (!reply) return;
-    setMessage(fillTemplate(reply.content, { name: lead?.name || '', agent: agentName }));
+    setMessage(reply.content);
     setTemplateName(reply.name);
   };
+
+  /** Coloca {{variavel}} onde está o cursor. */
+  const insertVariable = (name: string) => {
+    const tag = `{{${name}}}`;
+    const box = messageRef.current;
+    const start = box?.selectionStart ?? message.length;
+    const end = box?.selectionEnd ?? message.length;
+    const next = `${message.slice(0, start)}${tag}${message.slice(end)}`.slice(0, 4096);
+    setMessage(next);
+    setTemplateName(null);
+    requestAnimationFrame(() => {
+      box?.focus();
+      box?.setSelectionRange(start + tag.length, start + tag.length);
+    });
+  };
+
+  // Prévia com os dados do lead escolhido (só quando há variáveis).
+  const previewLeadId = editing?.leadId || leadId;
+  const hasVariables = message.includes('{{');
+  const previewKey = `${previewLeadId}::${message}`;
+  useEffect(() => {
+    if (!previewLeadId || !hasVariables) return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const response = await fetch('/api/scheduling/sends/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: previewLeadId, message }),
+      }).catch(() => null);
+      const json = response ? await response.json().catch(() => ({})) : {};
+      if (!cancelled && response?.ok && json.data) setPreview({ key: `${previewLeadId}::${message}`, text: json.data.text, unknown: json.data.unknown || [] });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [previewLeadId, message, hasVariables]);
+  const shownPreview = hasVariables && previewLeadId && preview?.key === previewKey ? preview : null;
 
   const submit = async () => {
     if (!editing && !leadId) return setError('Escolha o lead.');
@@ -193,9 +234,39 @@ export default function SendsView(props: SendsViewProps) {
 
         <label className={styles.field}>
           <span>Mensagem</span>
-          <textarea className={styles.input} rows={5} maxLength={4096} value={message} onChange={(e) => { setMessage(e.target.value); setTemplateName(null); }} placeholder="Oi! Passando para lembrar da nossa conversa de amanhã..." />
+          <textarea ref={messageRef} className={styles.input} rows={5} maxLength={4096} value={message} onChange={(e) => { setMessage(e.target.value); setTemplateName(null); }} placeholder="{{saudacao}}, {{primeiro_nome}}! Passando para lembrar da nossa conversa de amanhã. Seu protocolo é {{protocolo}}." />
           <small className={styles.counter}>{message.length}/4096</small>
         </label>
+
+        <div className={styles.varBox}>
+          <span className={styles.varTitle}><Braces size={13} /> Variáveis: clique para inserir no texto</span>
+          <div className={styles.varChips}>
+            {MESSAGE_VARIABLES.map((variable) => (
+              <button key={variable.name} type="button" className={styles.varChip} onClick={() => insertVariable(variable.name)} title={`{{${variable.name}}}`}>
+                {variable.label}
+              </button>
+            ))}
+          </div>
+          <small>Viram os dados do lead na hora do envio. Se estiver vazio, use um texto reserva: <code>{'{{primeiro_nome|cliente}}'}</code>.</small>
+        </div>
+
+        {hasVariables && (
+          <div className={styles.previewBox} aria-live="polite">
+            <span className={styles.varTitle}><Eye size={13} /> {previewLeadId ? `Como vai chegar para ${editing?.leadName || lead?.name || 'o lead'}` : 'Prévia'}</span>
+            {!previewLeadId ? (
+              <p className={styles.note}>Escolha o lead para ver a prévia.</p>
+            ) : shownPreview ? (
+              <>
+                <p className={styles.previewText}>{shownPreview.text || <em>(mensagem vazia)</em>}</p>
+                {shownPreview.unknown.length > 0 && (
+                  <small className={styles.badText}>Variável desconhecida: {shownPreview.unknown.map((name) => `{{${name}}}`).join(', ')}. Ela sai em branco.</small>
+                )}
+              </>
+            ) : (
+              <p className={styles.note}><Loader2 size={13} className={styles.spin} /> Montando a prévia...</p>
+            )}
+          </div>
+        )}
 
         {error && <div className={styles.errorBox}>{error}</div>}
 

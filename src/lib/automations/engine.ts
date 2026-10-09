@@ -107,6 +107,21 @@ export const newWebhookToken = () => `wh_${randomBytes(16).toString('hex')}`;
 
 // ── Dados do lead ────────────────────────────────────────────
 
+/** Protocolo com 6 dígitos (000123); vazio se a migration do protocolo não rodou. */
+export function formatProtocol(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? String(Math.trunc(number)).padStart(6, '0') : '';
+}
+
+/**
+ * Dados do lead e da empresa para trocar as variáveis ({{lead.name}},
+ * {{protocolo}}...) fora de uma automação -- ex.: mensagens agendadas.
+ */
+export async function leadTemplateContext(tenantId: string, leadId: string): Promise<RunContext | null> {
+  const loaded = await loadContext(tenantId, leadId, { context: {} } as Pick<RunRow, 'context'>, { name: '', graphParsed: { nodes: [], connections: [], variables: [] } } as unknown as LoadedFlow);
+  return loaded?.ctx ?? null;
+}
+
 async function loadContext(tenantId: string, leadId: string, run: Pick<RunRow, 'context'>, flow: LoadedFlow): Promise<{ ctx: RunContext; lead: Record<string, unknown> } | null> {
   const [{ data: lead }, { data: tenant }] = await Promise.all([
     supabaseAdmin.from('leads').select('*').eq('tenant_id', tenantId).eq('id', leadId).maybeSingle(),
@@ -139,6 +154,7 @@ async function loadContext(tenantId: string, leadId: string, run: Pick<RunRow, '
         assigned_name: String((owner.data as { name?: string } | null)?.name || ''),
         created_at: String(lead.created_at || ''),
         stage_changed_at: String(lead.stage_changed_at || lead.created_at || ''),
+        protocol: formatProtocol(lead.protocol),
       },
       company: {
         name: String(tenant?.name || ''),

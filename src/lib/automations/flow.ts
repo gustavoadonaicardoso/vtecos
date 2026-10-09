@@ -791,6 +791,8 @@ export interface RunContext {
     assigned_name: string;
     created_at: string;
     stage_changed_at: string;
+    /** Número de protocolo do lead (leads.protocol), vazio se a migration não rodou. */
+    protocol?: string;
   };
   company: { name: string; phone: string; website: string; address: string };
   flow: { name: string };
@@ -823,6 +825,7 @@ export const BUILTIN_VARIABLES: { group: string; items: { name: string; descript
       { name: 'lead.first_name', description: 'Primeiro nome' },
       { name: 'lead.last_name', description: 'Sobrenome' },
       { name: 'lead.phone', description: 'Telefone' },
+      { name: 'lead.protocol', description: 'Protocolo do atendimento' },
       { name: 'lead.email', description: 'E-mail' },
       { name: 'lead.cpf_cnpj', description: 'CPF ou CNPJ' },
       { name: 'lead.stage', description: 'Etapa do funil' },
@@ -912,6 +915,7 @@ export function variableValue(name: string, ctx: RunContext): string {
     case 'lead.first_name': return ctx.lead.name.trim().split(/\s+/)[0] || '';
     case 'lead.last_name': return ctx.lead.name.trim().split(/\s+/).slice(1).join(' ');
     case 'lead.phone': return ctx.lead.phone;
+    case 'lead.protocol': return ctx.lead.protocol || '';
     case 'lead.email': return ctx.lead.email;
     case 'lead.cpf_cnpj': return ctx.lead.cpf_cnpj;
     case 'lead.stage': return ctx.lead.stage;

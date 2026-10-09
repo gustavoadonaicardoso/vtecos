@@ -466,3 +466,31 @@ button.stat:hover { border-color: var(--brand); }
   .modal { width: 100%; max-height: 92dvh; border-radius: 18px 18px 0 0; }
   .toast { left: 16px; right: 16px; bottom: 16px; max-width: none; }
 }
+
+/* ── Variáveis e prévia das mensagens agendadas ── */
+.varBox { display: flex; flex-direction: column; gap: 7px; }
+.varBox small { color: var(--muted); font-size: 0.74rem; line-height: 1.45; }
+.varBox code { font-size: 0.72rem; padding: 1px 5px; border-radius: 6px; background: var(--soft); }
+.varTitle { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 0.75rem; font-weight: 600; }
+.varChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.varChip {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--soft);
+  color: var(--foreground);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.varChip:hover { border-color: var(--brand); color: var(--brand); }
+.previewBox {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--card-border);
+  background: var(--soft);
+}
+.previewText { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.86rem; line-height: 1.5; color: var(--foreground); }

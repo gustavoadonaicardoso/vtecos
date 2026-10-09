@@ -36,6 +36,8 @@ export type Lead = {
   chatChannel?: 'whatsapp' | 'instagram' | 'messenger';
   /** @ do Instagram de quem mandou Direct. */
   instagramUsername?: string | null;
+  /** Protocolo do atendimento (000123), usado em {{protocolo}}. */
+  protocol?: string;
 };
 
 /** Etiqueta cadastrada pela empresa. */
