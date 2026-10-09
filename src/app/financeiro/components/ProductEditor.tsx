@@ -9,7 +9,7 @@ import {
   UNIT_INFO, breakEvenUnits, buildCostContext, compatibleUnits, computeProductCost, formatMoney, formatPct, formatQty,
   priceForChannel,
 } from '@/lib/finance/calc';
-import { capitalize, categoryInfo, presetFor } from '@/lib/finance/business';
+import { capitalize, categoryInfo, labelsFor, presetFor } from '@/lib/finance/business';
 import type { FinProduct, FinProductItem, FinUnit } from '@/lib/finance/types';
 
 interface DraftItem {
@@ -40,10 +40,10 @@ const YIELD_UNITS = ['un', 'peça', 'kit', 'atendimento', 'sessão', 'hora', 'po
 let keySeq = 0;
 const newKey = () => `n${++keySeq}`;
 
-function toDraft(product: FinProduct | null, kind: 'product' | 'base'): Draft {
+function toDraft(product: FinProduct | null, kind: 'product' | 'base', yieldUnit = 'un'): Draft {
   if (!product) {
     return {
-      name: '', category: '', kind, yield_qty: '1', yield_unit: kind === 'base' ? 'g' : 'un', prep_minutes: '', loss_pct: '',
+      name: '', category: '', kind, yield_qty: '1', yield_unit: kind === 'base' && yieldUnit === 'un' ? 'g' : yieldUnit, prep_minutes: '', loss_pct: '',
       sale_price: '', target_margin_pct: '', notes: '', channel_prices: {}, items: [],
     };
   }
@@ -109,8 +109,11 @@ interface Props extends TabProps {
 export default function ProductEditor({ workspace, tenantId, setWorkspace, product, initialKind, onClose }: Props) {
   const { ingredients, products, channels, settings, access, business } = workspace;
   const terms = business.terms;
-  const example = presetFor(business.type).examples;
-  const [draft, setDraft] = useState<Draft>(() => toDraft(product, initialKind));
+  const preset = presetFor(business.type);
+  const example = preset.examples;
+  const labels = labelsFor(business);
+  const yieldUnits = [...(preset.yieldUnits || []), ...YIELD_UNITS];
+  const [draft, setDraft] = useState<Draft>(() => toDraft(product, initialKind, yieldUnits.includes(example.yieldUnit) ? example.yieldUnit : 'un'));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const readOnly = !access.canManage;
@@ -197,7 +200,7 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
   };
 
   const remove = async () => {
-    if (!draft.id || !confirm(`Excluir a ficha "${draft.name}"?`)) return;
+    if (!draft.id || !confirm(`Excluir "${draft.name}"?`)) return;
     try {
       await finRequest(`/products/${draft.id}`, tenantId, { method: 'DELETE' });
       setWorkspace((state) => state && ({ ...state, products: state.products.filter((item) => item.id !== draft.id) }));
@@ -213,7 +216,7 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <aside className={styles.drawer} onClick={(event) => event.stopPropagation()} aria-label="Ficha técnica">
+      <aside className={styles.drawer} onClick={(event) => event.stopPropagation()} aria-label={capitalize(terms.product)}>
         <div className={styles.drawerHead}>
           <h2><ClipboardList size={20} style={{ verticalAlign: '-3px', marginRight: 8 }} />{draft.id ? draft.name || capitalize(terms.product) : `Adicionar ${draft.kind === 'base' ? terms.base : terms.product}`}</h2>
           <div className={styles.headerActions}>
@@ -257,7 +260,7 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                   <div className={styles.inputGroup}>
                     <input className={styles.input} inputMode="decimal" value={draft.yield_qty} onChange={(event) => set('yield_qty', event.target.value)} disabled={readOnly} />
                     <select className={styles.input} style={{ width: 'auto', maxWidth: 110, flex: 'none', paddingInline: 8 }} value={draft.yield_unit} onChange={(event) => set('yield_unit', event.target.value)} disabled={readOnly}>
-                      {Array.from(new Set([...YIELD_UNITS, draft.yield_unit])).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                      {Array.from(new Set([...yieldUnits, draft.yield_unit])).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                     </select>
                   </div>
                 </label>
@@ -268,8 +271,8 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                     <span>min</span>
                   </div>
                 </label>
-                <label className={styles.field}>
-                  Perda / quebra
+                <label className={styles.field} title={labels.lossHint}>
+                  {labels.loss}
                   <div className={styles.inputGroup}>
                     <input className={styles.input} inputMode="decimal" value={draft.loss_pct} onChange={(event) => set('loss_pct', event.target.value)} placeholder="0" disabled={readOnly} />
                     <span>%</span>
@@ -343,12 +346,12 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
             {draft.kind === 'product' && (
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
-                  <h2><Tag size={18} /> Preço por canal de venda</h2>
+                  <h2><Tag size={18} /> Preço por {labels.channel.toLowerCase()}</h2>
                 </div>
                 <p className={styles.panelHint}>
                   Sugestão = custo ÷ (1 − impostos − taxas do canal − despesas fixas {formatPct(fixedPct)} − margem {formatPct(targetMargin, 0)}).
                   {base.source === 'expected'
-                    ? base.value > 0 ? ' Despesas fixas rateadas pelo faturamento esperado (Despesas e canais).' : ' Informe o faturamento esperado em “Despesas e canais” para ratear as despesas fixas.'
+                    ? base.value > 0 ? ` Despesas fixas rateadas pela previsão (${labels.expectedRevenue}, em Despesas e canais).` : ` Informe a ${labels.expectedRevenue === 'faturamento esperado' ? 'previsão de faturamento' : labels.expectedRevenue} em “Despesas e canais” para ratear as despesas fixas.`
                     : ` Despesas fixas rateadas pela média de ${base.months} mês(es) de vendas.`}
                   {' '}Clique na sugestão para usar.
                 </p>
@@ -356,7 +359,7 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                   <table className={`${styles.table} ${styles.priceTable}`}>
                     <thead>
                       <tr>
-                        <th>Canal</th>
+                        <th>{labels.channel}</th>
                         <th className={styles.num}>Custo + taxas</th>
                         <th className={styles.num}>Sugerido</th>
                         <th className={styles.num}>Seu preço</th>
@@ -409,13 +412,13 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                       })}
                     </tbody>
                   </table>
-                  {pricing.length === 0 && <div className={styles.empty}>Cadastre um canal de venda em “Despesas e canais”.</div>}
+                  {pricing.length === 0 && <div className={styles.empty}>Cadastre {labels.channels.toLowerCase()} em “Despesas e canais”.</div>}
                 </div>
               </section>
             )}
 
             <label className={styles.field}>
-              Observações e modo de fazer
+              {labels.notes}
               <textarea className={styles.input} rows={3} value={draft.notes} onChange={(event) => set('notes', event.target.value)} disabled={readOnly} />
             </label>
           </div>
@@ -428,13 +431,13 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                 Custo total: {formatMoney(cost.batchTotal)} · {terms.yield.toLowerCase()}: {formatQty(current.yield_qty)} {current.yield_unit}
               </span>
               <div className={styles.costList} style={{ marginTop: 16 }}>
-                <div><span>{terms.ingredients}</span><strong>{formatMoney(cost.ingredients)}</strong></div>
+                <div><span>{labels.groups.material}</span><strong>{formatMoney(cost.ingredients)}</strong></div>
                 {cost.bases > 0 && <div><span>{capitalize(terms.bases)}</span><strong>{formatMoney(cost.bases)}</strong></div>}
-                <div><span>Embalagens</span><strong>{formatMoney(cost.packaging)}</strong></div>
-                {cost.other > 0 && <div><span>Outros custos</span><strong>{formatMoney(cost.other)}</strong></div>}
-                <div><span>Perda ({formatPct(current.loss_pct, 0)})</span><strong>{formatMoney(cost.loss)}</strong></div>
+                {(cost.packaging > 0 || business.type !== 'software') && <div><span>{labels.groups.packaging}</span><strong>{formatMoney(cost.packaging)}</strong></div>}
+                {cost.other > 0 && <div><span>{labels.groups.other}</span><strong>{formatMoney(cost.other)}</strong></div>}
+                <div><span>{labels.loss} ({formatPct(current.loss_pct, 0)})</span><strong>{formatMoney(cost.loss)}</strong></div>
                 <div>
-                  <span>Mão de obra {settings.labor_hour_cost > 0 ? `(${formatQty(current.prep_minutes)} min)` : ''}</span>
+                  <span>{labels.labor} {settings.labor_hour_cost > 0 ? `(${formatQty(current.prep_minutes)} min)` : ''}</span>
                   <strong>{settings.labor_hour_cost > 0 ? formatMoney(cost.labor) : <span className={styles.muted}>não configurada</span>}</strong>
                 </div>
                 <div className={styles.costTotal}><span>Custo total</span><strong>{formatMoney(cost.batchTotal)}</strong></div>
@@ -450,7 +453,7 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                 <span className={styles.muted} style={{ fontSize: '0.8rem' }}>de lucro líquido por {draft.yield_unit || 'unidade'} ({formatPct(mainPricing.analysis.netMarginPct)})</span>
                 <div className={styles.costList} style={{ marginTop: 16 }}>
                   <div><span>Preço</span><strong>{formatMoney(mainPricing.analysis.price)}</strong></div>
-                  <div><span>− Custo do produto</span><strong>{formatMoney(mainPricing.unitVariableCost)}</strong></div>
+                  <div><span>− Custo {business.type === 'software' ? 'do cliente' : 'do produto'}</span><strong>{formatMoney(mainPricing.unitVariableCost)}</strong></div>
                   <div><span>− Impostos</span><strong>{formatMoney(mainPricing.analysis.taxes)}</strong></div>
                   <div><span>− Taxas / comissão</span><strong>{formatMoney(mainPricing.analysis.fees)}</strong></div>
                   <div><span>= Margem de contribuição</span><strong>{formatMoney(mainPricing.analysis.contribution)}</strong></div>
@@ -459,7 +462,8 @@ export default function ProductEditor({ workspace, tenantId, setWorkspace, produ
                 </div>
                 {unitsToBreakEven !== null && fixedMonthly > 0 && (
                   <p className={styles.panelHint} style={{ margin: '14px 0 0' }}>
-                    Só com este produto, seriam <strong>{unitsToBreakEven.toLocaleString('pt-BR')} {draft.yield_unit}/mês</strong> para pagar as despesas fixas ({formatMoney(fixedMonthly)}).
+                    Só com {business.type === 'software' ? 'este plano' : 'este item'}, seriam <strong>{unitsToBreakEven.toLocaleString('pt-BR')} {draft.yield_unit}{unitsToBreakEven === 1 ? '' : /[aeiou]$/.test(draft.yield_unit) ? 's' : ''}/mês</strong> para pagar as despesas fixas ({formatMoney(fixedMonthly)}).
+                    {business.type === 'software' && ' Esse é o número de clientes para empatar: cada cliente acima disso é lucro.'}
                   </p>
                 )}
               </section>

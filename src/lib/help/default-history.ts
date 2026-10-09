@@ -11,7 +11,7 @@ export const DEFAULT_ARTICLE_HISTORY: Record<string, string[]> = {
   'chamados-suporte': ['00ede920232aee66'],
   'conectar-redes-sociais': ['04a9c410840e7805', '32ec6f383fe5ef22'],
   'configuracoes-da-conta': ['ed278d8ca98ea088'],
-  'custos-e-precificacao': ['002a9fea5fcc9fbc'],
+  'custos-e-precificacao': ['002a9fea5fcc9fbc', '9838f47a1686045e'],
   'discador': ['716fb1ac28bdd0c9'],
   'disparos': ['674c4741e23550fb', 'caa0ff85c901e227'],
   'equipe-e-permissoes': ['4faa066eec057aa4', 'd5a11671f5482616', 'df7c96c8033999fe'],

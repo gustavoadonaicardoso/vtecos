@@ -17,6 +17,7 @@ import SalesTab from './components/SalesTab';
 import ImportTab from './components/ImportTab';
 import BusinessTab from './components/BusinessTab';
 import type { TabProps } from './components/shared';
+import { labelsFor } from '@/lib/finance/business';
 
 type TabId = 'overview' | 'products' | 'ingredients' | 'costs' | 'sales' | 'import' | 'business';
 
@@ -32,6 +33,16 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
 
 const TENANT_KEY = 'vortice-financeiro-tenant';
 
+/** Nome da aba com os termos do ramo (ex.: "Planos", "Recursos", "Mensalidades"). */
+function tabLabel(id: TabId, fallback: string, workspace: FinWorkspace | null) {
+  if (!workspace) return fallback;
+  const { terms } = workspace.business;
+  if (id === 'products') return terms.products;
+  if (id === 'ingredients') return terms.ingredients;
+  if (id === 'sales') return labelsFor(workspace.business).sales;
+  return fallback;
+}
+
 
 export default function FinanceiroPage() {
   const { user } = useAuth();
@@ -39,7 +50,7 @@ export default function FinanceiroPage() {
   const isClient = !user?.workspace?.is_platform;
 
   const [tab, setTab] = useState<TabId>('overview');
-  const [tenants, setTenants] = useState<{ id: string; name: string; status: string }[] | null>(null);
+  const [tenants, setTenants] = useState<{ id: string; name: string; status: string; is_platform?: boolean }[] | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<FinWorkspace | null>(null);
   const [error, setError] = useState('');
@@ -51,7 +62,7 @@ export default function FinanceiroPage() {
   // Equipe Vórtice: escolhe a empresa cliente (lembra a última no navegador).
   useEffect(() => {
     if (!user || isClient) return;
-    finRequest<{ id: string; name: string; status: string }[]>('/tenants', null)
+    finRequest<{ id: string; name: string; status: string; is_platform?: boolean }[]>('/tenants', null)
       .then((list) => {
         setTenants(list);
         let saved: string | null = null;
@@ -143,7 +154,7 @@ export default function FinanceiroPage() {
               aria-label="Empresa cliente"
             >
               {tenants.map((tenant) => (
-                <option key={tenant.id} value={tenant.id}>{tenant.name}{tenant.status !== 'ACTIVE' ? ' (inativa)' : ''}</option>
+                <option key={tenant.id} value={tenant.id}>{tenant.name}{tenant.is_platform ? ' (sua empresa)' : ''}{tenant.status !== 'ACTIVE' ? ' (inativa)' : ''}</option>
               ))}
             </select>
           </label>
@@ -161,7 +172,7 @@ export default function FinanceiroPage() {
             className={`${styles.tab} ${tab === item.id ? styles.tabActive : ''}`}
             onClick={() => setTab(item.id)}
           >
-            <item.icon size={16} /> {item.id === 'products' ? workspace?.business.terms.products || item.label : item.id === 'ingredients' ? workspace?.business.terms.ingredients || item.label : item.label}
+            <item.icon size={16} /> {tabLabel(item.id, item.label, workspace)}
           </button>
         ))}
       </nav>
@@ -169,7 +180,7 @@ export default function FinanceiroPage() {
       {loading || !tabProps ? (
         <div className={styles.center}>{loading ? 'Carregando a planilha…' : 'Sem dados.'}</div>
       ) : tab === 'overview' ? (
-        <OverviewTab {...tabProps} month={month} onMonthChange={setMonth} sales={sales} onNavigate={(id) => setTab(id as TabId)} />
+        <OverviewTab {...tabProps} month={month} onMonthChange={setMonth} sales={sales} onNavigate={(id) => setTab(id as TabId)} onSalesChanged={afterSalesChange} />
       ) : tab === 'products' ? (
         <ProductsTab {...tabProps} />
       ) : tab === 'ingredients' ? (
