@@ -72,6 +72,7 @@ function mapDbRowToLead(row: Row): Lead {
     aiPausedUntil: (row.ai_paused_until as string) || null,
     chatChannel: row.chat_channel === 'instagram' || row.chat_channel === 'messenger' ? row.chat_channel : 'whatsapp',
     instagramUsername: (row.instagram_username as string) || null,
+    protocol: Number(row.protocol) > 0 ? String(row.protocol).padStart(6, '0') : undefined,
   };
 }
 

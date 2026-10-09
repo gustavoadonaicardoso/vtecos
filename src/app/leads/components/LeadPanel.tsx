@@ -104,6 +104,7 @@ export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, o
 
         <div className={styles.panelBody}>
           <dl className={styles.facts}>
+            {lead.protocol && <div><dt>Protocolo</dt><dd>{lead.protocol}</dd></div>}
             <div><dt>Origem</dt><dd>{lead.source || 'Não informada'}</dd></div>
             <div><dt>Entrou em</dt><dd>{lead.createdAt ? formatDateTime(lead.createdAt) : lead.entryDate}</dd></div>
             <div><dt>Última mensagem</dt><dd>{lead.lastMsg || '—'}</dd></div>
