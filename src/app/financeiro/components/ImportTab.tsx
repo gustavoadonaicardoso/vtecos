@@ -35,19 +35,26 @@ function kindsFor(business: FinBusiness): Record<Kind, KindDef> {
       { key: 'purchase_unit', label: 'Unidade', synonyms: ['unidade', 'un', 'medida', 'unid'] },
       { key: 'purchase_price', label: 'Preço pago', required: true, synonyms: ['preco', 'valor', 'custo', 'preco pago', 'valor pago', 'total'] },
       { key: 'category', label: `Tipo (${business.categories.map((item) => item.label).slice(0, 3).join(' / ')})`, synonyms: ['tipo', 'categoria', 'grupo'] },
+      { key: 'currency', label: 'Moeda (R$, US$, €)', synonyms: ['moeda', 'currency'] },
       { key: 'supplier', label: 'Fornecedor', synonyms: ['fornecedor', 'marca', 'loja'] },
     ],
     example: [['Nome', 'Quantidade', 'Unidade', 'Preço', 'Tipo', 'Fornecedor'], [example.ingredient, '5', example.ingredientUnit, '25,00', firstType, 'Fornecedor A'], ['Embalagem', '50', 'un', '60,00', secondType, '']],
   },
   fixed_costs: {
     title: 'Despesas fixas',
-    hint: 'Uma linha por despesa mensal: aluguel, luz, salários, pró-labore…',
+    hint: business.type === 'software'
+      ? 'Uma linha por despesa: VPS, domínio, Claude, ChatGPT, contador… Moeda (R$/US$/€) e frequência (mensal/anual) são opcionais.'
+      : 'Uma linha por despesa: aluguel, luz, salários, pró-labore… Frequência (mensal/anual) é opcional.',
     fields: [
       { key: 'name', label: 'Descrição', required: true, synonyms: ['descricao', 'despesa', 'nome', 'conta', 'item'] },
-      { key: 'amount', label: 'Valor mensal', required: true, synonyms: ['valor', 'valor mensal', 'custo', 'total', 'preco'] },
+      { key: 'amount', label: 'Valor', required: true, synonyms: ['valor', 'valor mensal', 'custo', 'total', 'preco'] },
       { key: 'category', label: 'Categoria', synonyms: ['categoria', 'tipo', 'grupo'] },
+      { key: 'currency', label: 'Moeda (R$, US$, €)', synonyms: ['moeda', 'currency'] },
+      { key: 'recurrence', label: 'Frequência (mensal, anual)', synonyms: ['frequencia', 'recorrencia', 'periodicidade', 'cobranca'] },
     ],
-    example: [['Despesa', 'Valor', 'Categoria'], ['Aluguel', '1.800,00', 'Aluguel'], ['Energia', '450,00', 'Energia']],
+    example: business.type === 'software'
+      ? [['Despesa', 'Valor', 'Categoria', 'Moeda', 'Frequência'], ['VPS / servidor', '120,00', 'Servidor e hospedagem', 'R$', 'mensal'], ['Claude', '20,00', 'IA e ferramentas de desenvolvimento', 'US$', 'mensal'], ['Domínio (.com.br)', '40,00', 'Domínio e e-mail', 'R$', 'anual']]
+      : [['Despesa', 'Valor', 'Categoria', 'Frequência'], ['Aluguel', '1.800,00', 'Aluguel', 'mensal'], ['Energia', '450,00', 'Energia', 'mensal'], ['IPTU', '1.200,00', 'Impostos e taxas fixas', 'anual']],
   },
   sales: {
     title: 'Vendas',
@@ -67,6 +74,14 @@ function kindsFor(business: FinBusiness): Record<Kind, KindDef> {
 
 const plain = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 
+/** "US$", "USD", "dólar" → USD; "€", "euro" → EUR; o resto é real. */
+function currencyCode(value: string) {
+  const folded = plain(value).replace(/\s/g, '');
+  if (/^(us|usd|dolar|dolares|u\$s)/.test(folded) || value.includes('US$')) return 'USD';
+  if (/^(eur|euro)/.test(folded) || value.includes('€')) return 'EUR';
+  return 'BRL';
+}
+
 function normalizeUnit(value: unknown, fallback: FinUnit): FinUnit {
   const text = plain(String(value || ''));
   if (['kg', 'kilo', 'quilo', 'quilos', 'kgs'].includes(text)) return 'kg';
@@ -80,6 +95,10 @@ function normalizeUnit(value: unknown, fallback: FinUnit): FinUnit {
   if (['ml', 'mililitro', 'mililitros'].includes(text)) return 'ml';
   if (['un', 'und', 'unid', 'unidade', 'unidades', 'pc', 'pct', 'pacote', 'cx', 'caixa'].includes(text)) return 'un';
   if (['dz', 'duzia', 'duzias'].includes(text)) return 'dz';
+  if (['mil', 'milhar', 'mil unidades'].includes(text)) return 'mil';
+  if (['mi', 'milhao', 'milhoes', 'milhao de unidades'].includes(text)) return 'mi';
+  if (['gb', 'giga', 'gigabyte', 'gigabytes'].includes(text)) return 'gb';
+  if (['mb', 'mega', 'megabyte', 'megabytes'].includes(text)) return 'mb';
   return fallback;
 }
 
@@ -187,7 +206,9 @@ export default function ImportTab({ workspace, tenantId, reload, onSalesImported
         purchase_qty: toNum(text('purchase_qty'), 1) || 1,
         purchase_unit: normalizeUnit(get('purchase_unit'), unitFallback),
         purchase_price: typeof get('purchase_price') === 'number' ? get('purchase_price') : toNum(text('purchase_price')),
-        category: /embal/.test(plain(text('category'))) ? 'embalagem' : /outro/.test(plain(text('category'))) ? 'outro' : 'ingrediente',
+        // O servidor acha o tipo da empresa pelo nome (ou usa o primeiro).
+        category: text('category'),
+        currency: currencyCode(text('currency')),
         supplier: text('supplier'),
       };
     }
@@ -196,7 +217,8 @@ export default function ImportTab({ workspace, tenantId, reload, onSalesImported
         name: text('name'),
         amount: typeof get('amount') === 'number' ? get('amount') : toNum(text('amount')),
         category: text('category') || 'Outros',
-        recurrence: 'monthly',
+        currency: currencyCode(text('currency')),
+        recurrence: text('recurrence') || 'monthly',
       };
     }
     return {

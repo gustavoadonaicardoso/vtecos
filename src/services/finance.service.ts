@@ -17,8 +17,9 @@ import {
   buildCostContext, computeProductCost, defaultSalePrice, isUnit, monthKey, saleSnapshot,
 } from '@/lib/finance/calc';
 import type {
-  FinChannel, FinFixedCost, FinIngredient, FinMonthRevenue, FinProduct, FinProductItem, FinSale, FinSettings, FinWorkspace,
+  FinChannel, FinCurrency, FinFixedCost, FinIngredient, FinMonthRevenue, FinProduct, FinProductItem, FinSale, FinSettings, FinWorkspace,
 } from '@/lib/finance/types';
+import { fetchExchangeRates } from '@/lib/finance/fx';
 import type { FinanceAccess } from '@/lib/finance/access';
 
 type Row = Record<string, unknown>;
@@ -30,6 +31,10 @@ export const DEFAULT_SETTINGS: FinSettings = {
   target_margin_pct: 20,
   labor_hour_cost: 0,
   expected_monthly_revenue: 0,
+  usd_rate: 0,
+  eur_rate: 0,
+  fx_fee_pct: 3.5,
+  fx_updated_at: null,
 };
 
 // Canais comuns a qualquer ramo (cada empresa ajusta, renomeia ou apaga).
@@ -54,6 +59,12 @@ const text = (value: unknown, max = 200) => (typeof value === 'string' ? value.t
 const isUuid = (value: unknown): value is string =>
   typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const isDate = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+const toCurrency = (value: unknown): FinCurrency => {
+  const raw = typeof value === 'string' ? value.trim().toUpperCase() : '';
+  if (raw === 'USD' || raw === 'US$' || raw === 'DOLAR' || raw === 'DÓLAR') return 'USD';
+  if (raw === 'EUR' || raw === '€' || raw === 'EURO') return 'EUR';
+  return 'BRL';
+};
 
 function toSettings(row: Row | null): FinSettings {
   if (!row) return { ...DEFAULT_SETTINGS };
@@ -63,6 +74,10 @@ function toSettings(row: Row | null): FinSettings {
     target_margin_pct: num(row.target_margin_pct, DEFAULT_SETTINGS.target_margin_pct),
     labor_hour_cost: num(row.labor_hour_cost),
     expected_monthly_revenue: num(row.expected_monthly_revenue),
+    usd_rate: num(row.usd_rate),
+    eur_rate: num(row.eur_rate),
+    fx_fee_pct: num(row.fx_fee_pct, DEFAULT_SETTINGS.fx_fee_pct),
+    fx_updated_at: (row.fx_updated_at as string) || null,
   };
 }
 
@@ -74,6 +89,7 @@ function toIngredient(row: Row): FinIngredient {
     purchase_unit: row.purchase_unit as FinIngredient['purchase_unit'],
     purchase_qty: num(row.purchase_qty, 1),
     purchase_price: num(row.purchase_price),
+    currency: toCurrency(row.currency),
     supplier: (row.supplier as string) || '',
     updated_at: row.updated_at as string,
   };
@@ -127,7 +143,8 @@ function toFixedCost(row: Row): FinFixedCost {
     name: row.name as string,
     category: (row.category as string) || 'outros',
     amount: num(row.amount),
-    recurrence: row.recurrence === 'once' ? 'once' : 'monthly',
+    currency: toCurrency(row.currency),
+    recurrence: row.recurrence === 'once' ? 'once' : row.recurrence === 'yearly' ? 'yearly' : 'monthly',
     month: (row.month as string) || null,
     active: row.active !== false,
   };
@@ -241,7 +258,7 @@ export async function loadWorkspace(access: FinanceAccess): Promise<FinWorkspace
     loadRevenueHistory(tenantId),
   ]);
   return {
-    tenant: access.tenant,
+    tenant: { id: access.tenant.id, name: access.tenant.name, isPlatform: access.tenant.isPlatform },
     settings: toSettings(settingsRow),
     business: resolveBusiness(settingsRow),
     ingredients,
@@ -270,22 +287,45 @@ export async function listSales(tenantId: string, month: string) {
 }
 
 export async function listTenantsForStaff() {
-  const { data, error } = await db.from('tenants').select('id, name, status').order('name');
+  const { data, error } = await db.from('tenants').select('id, name, status, is_platform').order('name');
   if (error) throw new Error(error.message);
-  return data || [];
+  // A própria Vórtice primeiro: é onde ficam os custos do sistema.
+  return (data || []).sort((a, b) => Number(b.is_platform === true) - Number(a.is_platform === true));
 }
 
 // ── Validação de entrada ─────────────────────────────────────
 
-export function parseSettings(body: Row): FinSettings {
+export function parseSettings(body: Row, current: FinSettings = DEFAULT_SETTINGS): FinSettings {
   const pct = (value: unknown, fallback: number) => Math.min(95, Math.max(0, num(value, fallback)));
+  const rate = (value: unknown, fallback: number) => Math.min(1000, Math.max(0, num(value, fallback)));
+  const usd_rate = rate(body.usd_rate, current.usd_rate);
+  const eur_rate = rate(body.eur_rate, current.eur_rate);
+  const ratesChanged = usd_rate !== current.usd_rate || eur_rate !== current.eur_rate;
   return {
     tax_pct: pct(body.tax_pct, DEFAULT_SETTINGS.tax_pct),
     commission_pct: pct(body.commission_pct, 0),
     target_margin_pct: pct(body.target_margin_pct, DEFAULT_SETTINGS.target_margin_pct),
     labor_hour_cost: Math.max(0, num(body.labor_hour_cost)),
     expected_monthly_revenue: Math.max(0, num(body.expected_monthly_revenue)),
+    usd_rate,
+    eur_rate,
+    fx_fee_pct: Math.min(30, Math.max(0, num(body.fx_fee_pct, current.fx_fee_pct))),
+    fx_updated_at: ratesChanged ? new Date().toISOString() : current.fx_updated_at,
   };
+}
+
+/** Configurações atuais (para mesclar o que o formulário não mandou). */
+export async function currentSettings(tenantId: string) {
+  return loadSettings(tenantId);
+}
+
+/** Busca a cotação de hoje (Banco Central) e grava nas configurações. */
+export async function refreshExchangeRates(tenantId: string) {
+  const current = await loadSettings(tenantId);
+  const rates = await fetchExchangeRates();
+  const next: FinSettings = { ...current, usd_rate: rates.usd, eur_rate: rates.eur, fx_updated_at: new Date().toISOString() };
+  await saveSettings(tenantId, next);
+  return { settings: next, source: rates.source, date: rates.date };
 }
 
 /** Tipo do insumo: chave ou nome de um tipo da empresa (planilhas trazem o nome). */
@@ -308,7 +348,7 @@ export function parseIngredient(body: Row, categories: IngredientCategoryDef[] =
   const purchase_price = num(body.purchase_price);
   if (purchase_qty <= 0) return { error: `${name}: quantidade da compra deve ser maior que zero.` };
   if (purchase_price < 0) return { error: `${name}: preço inválido.` };
-  return { data: { name, category, purchase_unit, purchase_qty, purchase_price, supplier: text(body.supplier, 120) } };
+  return { data: { name, category, purchase_unit, purchase_qty, purchase_price, currency: toCurrency(body.currency), supplier: text(body.supplier, 120) } };
 }
 
 export function parseChannel(body: Row): Parsed<Omit<FinChannel, 'id' | 'position'>> {
@@ -326,13 +366,21 @@ export function parseFixedCost(body: Row): Parsed<Omit<FinFixedCost, 'id'>> {
   if (!name) return { error: 'Informe a descrição da despesa.' };
   const amount = num(body.amount);
   if (amount < 0) return { error: `${name}: valor inválido.` };
-  const recurrence = body.recurrence === 'once' ? 'once' : 'monthly';
+  const recurrence = parseRecurrence(body.recurrence);
   let month: string | null = null;
   if (recurrence === 'once') {
     const raw = text(body.month, 10);
     month = /^\d{4}-\d{2}/.test(raw) ? `${raw.slice(0, 7)}-01` : `${monthKey(new Date())}-01`;
   }
-  return { data: { name, category: text(body.category, 60) || 'outros', amount, recurrence, month, active: body.active !== false } };
+  return { data: { name, category: text(body.category, 60) || 'outros', amount, currency: toCurrency(body.currency), recurrence, month, active: body.active !== false } };
+}
+
+/** "monthly", "anual", "Só uma vez"... (planilhas trazem em português). */
+function parseRecurrence(value: unknown): FinFixedCost['recurrence'] {
+  const raw = typeof value === 'string' ? normalizeName(value) : '';
+  if (raw === 'yearly' || raw.startsWith('anual') || raw.startsWith('ano') || raw === 'por ano') return 'yearly';
+  if (raw === 'once' || raw.startsWith('avuls') || raw.startsWith('uma vez') || raw.startsWith('so uma') || raw.startsWith('unic')) return 'once';
+  return 'monthly';
 }
 
 export interface ProductInput extends Omit<FinProduct, 'id' | 'items'> {
@@ -500,7 +548,27 @@ export async function saveBusiness(tenantId: string, body: Row): Promise<{ data:
     { onConflict: 'tenant_id' }
   );
   if (error) return { error: error.message };
+  if (body.applyPreset === true && preset.channels) await swapUntouchedChannels(tenantId, preset.channels);
   return { data: resolveBusiness({ business_type: type, terms, ingredient_categories: categories }) };
+}
+
+/**
+ * Troca os canais criados no primeiro acesso pelos do ramo (ex.: formas
+ * de cobrança de quem vende sistema) -- só se a empresa ainda não mexeu
+ * neles e nenhuma venda os usa.
+ */
+async function swapUntouchedChannels(tenantId: string, channels: NonNullable<ReturnType<typeof presetFor>['channels']>) {
+  const current = await loadChannels(tenantId);
+  const untouched = current.length === DEFAULT_CHANNELS.length && current.every((channel) => {
+    const original = DEFAULT_CHANNELS.find((item) => item.name === channel.name);
+    return original && original.fee_pct === channel.fee_pct && original.fixed_fee === channel.fixed_fee && original.extra_cost === channel.extra_cost && channel.active;
+  });
+  if (!untouched) return;
+  const { count } = await db.from('fin_sales').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).not('channel_id', 'is', null);
+  if (count) return;
+  const { error } = await db.from('fin_channels').delete().eq('tenant_id', tenantId).in('id', current.map((channel) => channel.id));
+  if (error) return;
+  await db.from('fin_channels').insert(channels.map((channel, position) => ({ ...channel, position, tenant_id: tenantId })));
 }
 
 export async function saveSettings(tenantId: string, settings: FinSettings) {
@@ -689,6 +757,96 @@ export async function importRows(tenantId: string, kind: 'ingredients' | 'fixed_
     inserted = valid.length;
   }
   return { inserted, updated, errors };
+}
+
+// ── Vórtice: clientes e planos do próprio sistema ───────────
+
+const BILL_PREFIX = 'Mensalidade · ';
+
+export interface PlatformSummary {
+  plans: { id: string; name: string; price: number; active: boolean; clients: number; mrr: number; hasProduct: boolean }[];
+  clients: number;
+  /** Clientes ativos sem plano ou com plano de preço zero. */
+  unpaid: number;
+  mrr: number;
+  /** Mensalidades já lançadas no mês pedido. */
+  billed: number;
+}
+
+/** Empresas clientes ativas com o plano de cada uma (dados do Painel Master). */
+async function loadPlatformClients() {
+  const [{ data: tenants, error }, { data: plans, error: plansError }] = await Promise.all([
+    // tenant-scope: ok (só a planilha da própria Vórtice chega aqui: lista os clientes dela)
+    db.from('tenants').select('id, name, status, plan_id').eq('is_platform', false).eq('status', 'ACTIVE').order('name'),
+    // tenant-scope: ok (planos são da plataforma, não de uma empresa)
+    db.from('plans').select('id, name, price, active').order('price'),
+  ]);
+  if (error) throw new Error(error.message);
+  if (plansError) throw new Error(plansError.message);
+  const planById = new Map((plans || []).map((plan) => [plan.id as string, { id: plan.id as string, name: plan.name as string, price: num(plan.price), active: plan.active !== false }]));
+  return {
+    plans: [...planById.values()],
+    clients: (tenants || []).map((tenant) => ({ id: tenant.id as string, name: tenant.name as string, plan: tenant.plan_id ? planById.get(tenant.plan_id as string) || null : null })),
+  };
+}
+
+async function billedThisMonth(tenantId: string, month: string) {
+  const sales = await listSales(tenantId, month);
+  return new Set(sales.filter((sale) => sale.description.startsWith(BILL_PREFIX)).map((sale) => sale.description));
+}
+
+export async function platformSummary(tenantId: string, month: string): Promise<PlatformSummary> {
+  const [{ plans, clients }, products, billed] = await Promise.all([loadPlatformClients(), loadProducts(tenantId), billedThisMonth(tenantId, month)]);
+  const productNames = new Set(products.map((product) => normalizeName(product.name)));
+  const rows = plans.map((plan) => {
+    const count = clients.filter((client) => client.plan?.id === plan.id).length;
+    return { ...plan, clients: count, mrr: count * plan.price, hasProduct: productNames.has(normalizeName(plan.name)) };
+  });
+  return {
+    plans: rows,
+    clients: clients.length,
+    unpaid: clients.filter((client) => !client.plan || client.plan.price <= 0).length,
+    mrr: rows.reduce((sum, plan) => sum + plan.mrr, 0),
+    billed: billed.size,
+  };
+}
+
+/** Cria um plano em "Planos" para cada plano do Painel Master que ainda não tem. */
+export async function importPlatformPlans(tenantId: string) {
+  const [{ plans }, products] = await Promise.all([loadPlatformClients(), loadProducts(tenantId)]);
+  const existing = new Set(products.map((product) => normalizeName(product.name)));
+  let created = 0;
+  for (const plan of plans.filter((item) => item.active && !existing.has(normalizeName(item.name)))) {
+    const result = await saveProduct(tenantId, null, {
+      name: plan.name, category: 'Planos do sistema', kind: 'product', yield_qty: 1, yield_unit: 'cliente', prep_minutes: 0, loss_pct: 0,
+      sale_price: plan.price, channel_prices: {}, target_margin_pct: null, notes: '', active: true, items: [],
+    });
+    if ('error' in result && result.error) throw new Error(result.error);
+    created += 1;
+  }
+  return { created };
+}
+
+/** Lança a mensalidade de cada cliente ativo do mês (sem repetir quem já foi lançado). */
+export async function billPlatformMonth(tenantId: string, createdBy: string, month: string) {
+  const [{ clients }, billed, channels] = await Promise.all([loadPlatformClients(), billedThisMonth(tenantId, month), loadChannels(tenantId)]);
+  const channel = channels.find((item) => item.active) || null;
+  const inputs = clients
+    .filter((client) => client.plan && client.plan.price > 0 && !billed.has(`${BILL_PREFIX}${client.name}`))
+    .map((client) => ({
+      sold_at: `${month}-01`,
+      product_id: null,
+      product_name: client.plan!.name,
+      channel_id: channel?.id ?? null,
+      channel_name: '',
+      description: `${BILL_PREFIX}${client.name}`,
+      quantity: 1,
+      unit_price: client.plan!.price,
+      discount: 0,
+    }));
+  if (inputs.length === 0) return { inserted: 0, skipped: billed.size };
+  const result = await createSales(tenantId, createdBy, inputs, 'manual');
+  return { inserted: result.inserted.length, skipped: billed.size };
 }
 
 export const mappers = { toIngredient, toChannel, toFixedCost };

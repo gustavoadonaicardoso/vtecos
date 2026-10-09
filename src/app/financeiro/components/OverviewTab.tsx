@@ -10,36 +10,42 @@ import {
 import styles from '../financeiro.module.css';
 import { MonthPicker, marginTone, pricingBase, type TabProps } from './shared';
 import {
-  buildCostContext, computeMonthResult, computeProductCost, fixedCostsForMonth, formatMoney, formatPct, formatQty, priceForChannel,
+  buildCostContext, computeMonthResult, computeProductCost, fixedCostsForMonth, formatMoney, formatPct, formatQty, missingRate, priceForChannel,
 } from '@/lib/finance/calc';
+import { capitalize, labelsFor } from '@/lib/finance/business';
 import type { FinSale } from '@/lib/finance/types';
+import PlatformPanel from './PlatformPanel';
 
 interface Props extends TabProps {
   month: string;
   onMonthChange: (month: string) => void;
   sales: FinSale[] | null;
   onNavigate: (tab: string) => void;
+  /** Depois de lançar as mensalidades dos clientes (planilha da Vórtice). */
+  onSalesChanged: () => Promise<void>;
 }
 
 const compact = (value: number) =>
   Math.abs(value) >= 1000 ? `${(value / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 
-export default function OverviewTab({ workspace, month, onMonthChange, sales, onNavigate }: Props) {
+export default function OverviewTab({ workspace, tenantId, setWorkspace, reload, month, onMonthChange, sales, onNavigate, onSalesChanged }: Props) {
   const { products, ingredients, settings, channels, fixedCosts, business } = workspace;
   const terms = business.terms;
+  const labels = labelsFor(business);
+  const isSoftware = business.type === 'software';
 
   const result = useMemo(() => {
-    const fixed = fixedCostsForMonth(fixedCosts, month);
+    const fixed = fixedCostsForMonth(fixedCosts, month, settings);
     return computeMonthResult(sales || [], fixed, month, {
       products: new Map(products.map((product) => [product.id, product.name])),
       channels: new Map(channels.map((channel) => [channel.id, channel.name])),
     });
-  }, [sales, fixedCosts, month, products, channels]);
+  }, [sales, fixedCosts, month, products, channels, settings]);
 
   // Alertas a partir das fichas: produto com prejuízo, abaixo da meta ou sem preço.
   const alerts = useMemo(() => {
     const { fixedPct, base } = pricingBase(workspace, month);
-    const ctx = buildCostContext(products, ingredients, settings);
+    const ctx = buildCostContext(products, ingredients, settings, business.categories);
     const main = channels.find((channel) => channel.active);
     const list: { tone: 'bad' | 'warn' | 'info'; text: string; tab: string }[] = [];
     for (const product of products.filter((item) => item.kind === 'product' && item.active)) {
@@ -51,16 +57,19 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
       if (product.sale_price <= 0) {
         list.push({ tone: 'info', text: `${product.name}: sem preço de venda${pricing.roundedPrice ? ` (sugerido ${formatMoney(pricing.roundedPrice)})` : ''}`, tab: 'products' });
       } else if (pricing.analysis && pricing.analysis.netProfit < 0) {
-        list.push({ tone: 'bad', text: `${product.name}: dá prejuízo de ${formatMoney(-pricing.analysis.netProfit)} por unidade a ${formatMoney(product.sale_price)}`, tab: 'products' });
+        list.push({ tone: 'bad', text: `${product.name}: dá prejuízo de ${formatMoney(-pricing.analysis.netProfit)} por ${product.yield_unit || 'unidade'} a ${formatMoney(product.sale_price)}`, tab: 'products' });
       } else if (pricing.analysis && pricing.analysis.netMarginPct < target) {
         list.push({ tone: 'warn', text: `${product.name}: margem de ${formatPct(pricing.analysis.netMarginPct)}, abaixo da meta de ${formatPct(target, 0)}`, tab: 'products' });
       }
     }
-    if (fixedCosts.length === 0) list.push({ tone: 'info', text: 'Cadastre as despesas fixas (aluguel, luz, salários) para calcular o lucro de verdade.', tab: 'costs' });
-    else if (base.value <= 0) list.push({ tone: 'info', text: 'Informe o faturamento esperado para ratear as despesas fixas no preço.', tab: 'costs' });
+    if (fixedCosts.length === 0) list.push({ tone: 'info', text: `Cadastre as despesas fixas (${isSoftware ? 'VPS, domínio, Claude, ChatGPT, contador, pró-labore' : 'aluguel, luz, salários'}) para calcular o lucro de verdade.`, tab: 'costs' });
+    else if (base.value <= 0) list.push({ tone: 'info', text: `Informe a previsão (${labels.expectedRevenue}) para ratear as despesas fixas no preço.`, tab: 'costs' });
+    if ([...fixedCosts, ...ingredients].some((item) => missingRate(item.currency, settings))) {
+      list.push({ tone: 'warn', text: 'Há custos em dólar/euro sem cotação: eles estão entrando como R$ 0,00.', tab: 'costs' });
+    }
     const weight = { bad: 0, warn: 1, info: 2 };
     return list.sort((a, b) => weight[a.tone] - weight[b.tone]).slice(0, 8);
-  }, [workspace, month, products, ingredients, settings, channels, fixedCosts]);
+  }, [workspace, month, products, ingredients, settings, channels, fixedCosts, business.categories, isSoftware, labels.expectedRevenue]);
 
   const hasSales = (sales?.length || 0) > 0;
   // Mês corrente: a linha para no dia de hoje (dias futuros ainda não aconteceram).
@@ -71,13 +80,16 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
     cumulativeProfit: day.day > todayKey ? null : day.cumulativeProfit,
   }));
   const waterfall = [
-    { label: 'Faturamento', value: result.revenue, color: '#3b82f6' },
-    { label: 'Custo dos produtos', value: -result.cmv, color: '#f97316' },
+    { label: labels.revenue, value: result.revenue, color: '#3b82f6' },
+    { label: labels.cogs, value: -result.cmv, color: '#f97316' },
     { label: 'Taxas e comissões', value: -result.fees, color: '#eab308' },
     { label: 'Impostos', value: -result.taxes, color: '#a855f7' },
     { label: 'Despesas fixas', value: -result.fixed, color: '#ef4444' },
   ];
   const scale = Math.max(result.revenue, result.fixed, 1);
+  // Sistema: quantos clientes (na média do mês) pagam as despesas fixas.
+  const perClient = result.salesCount > 0 ? result.contribution / result.salesCount : 0;
+  const clientsToBreakEven = isSoftware && perClient > 0 ? Math.ceil(result.fixed / perClient) : null;
 
   return (
     <>
@@ -85,10 +97,17 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
         <div className={styles.setupBanner}>
           <div>
             <strong>Qual é o seu ramo?</strong>
-            <span>Escolha o modelo do seu negócio (loja, serviços, restaurante, indústria...) para os nomes, tipos e exemplos ficarem do seu jeito.</span>
+            <span>
+              {workspace.tenant.isPlatform
+                ? 'Esta é a planilha da sua própria empresa. Se você vende o sistema, escolha "Software, SaaS e sistemas": planos, custos por cliente, despesas em dólar (Claude, ChatGPT, Supabase) e clientes do Painel Master.'
+                : 'Escolha o modelo do seu negócio (loja, serviços, sistema, restaurante, indústria...) para os nomes, tipos e exemplos ficarem do seu jeito.'}
+            </span>
           </div>
           <button className={styles.primaryButton} onClick={() => onNavigate('business')}>Escolher o ramo</button>
         </div>
+      )}
+      {workspace.tenant.isPlatform && workspace.access.canManage && (
+        <PlatformPanel workspace={workspace} tenantId={tenantId} setWorkspace={setWorkspace} reload={reload} month={month} onSalesChanged={onSalesChanged} />
       )}
       <div className={styles.panelHeader} style={{ marginBottom: 0 }}>
         <h2 style={{ fontSize: '1.2rem' }}>Resultado do mês</h2>
@@ -97,9 +116,13 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
 
       <div className={styles.kpis}>
         <div className={styles.kpi} style={{ '--kpi-color': '#3b82f6' } as React.CSSProperties}>
-          <span className={styles.kpiLabel}><CircleDollarSign size={16} /> Faturamento</span>
+          <span className={styles.kpiLabel}><CircleDollarSign size={16} /> {labels.revenue}</span>
           <span className={styles.kpiValue}>{formatMoney(result.revenue)}</span>
-          <span className={styles.kpiFoot}>{result.salesCount} venda(s) · ticket médio {formatMoney(result.averageTicket)}</span>
+          <span className={styles.kpiFoot}>
+            {isSoftware
+              ? `${result.salesCount} mensalidade(s) · média ${formatMoney(result.averageTicket)} por cliente`
+              : `${result.salesCount} venda(s) · ticket médio ${formatMoney(result.averageTicket)}`}
+          </span>
         </div>
         <div className={styles.kpi} style={{ '--kpi-color': result.netProfit < 0 ? '#ef4444' : '#10b981' } as React.CSSProperties}>
           <span className={styles.kpiLabel}><PiggyBank size={16} /> Lucro líquido</span>
@@ -113,7 +136,14 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
         </div>
         <div className={styles.kpi} style={{ '--kpi-color': '#f59e0b' } as React.CSSProperties}>
           <span className={styles.kpiLabel}><Scale size={16} /> Ponto de equilíbrio</span>
-          <span className={styles.kpiValue}>{result.breakEvenRevenue !== null ? formatMoney(result.breakEvenRevenue) : '—'}</span>
+          <span className={styles.kpiValue}>
+            {clientsToBreakEven !== null
+              ? `${clientsToBreakEven.toLocaleString('pt-BR')} cliente${clientsToBreakEven === 1 ? '' : 's'}`
+              : result.breakEvenRevenue !== null ? formatMoney(result.breakEvenRevenue) : '—'}
+          </span>
+          {clientsToBreakEven !== null && result.breakEvenRevenue !== null && (
+            <span className={styles.kpiFoot}>{formatMoney(result.breakEvenRevenue)} por mês · hoje {result.salesCount} pagando</span>
+          )}
           {result.breakEvenProgress !== null ? (
             <>
               <div className={styles.progress}><div style={{ width: `${result.breakEvenProgress}%`, background: result.breakEvenProgress >= 100 ? 'var(--good)' : 'var(--warn)' }} /></div>
@@ -122,7 +152,7 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
               </span>
             </>
           ) : (
-            <span className={styles.kpiFoot}>faturamento mínimo para não ter prejuízo</span>
+            <span className={styles.kpiFoot}>{isSoftware ? 'clientes pagando para não ter prejuízo' : 'faturamento mínimo para não ter prejuízo'}</span>
           )}
         </div>
       </div>
@@ -130,7 +160,7 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
       <div className={styles.grid3}>
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
-            <h2><TrendingUp size={18} /> Vendas por dia e lucro acumulado</h2>
+            <h2><TrendingUp size={18} /> {labels.sales} por dia e lucro acumulado</h2>
           </div>
           <p className={styles.panelHint}>A linha verde começa em −{formatMoney(result.fixed)} (despesas fixas do mês) e sobe com o que sobra de cada venda. Quando cruza o zero, o mês se pagou.</p>
           <div className={styles.chartBox}>
@@ -140,7 +170,7 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} interval={2} />
                 <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={compact} width={56} />
                 <Tooltip
-                  formatter={(value, name) => [formatMoney(Number(value)), name === 'revenue' ? 'Vendas do dia' : 'Lucro acumulado']}
+                  formatter={(value, name) => [formatMoney(Number(value)), name === 'revenue' ? `${labels.sales} do dia` : 'Lucro acumulado']}
                   labelFormatter={(label) => `Dia ${label}`}
                   contentStyle={{ borderRadius: 12, border: '1px solid rgba(148,163,184,0.3)', background: 'var(--background)', color: 'var(--foreground)' }}
                 />
@@ -179,12 +209,12 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
             <h2><Trophy size={18} /> O que mais deu lucro</h2>
           </div>
           {result.byProduct.length === 0 ? (
-            <div className={styles.empty}>Sem vendas neste mês.</div>
+            <div className={styles.empty}>Sem {labels.sales.toLowerCase()} neste mês.</div>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Produto</th><th className={styles.num}>Qtd.</th><th className={styles.num}>Vendas</th><th className={styles.num}>Contribuição</th><th className={styles.num}>Margem</th></tr>
+                  <tr><th>{capitalize(terms.product)}</th><th className={styles.num}>Qtd.</th><th className={styles.num}>Vendas</th><th className={styles.num}>Contribuição</th><th className={styles.num}>Margem</th></tr>
                 </thead>
                 <tbody>
                   {result.byProduct.slice(0, 8).map((row) => (
@@ -204,10 +234,10 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
 
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
-            <h2><Store size={18} /> Por canal</h2>
+            <h2><Store size={18} /> Por {labels.channel.toLowerCase()}</h2>
           </div>
           {result.byChannel.length === 0 ? (
-            <div className={styles.empty}>Sem vendas neste mês.</div>
+            <div className={styles.empty}>Sem {labels.sales.toLowerCase()} neste mês.</div>
           ) : (
             <div className={styles.waterfall}>
               {result.byChannel.map((row) => (
@@ -218,7 +248,7 @@ export default function OverviewTab({ workspace, month, onMonthChange, sales, on
                 </div>
               ))}
               <p className={styles.panelHint} style={{ margin: '6px 0 0' }}>
-                Sobra por canal (depois de custo, taxas e impostos): {result.byChannel.map((row) => `${row.name} ${row.revenue > 0 ? formatPct((row.contribution / row.revenue) * 100, 0) : '—'}`).join(' · ')}
+                Sobra por {labels.channel.toLowerCase()} (depois de custo, taxas e impostos): {result.byChannel.map((row) => `${row.name} ${row.revenue > 0 ? formatPct((row.contribution / row.revenue) * 100, 0) : '—'}`).join(' · ')}
               </p>
             </div>
           )}

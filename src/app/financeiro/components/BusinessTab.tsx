@@ -7,8 +7,8 @@ import { finRequest } from '../api';
 import type { TabProps } from './shared';
 import {
   BUSINESS_PRESETS,
-  GROUP_LABEL,
   TERM_INFO,
+  labelsFor,
   presetFor,
   type BusinessType,
   type CategoryGroup,
@@ -27,6 +27,7 @@ export default function BusinessTab({ workspace, tenantId, setWorkspace }: TabPr
   const { business, ingredients, access } = workspace;
   const readOnly = !access.canManage;
   const preset = presetFor(business.type);
+  const groupLabels = labelsFor(business).groups;
   const [terms, setTerms] = useState<Partial<Terms>>(business.customTerms);
   const [categories, setCategories] = useState<CategoryDraft[]>(business.categories);
   const [busy, setBusy] = useState<string | null>(null);
@@ -147,7 +148,7 @@ export default function BusinessTab({ workspace, tenantId, setWorkspace }: TabPr
           )}
         </div>
         <p className={styles.panelHint}>
-          Separe o que você compra do seu jeito (ex.: tecidos, aviamentos, revenda). &quot;Entra como&quot; diz em que linha o custo aparece no detalhe de cada {business.terms.product}: material, embalagem ou outros custos.
+          Separe o que você compra do seu jeito (ex.: tecidos, aviamentos, revenda). &quot;Entra em&quot; diz em que linha o custo aparece no detalhe de cada {business.terms.product}: {Object.values(groupLabels).map((item) => item.toLowerCase()).join(', ')}.
         </p>
         <div className={styles.categoryList}>
           {categories.map((item, index) => {
@@ -156,7 +157,7 @@ export default function BusinessTab({ workspace, tenantId, setWorkspace }: TabPr
               <div key={`${item.key}-${index}`} className={styles.categoryRow}>
                 <input className={styles.input} value={item.label} placeholder="Nome do tipo" maxLength={40} disabled={readOnly} onChange={(event) => setCategory(index, { label: event.target.value })} aria-label="Nome do tipo" />
                 <select className={styles.input} value={item.group} disabled={readOnly} onChange={(event) => setCategory(index, { group: event.target.value as CategoryGroup })} aria-label="Entra como">
-                  {(Object.keys(GROUP_LABEL) as CategoryGroup[]).map((group) => <option key={group} value={group}>{GROUP_LABEL[group]}</option>)}
+                  {(Object.keys(groupLabels) as CategoryGroup[]).map((group) => <option key={group} value={group}>Entra em {groupLabels[group].toLowerCase()}</option>)}
                 </select>
                 <span className={styles.muted} style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{count ? `${count} item(ns)` : 'sem itens'}</span>
                 {!readOnly && (

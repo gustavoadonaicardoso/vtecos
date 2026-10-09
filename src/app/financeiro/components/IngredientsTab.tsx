@@ -4,10 +4,12 @@ import React, { useMemo, useState } from 'react';
 import { Check, Package, Pencil, Plus, Search, Settings2, Trash2, X } from 'lucide-react';
 import styles from '../financeiro.module.css';
 import { finRequest, numText, toNum } from '../api';
-import type { TabProps } from './shared';
-import { BASE_DISPLAY, UNIT_INFO, UNITS, formatMoney, formatQty, ingredientBaseCost } from '@/lib/finance/calc';
+import { refreshRates, type TabProps } from './shared';
+import {
+  CURRENCIES, UNIT_INFO, UNITS, formatCurrency, formatMoney, formatQty, missingRate, toBRL, unitCostLabel, type FxSettings,
+} from '@/lib/finance/calc';
 import { capitalize, categoryInfo, presetFor } from '@/lib/finance/business';
-import type { FinIngredient, FinUnit, IngredientCategory } from '@/lib/finance/types';
+import type { FinCurrency, FinIngredient, FinUnit, IngredientCategory } from '@/lib/finance/types';
 
 interface Draft {
   id?: string;
@@ -16,21 +18,22 @@ interface Draft {
   purchase_qty: string;
   purchase_unit: FinUnit;
   purchase_price: string;
+  currency: FinCurrency;
   supplier: string;
 }
 
-/** "R$ 4,50 / kg" — custo na unidade que a pessoa pensa (kg, litro, metro, hora...). */
-export function unitPriceLabel(ingredient: Pick<FinIngredient, 'purchase_unit' | 'purchase_qty' | 'purchase_price'>) {
-  const display = BASE_DISPLAY[UNIT_INFO[ingredient.purchase_unit].base];
-  return `${formatMoney(ingredientBaseCost(ingredient) * display.per)} / ${display.label}`;
+/** "R$ 4,50 / kg" — custo em reais na unidade que a pessoa pensa (kg, litro, GB, mil mensagens...). */
+export function unitPriceLabel(ingredient: Pick<FinIngredient, 'purchase_unit' | 'purchase_qty' | 'purchase_price'> & { currency?: FinCurrency }, fx?: FxSettings) {
+  return unitCostLabel(ingredient, fx);
 }
 
 export default function IngredientsTab({ workspace, tenantId, setWorkspace, onNavigate }: TabProps) {
-  const { ingredients, products, access, business } = workspace;
+  const { ingredients, products, access, business, settings } = workspace;
+  const isSoftware = business.type === 'software';
   const terms = business.terms;
   const example = presetFor(business.type).examples;
   const defaultUnit = (UNITS.includes(example.ingredientUnit as FinUnit) ? example.ingredientUnit : 'un') as FinUnit;
-  const EMPTY: Draft = { name: '', category: business.categories[0]?.key || 'outro', purchase_qty: '1', purchase_unit: defaultUnit, purchase_price: '', supplier: '' };
+  const EMPTY: Draft = { name: '', category: business.categories[0]?.key || 'outro', purchase_qty: '1', purchase_unit: defaultUnit, purchase_price: '', currency: 'BRL', supplier: '' };
   const label = (key: string) => categoryInfo(business, key).label;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [query, setQuery] = useState('');
@@ -54,22 +57,24 @@ export default function IngredientsTab({ workspace, tenantId, setWorkspace, onNa
     (item.name.toLowerCase().includes(term) || item.supplier.toLowerCase().includes(term))
   );
 
-  // Soma do que foi pago em cada item cadastrado: geral, por tipo e no filtro atual.
+  // Soma do que foi pago em cada item cadastrado (em reais): geral, por tipo e no filtro atual.
+  const paid = (item: FinIngredient) => toBRL(item.purchase_price, item.currency, settings);
   const totals = useMemo(() => {
     const byCategory = new Map<string, { total: number; count: number }>();
     let total = 0;
     for (const item of ingredients) {
-      total += item.purchase_price;
+      const value = toBRL(item.purchase_price, item.currency, settings);
+      total += value;
       const entry = byCategory.get(item.category) || { total: 0, count: 0 };
-      entry.total += item.purchase_price;
+      entry.total += value;
       entry.count += 1;
       byCategory.set(item.category, entry);
     }
     const order = business.categories.map((item) => item.key);
     const groups = [...byCategory.entries()].sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99));
     return { total, groups, missingPrice: ingredients.filter((item) => item.purchase_price <= 0).length };
-  }, [ingredients, business.categories]);
-  const visibleTotal = visible.reduce((sum, item) => sum + item.purchase_price, 0);
+  }, [ingredients, business.categories, settings]);
+  const visibleTotal = visible.reduce((sum, item) => sum + paid(item), 0);
   const filtered = visible.length !== ingredients.length;
   const categoryKeys = Array.from(new Set([...business.categories.map((item) => item.key), ...ingredients.map((item) => item.category)]));
 
@@ -84,6 +89,7 @@ export default function IngredientsTab({ workspace, tenantId, setWorkspace, onNa
       purchase_qty: toNum(draft.purchase_qty, 1),
       purchase_unit: draft.purchase_unit,
       purchase_price: toNum(draft.purchase_price),
+      currency: draft.currency,
       supplier: draft.supplier,
     };
     try {
@@ -96,7 +102,8 @@ export default function IngredientsTab({ workspace, tenantId, setWorkspace, onNa
           ? current.ingredients.map((item) => (item.id === saved.id ? saved : item))
           : [...current.ingredients, saved].sort((a, b) => a.name.localeCompare(b.name)),
       }));
-      setDraft(draft.id ? null : { ...EMPTY, category: draft.category, purchase_unit: draft.purchase_unit });
+      setDraft(draft.id ? null : { ...EMPTY, category: draft.category, purchase_unit: draft.purchase_unit, currency: draft.currency });
+      if (missingRate(saved.currency, settings)) await refreshRates(tenantId, setWorkspace).catch(() => setError('Não foi possível buscar a cotação. Informe o dólar/euro em Despesas e canais > Parâmetros.'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar.');
     } finally {
@@ -121,11 +128,14 @@ export default function IngredientsTab({ workspace, tenantId, setWorkspace, onNa
     purchase_qty: numText(ingredient.purchase_qty),
     purchase_unit: ingredient.purchase_unit,
     purchase_price: numText(ingredient.purchase_price),
+    currency: ingredient.currency,
     supplier: ingredient.supplier,
   });
 
   const preview = draft && toNum(draft.purchase_qty) > 0
-    ? unitPriceLabel({ purchase_unit: draft.purchase_unit, purchase_qty: toNum(draft.purchase_qty), purchase_price: toNum(draft.purchase_price) })
+    ? missingRate(draft.currency, settings)
+      ? 'a cotação do dia é buscada ao salvar'
+      : unitPriceLabel({ purchase_unit: draft.purchase_unit, purchase_qty: toNum(draft.purchase_qty), purchase_price: toNum(draft.purchase_price), currency: draft.currency }, settings)
     : null;
 
   return (
@@ -141,15 +151,23 @@ export default function IngredientsTab({ workspace, tenantId, setWorkspace, onNa
           )}
         </div>
       </div>
-      <p className={styles.panelHint}>
-        Cadastre como você compra: o nome (ex.: {example.ingredient.toLowerCase()}), a quantidade, a unidade e o preço pago. O sistema calcula o custo por {UNIT_INFO[defaultUnit].label} e usa em {terms.products.toLowerCase()}.
-        Quando o preço mudar, edite aqui: tudo que usa este item se atualiza.
-      </p>
+      {isSoftware ? (
+        <p className={styles.panelHint}>
+          Aqui vai o que <strong>cresce a cada cliente</strong>: mensagens de WhatsApp, tokens de IA, minutos de ligação, SMS, espaço em GB, a fatia do servidor de cada cliente.
+          Cadastre como o fornecedor cobra (ex.: 1 mil mensagens por US$ 14; 1 milhão de tokens por US$ 0,30; 1 GB por US$ 0,02) e, em cada plano, quanto um cliente consome por mês.
+          O que você paga igual com 1 ou 100 clientes (VPS, Claude, ChatGPT, domínio) vai em Despesas.
+        </p>
+      ) : (
+        <p className={styles.panelHint}>
+          Cadastre como você compra: o nome (ex.: {example.ingredient.toLowerCase()}), a quantidade, a unidade e o preço pago. O sistema calcula o custo por {UNIT_INFO[defaultUnit].label} e usa em {terms.products.toLowerCase()}.
+          Quando o preço mudar, edite aqui: tudo que usa este item se atualiza.
+        </p>
+      )}
 
       {ingredients.length > 0 && (
         <div className={styles.totalsRow}>
           <button type="button" className={`${styles.totalCard} ${category === 'all' ? styles.totalCardOn : ''}`} onClick={() => setCategory('all')}>
-            <span>Total comprado</span>
+            <span>{isSoftware ? 'Total dos pacotes' : 'Total comprado'}</span>
             <strong>{formatMoney(totals.total)}</strong>
             <small>{ingredients.length} {ingredients.length === 1 ? terms.ingredient : terms.ingredients.toLowerCase()}{totals.missingPrice ? ` · ${totals.missingPrice} sem preço` : ''}</small>
           </button>
@@ -188,8 +206,13 @@ export default function IngredientsTab({ workspace, tenantId, setWorkspace, onNa
             </select>
           </label>
           <label className={styles.field}>
-            Preço pago (R$)
-            <input className={styles.input} inputMode="decimal" value={draft.purchase_price} onChange={(event) => setDraft({ ...draft, purchase_price: event.target.value })} placeholder="0,00" required />
+            Preço pago
+            <div className={styles.inputGroup}>
+              <select className={styles.input} style={{ width: 'auto', flex: 'none', paddingInline: 6 }} value={draft.currency} onChange={(event) => setDraft({ ...draft, currency: event.target.value as FinCurrency })} aria-label="Moeda">
+                {CURRENCIES.map((item) => <option key={item.code} value={item.code}>{item.symbol}</option>)}
+              </select>
+              <input className={styles.input} inputMode="decimal" value={draft.purchase_price} onChange={(event) => setDraft({ ...draft, purchase_price: event.target.value })} placeholder="0,00" required />
+            </div>
           </label>
           <label className={styles.field}>
             Fornecedor <small>(opcional)</small>
@@ -236,9 +259,13 @@ export default function IngredientsTab({ workspace, tenantId, setWorkspace, onNa
                 </td>
                 <td><span className={styles.tag}>{label(item.category)}</span></td>
                 <td className={styles.num}>{formatQty(item.purchase_qty)} {item.purchase_unit}</td>
-                <td className={styles.num}>{formatMoney(item.purchase_price)}</td>
+                <td className={styles.num}>{formatCurrency(item.purchase_price, item.currency)}</td>
                 <td className={styles.num}>
-                  {item.purchase_price > 0 ? <strong>{unitPriceLabel(item)}</strong> : <span className={styles.tagWarn + ' ' + styles.tag}>sem preço</span>}
+                  {item.purchase_price <= 0
+                    ? <span className={styles.tagWarn + ' ' + styles.tag}>sem preço</span>
+                    : missingRate(item.currency, settings)
+                      ? <span className={styles.tagWarn + ' ' + styles.tag}>sem cotação</span>
+                      : <strong>{unitPriceLabel(item, settings)}</strong>}
                 </td>
                 <td className={styles.muted}>{usage.get(item.id) ? `${usage.get(item.id)} item(ns)` : '—'}</td>
                 {access.canManage && (

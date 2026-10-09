@@ -15,15 +15,19 @@
  *   preço = custo variável unitário / (1 − (impostos% + taxas do canal%
  *           + comissão% + despesas fixas% + margem desejada%))
  *   despesas fixas% = despesas fixas do mês / faturamento médio.
+ *
+ * Moeda: despesas e compras em dólar/euro viram reais pela cotação das
+ * configurações + IOF/spread do cartão. Despesa anual entra no mês como
+ * 1/12 do valor (a reserva que você precisa guardar todo mês).
  * ============================================================
  */
 
 import { categoryInfo, type IngredientCategoryDef } from './business';
 import type {
-  FinChannel, FinFixedCost, FinIngredient, FinMonthRevenue, FinProduct, FinSale, FinSettings, FinUnit,
+  FinChannel, FinCurrency, FinFixedCost, FinIngredient, FinMonthRevenue, FinProduct, FinSale, FinSettings, FinUnit,
 } from './types';
 
-export type BaseUnit = 'g' | 'ml' | 'un' | 'cm' | 'm2' | 'min';
+export type BaseUnit = 'g' | 'ml' | 'un' | 'cm' | 'm2' | 'min' | 'mb';
 
 export const UNIT_INFO: Record<FinUnit, { base: BaseUnit; factor: number; label: string }> = {
   kg: { base: 'g', factor: 1000, label: 'kg' },
@@ -32,11 +36,15 @@ export const UNIT_INFO: Record<FinUnit, { base: BaseUnit; factor: number; label:
   ml: { base: 'ml', factor: 1, label: 'ml' },
   un: { base: 'un', factor: 1, label: 'unidade' },
   dz: { base: 'un', factor: 12, label: 'dúzia' },
+  mil: { base: 'un', factor: 1000, label: 'mil unidades' },
+  mi: { base: 'un', factor: 1_000_000, label: 'milhão de unidades' },
   m: { base: 'cm', factor: 100, label: 'metro' },
   cm: { base: 'cm', factor: 1, label: 'cm' },
   m2: { base: 'm2', factor: 1, label: 'm²' },
   h: { base: 'min', factor: 60, label: 'hora' },
   min: { base: 'min', factor: 1, label: 'minuto' },
+  mb: { base: 'mb', factor: 1, label: 'MB' },
+  gb: { base: 'mb', factor: 1000, label: 'GB' },
 };
 
 /** Como mostrar o custo de cada família de unidade ("R$ 4,50 / kg"). */
@@ -47,6 +55,7 @@ export const BASE_DISPLAY: Record<BaseUnit, { per: number; label: string }> = {
   cm: { per: 100, label: 'metro' },
   m2: { per: 1, label: 'm²' },
   min: { per: 60, label: 'hora' },
+  mb: { per: 1000, label: 'GB' },
 };
 
 export const UNITS = Object.keys(UNIT_INFO) as FinUnit[];
@@ -65,16 +74,69 @@ const round = (value: number, digits = 2) => {
   return Math.round((value + Number.EPSILON) * factor) / factor;
 };
 
-/** Custo por unidade-base (g, ml ou un) de um insumo. */
-export function ingredientBaseCost(ingredient: Pick<FinIngredient, 'purchase_unit' | 'purchase_qty' | 'purchase_price'>) {
+// ── Moeda ────────────────────────────────────────────────────
+
+export const CURRENCIES: { code: FinCurrency; label: string; symbol: string }[] = [
+  { code: 'BRL', label: 'Real (R$)', symbol: 'R$' },
+  { code: 'USD', label: 'Dólar (US$)', symbol: 'US$' },
+  { code: 'EUR', label: 'Euro (€)', symbol: '€' },
+];
+
+export type FxSettings = Pick<FinSettings, 'usd_rate' | 'eur_rate' | 'fx_fee_pct'>;
+
+/** Reais por 1 unidade da moeda, já com IOF/spread (0 = sem cotação). */
+export function currencyRate(currency: FinCurrency | undefined, fx: FxSettings | undefined) {
+  if (!currency || currency === 'BRL') return 1;
+  const rate = currency === 'USD' ? fx?.usd_rate ?? 0 : fx?.eur_rate ?? 0;
+  return rate > 0 ? rate * (1 + (fx?.fx_fee_pct ?? 0) / 100) : 0;
+}
+
+export function toBRL(amount: number, currency: FinCurrency | undefined, fx: FxSettings | undefined) {
+  return amount * currencyRate(currency, fx);
+}
+
+/** Moeda estrangeira sem cotação informada (o valor em reais sai zerado). */
+export function missingRate(currency: FinCurrency | undefined, fx: FxSettings | undefined) {
+  return Boolean(currency && currency !== 'BRL' && currencyRate(currency, fx) === 0);
+}
+
+export const formatCurrency = (value: number, currency: FinCurrency = 'BRL') =>
+  (Number.isFinite(value) ? value : 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency,
+    // Preços de API costumam ter mais casas (US$ 0,0035 por mensagem).
+    maximumFractionDigits: Math.abs(value) > 0 && Math.abs(value) < 1 ? 4 : 2,
+  });
+
+// ── Insumos ──────────────────────────────────────────────────
+
+type CostSource = Pick<FinIngredient, 'purchase_unit' | 'purchase_qty' | 'purchase_price'> & { currency?: FinCurrency };
+
+/** Custo em reais por unidade-base (g, ml, un...) de um insumo. */
+export function ingredientBaseCost(ingredient: CostSource, fx?: FxSettings) {
   const baseQty = ingredient.purchase_qty * UNIT_INFO[ingredient.purchase_unit].factor;
-  return baseQty > 0 ? ingredient.purchase_price / baseQty : 0;
+  return baseQty > 0 ? toBRL(ingredient.purchase_price, ingredient.currency, fx) / baseQty : 0;
 }
 
 /** Custo de `quantity` `unit` de um insumo (null se as unidades não combinam). */
-export function ingredientCostFor(ingredient: FinIngredient, quantity: number, unit: FinUnit) {
+export function ingredientCostFor(ingredient: FinIngredient, quantity: number, unit: FinUnit, fx?: FxSettings) {
   if (UNIT_INFO[unit].base !== UNIT_INFO[ingredient.purchase_unit].base) return null;
-  return quantity * UNIT_INFO[unit].factor * ingredientBaseCost(ingredient);
+  return quantity * UNIT_INFO[unit].factor * ingredientBaseCost(ingredient, fx);
+}
+
+/**
+ * Custo legível na unidade em que a pessoa pensa: "R$ 4,50 / kg",
+ * "R$ 0,12 / GB"; coisas baratinhas por unidade (mensagens, tokens)
+ * aparecem por mil ou por milhão.
+ */
+export function unitCostLabel(ingredient: CostSource, fx?: FxSettings) {
+  const base = UNIT_INFO[ingredient.purchase_unit].base;
+  const perBase = ingredientBaseCost(ingredient, fx);
+  let { per, label } = BASE_DISPLAY[base];
+  if (base === 'un' && perBase > 0 && perBase < 0.01) {
+    [per, label] = perBase * 1000 >= 0.01 ? [1000, 'mil'] : [1_000_000, 'milhão'];
+  }
+  return `${formatCurrency(perBase * per)} / ${label}`;
 }
 
 export interface CostLine {
@@ -136,7 +198,7 @@ export function computeProductCost(product: FinProduct, ctx: CostContext, stack:
         result.warnings.push('Há um insumo removido na ficha.');
         return;
       }
-      const cost = ingredientCostFor(ingredient, item.quantity, item.unit);
+      const cost = ingredientCostFor(ingredient, item.quantity, item.unit, ctx.settings);
       const line: CostLine = {
         key, name: ingredient.name, kind: ingredient.category, quantity: item.quantity, unitLabel: item.unit, cost: cost ?? 0,
       };
@@ -145,6 +207,7 @@ export function computeProductCost(product: FinProduct, ctx: CostContext, stack:
         result.warnings.push(`${ingredient.name}: unidade incompatível.`);
       }
       if (ingredient.purchase_price <= 0) result.warnings.push(`${ingredient.name}: sem preço de compra.`);
+      else if (missingRate(ingredient.currency, ctx.settings)) result.warnings.push(`${ingredient.name}: falta a cotação do ${ingredient.currency === 'EUR' ? 'euro' : 'dólar'}.`);
       result.lines.push(line);
       const group = categoryInfo({ categories: ctx.categories }, ingredient.category).group;
       if (group === 'packaging') result.packaging += line.cost;
@@ -189,15 +252,24 @@ export function monthKey(date: Date | string) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-/** Despesas fixas mensais + avulsas lançadas no mês (YYYY-MM). */
-export function fixedCostsForMonth(costs: FinFixedCost[], month: string) {
-  return costs
-    .filter((cost) => cost.active && (cost.recurrence === 'monthly' || (cost.month || '').slice(0, 7) === month))
-    .reduce((sum, cost) => sum + cost.amount, 0);
+/** Quanto uma despesa pesa por mês, em reais (anual = 1/12; avulsa = o valor todo). */
+export function fixedCostMonthly(cost: Pick<FinFixedCost, 'amount' | 'currency' | 'recurrence'>, fx?: FxSettings) {
+  const value = toBRL(cost.amount, cost.currency, fx);
+  return cost.recurrence === 'yearly' ? value / 12 : value;
 }
 
-export function monthlyFixedCosts(costs: FinFixedCost[]) {
-  return costs.filter((cost) => cost.active && cost.recurrence === 'monthly').reduce((sum, cost) => sum + cost.amount, 0);
+const isRecurring = (cost: FinFixedCost) => cost.recurrence === 'monthly' || cost.recurrence === 'yearly';
+
+/** Despesas fixas (mensais + 1/12 das anuais) + avulsas lançadas no mês (YYYY-MM). */
+export function fixedCostsForMonth(costs: FinFixedCost[], month: string, fx?: FxSettings) {
+  return costs
+    .filter((cost) => cost.active && (isRecurring(cost) || (cost.month || '').slice(0, 7) === month))
+    .reduce((sum, cost) => sum + fixedCostMonthly(cost, fx), 0);
+}
+
+/** Despesas fixas de um mês normal (mensais + 1/12 das anuais), em reais. */
+export function monthlyFixedCosts(costs: FinFixedCost[], fx?: FxSettings) {
+  return costs.filter((cost) => cost.active && isRecurring(cost)).reduce((sum, cost) => sum + fixedCostMonthly(cost, fx), 0);
 }
 
 /**

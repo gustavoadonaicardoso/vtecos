@@ -2,7 +2,9 @@
 
 import type { FinBusiness } from './business';
 
-export type FinUnit = 'kg' | 'g' | 'l' | 'ml' | 'un' | 'dz' | 'm' | 'cm' | 'm2' | 'h' | 'min';
+export type FinUnit = 'kg' | 'g' | 'l' | 'ml' | 'un' | 'dz' | 'mil' | 'mi' | 'm' | 'cm' | 'm2' | 'h' | 'min' | 'mb' | 'gb';
+/** Moeda de uma despesa ou compra (dólar/euro viram reais pela cotação das configurações). */
+export type FinCurrency = 'BRL' | 'USD' | 'EUR';
 /** Chave de um tipo de insumo da empresa (ver business.ts: cada empresa cria os seus). */
 export type IngredientCategory = string;
 
@@ -12,6 +14,12 @@ export interface FinSettings {
   target_margin_pct: number;
   labor_hour_cost: number;
   expected_monthly_revenue: number;
+  /** Cotação usada para o que é cobrado em dólar/euro (0 = ainda não informada). */
+  usd_rate: number;
+  eur_rate: number;
+  /** IOF + spread do cartão sobre compras em moeda estrangeira. */
+  fx_fee_pct: number;
+  fx_updated_at: string | null;
 }
 
 export interface FinIngredient {
@@ -21,6 +29,7 @@ export interface FinIngredient {
   purchase_unit: FinUnit;
   purchase_qty: number;
   purchase_price: number;
+  currency: FinCurrency;
   supplier: string;
   updated_at?: string;
 }
@@ -65,8 +74,11 @@ export interface FinFixedCost {
   id: string;
   name: string;
   category: string;
+  /** Valor na moeda da despesa (ver currency). */
   amount: number;
-  recurrence: 'monthly' | 'once';
+  currency: FinCurrency;
+  /** yearly entra no mês como 1/12 do valor. */
+  recurrence: 'monthly' | 'yearly' | 'once';
   /** YYYY-MM-01 quando recurrence = once. */
   month: string | null;
   active: boolean;
@@ -94,7 +106,8 @@ export interface FinMonthRevenue {
 }
 
 export interface FinWorkspace {
-  tenant: { id: string; name: string };
+  /** isPlatform: é a própria empresa dona do sistema (Vórtice). */
+  tenant: { id: string; name: string; isPlatform?: boolean };
   settings: FinSettings;
   business: FinBusiness;
   ingredients: FinIngredient[];

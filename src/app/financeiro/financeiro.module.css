@@ -745,3 +745,18 @@
 .spin { animation: finSpin 0.9s linear infinite; }
 @keyframes finSpin { to { transform: rotate(360deg); } }
 .inputGroup .input:first-child { min-width: 56px; }
+
+/* ── Despesas: checklist, grupos e moeda ── */
+.suggestBox { display: flex; flex-direction: column; gap: 6px; padding: 14px; margin-bottom: 16px; border-radius: 14px; border: 1px dashed var(--card-border); background: var(--soft); }
+.suggestBox > span { font-size: 0.82rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; font: inherit; font-size: 0.8rem;
+  border: 1px solid var(--card-border); background: var(--background); color: var(--foreground); cursor: pointer;
+}
+.chip:hover { border-color: var(--accent, #3b82f6); }
+.chip small { color: var(--muted); font-size: 0.7rem; }
+.groupRow td { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); background: var(--soft); }
+.fxBox { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; border: 1px solid var(--card-border); }
+.fxBox > strong { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+.platformGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }

@@ -3,8 +3,8 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from '../financeiro.module.css';
-import { monthLabel, shiftMonth } from '../api';
-import type { FinWorkspace } from '@/lib/finance/types';
+import { finRequest, monthLabel, shiftMonth } from '../api';
+import type { FinSettings, FinWorkspace } from '@/lib/finance/types';
 import { fixedCostPct, monthlyFixedCosts, revenueBase } from '@/lib/finance/calc';
 
 export interface TabProps {
@@ -35,7 +35,17 @@ export function marginTone(marginPct: number, targetPct: number) {
 
 /** Rateio das despesas fixas usado nas fichas: % sobre o faturamento médio. */
 export function pricingBase(workspace: FinWorkspace, month: string) {
-  const fixedMonthly = monthlyFixedCosts(workspace.fixedCosts);
+  const fixedMonthly = monthlyFixedCosts(workspace.fixedCosts, workspace.settings);
   const base = revenueBase(workspace.revenueHistory, workspace.settings, month);
   return { fixedMonthly, base, fixedPct: fixedCostPct(fixedMonthly, base.value) };
+}
+
+/** Busca a cotação do dia (dólar/euro) no servidor e atualiza a planilha aberta. */
+export async function refreshRates(
+  tenantId: string | null,
+  setWorkspace: React.Dispatch<React.SetStateAction<FinWorkspace | null>>
+) {
+  const result = await finRequest<{ settings: FinSettings; source: string; date: string }>('/fx', tenantId, { method: 'POST', body: {} });
+  setWorkspace((state) => state && ({ ...state, settings: result.settings }));
+  return result;
 }

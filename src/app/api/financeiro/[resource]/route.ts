@@ -2,14 +2,17 @@ import { NextResponse } from 'next/server';
 import { requireActiveProfile } from '@/lib/session';
 import { requireFinanceAccess } from '@/lib/finance/access';
 import {
-  createSales, importRows, insertRow, listSales, listTenantsForStaff, mappers, parseChannel, parseFixedCost,
-  loadBusiness, parseIngredient, parseProduct, parseSaleInput, parseSettings, reorderChannels, saveBusiness, saveProduct, saveSettings,
+  billPlatformMonth, createSales, currentSettings, importPlatformPlans, importRows, insertRow, listSales, listTenantsForStaff, mappers,
+  parseChannel, parseFixedCost, loadBusiness, parseIngredient, parseProduct, parseSaleInput, parseSettings, platformSummary,
+  refreshExchangeRates, reorderChannels, saveBusiness, saveProduct, saveSettings,
 } from '@/services/finance.service';
 
 type Params = { params: Promise<{ resource: string }> };
 type SaleInput = Extract<ReturnType<typeof parseSaleInput>, { data: unknown }>['data'];
 
 const fail = (message: string, status = 400) => NextResponse.json({ error: message }, { status });
+const isMonth = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+const NOT_PLATFORM = 'Só a planilha da própria Vórtice usa os clientes do Painel Master.';
 
 export async function GET(request: Request, { params }: Params) {
   const { resource } = await params;
@@ -35,6 +38,20 @@ export async function GET(request: Request, { params }: Params) {
       return NextResponse.json({ data: await listSales(auth.access.tenant.id, month) });
     } catch (err: unknown) {
       return fail(err instanceof Error ? err.message : 'Erro ao listar vendas.', 500);
+    }
+  }
+
+  // Clientes e planos do Painel Master (só na planilha da Vórtice).
+  if (resource === 'platform') {
+    const auth = await requireFinanceAccess(request);
+    if ('error' in auth) return fail(auth.error.message, auth.error.status);
+    if (!auth.access.tenant.isPlatform) return fail(NOT_PLATFORM, 403);
+    const month = new URL(request.url).searchParams.get('month') || '';
+    if (!isMonth(month)) return fail('Mês inválido.');
+    try {
+      return NextResponse.json({ data: await platformSummary(auth.access.tenant.id, month) });
+    } catch (err: unknown) {
+      return fail(err instanceof Error ? err.message : 'Erro ao carregar os clientes.', 500);
     }
   }
 
@@ -88,7 +105,21 @@ export async function POST(request: Request, { params }: Params) {
         return NextResponse.json({ data: result.data });
       }
       case 'settings': {
-        return NextResponse.json({ data: await saveSettings(tenantId, parseSettings(body)) });
+        return NextResponse.json({ data: await saveSettings(tenantId, parseSettings(body, await currentSettings(tenantId))) });
+      }
+      case 'fx': {
+        const result = await refreshExchangeRates(tenantId).catch((err: Error) => ({ error: err.message }));
+        if ('error' in result) return fail(result.error, 502);
+        return NextResponse.json({ data: result });
+      }
+      case 'platform': {
+        if (!auth.access.tenant.isPlatform) return fail(NOT_PLATFORM, 403);
+        if (body.action === 'import_plans') return NextResponse.json({ data: await importPlatformPlans(tenantId) });
+        if (body.action === 'bill_month') {
+          if (!isMonth(body.month)) return fail('Mês inválido.');
+          return NextResponse.json({ data: await billPlatformMonth(tenantId, auth.access.profile.id, body.month) });
+        }
+        return fail('Ação inválida.');
       }
       case 'sales': {
         const list = Array.isArray(body.sales) ? (body.sales as Record<string, unknown>[]) : [body];

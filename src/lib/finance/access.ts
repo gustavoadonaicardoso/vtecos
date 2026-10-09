@@ -16,7 +16,8 @@ import type { UserProfile } from '@/types';
 
 export interface FinanceAccess {
   profile: UserProfile;
-  tenant: { id: string; name: string };
+  /** isPlatform: a planilha aberta é a da própria Vórtice (dona do sistema). */
+  tenant: { id: string; name: string; isPlatform: boolean };
   canManage: boolean;
   canSell: boolean;
   isClient: boolean;
@@ -30,15 +31,15 @@ export async function requireFinanceAccess(request: Request, need: 'view' | 'man
   const { profile } = auth;
   const isClient = !auth.isPlatform;
 
-  let tenant = { id: auth.tenantId, name: auth.tenantName };
+  let tenant = { id: auth.tenantId, name: auth.tenantName, isPlatform: auth.isPlatform };
 
   // Equipe da plataforma pode abrir a planilha de uma empresa cliente
   // (suporte). Qualquer outra empresa fica presa à própria.
   const requested = new URL(request.url).searchParams.get('tenant') || '';
   if (auth.isPlatform && requested && requested !== auth.tenantId) {
-    const { data } = await supabaseAdmin.from('tenants').select('id, name').eq('id', requested).maybeSingle();
+    const { data } = await supabaseAdmin.from('tenants').select('id, name, is_platform').eq('id', requested).maybeSingle();
     if (!data) return { error: { message: 'Empresa não encontrada.', status: 404 } };
-    tenant = data;
+    tenant = { id: data.id, name: data.name, isPlatform: data.is_platform === true };
   }
 
   const canManage = ['ADMIN', 'MANAGER'].includes(profile.role);
