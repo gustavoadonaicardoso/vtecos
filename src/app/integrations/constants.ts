@@ -99,11 +99,11 @@ export const CATALOG: CatalogItem[] = [
     id: 'ai',
     provider: 'ai',
     name: 'Inteligência artificial',
-    description: 'Atendente com IA, legendas e notas fiscais. Use a IA da Vórtice ou a sua chave do Gemini.',
+    description: 'Atendente com IA e legendas das redes sociais. Use a IA da Vórtice ou a sua chave do Gemini.',
     icon: Sparkles,
     color: '#8b5cf6',
     category: 'IA',
-    module: ['automacoes', 'social', 'fiscal'],
+    module: ['automacoes', 'social'],
     helpSlug: 'integracao-ia',
   },
 ];

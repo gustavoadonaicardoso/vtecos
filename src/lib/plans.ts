@@ -43,7 +43,6 @@ export const PLAN_MODULES: PlanModule[] = [
   { key: 'senhas', label: 'Senhas, Totem e Painel', description: 'Fila de atendimento presencial com totem e TV.', routes: ['/queue'] },
   { key: 'agendamento', label: 'Agendamento', description: 'Agenda e lembretes.', routes: ['/scheduling'] },
   { key: 'planejamentos', label: 'Planejamentos e Projetos', description: 'Funis, mapas de estratégia e projetos.', routes: ['/planejamentos', '/projetos'] },
-  { key: 'fiscal', label: 'Notas Fiscais', description: 'Emissão de NF.', routes: ['/fiscal'] },
 ];
 
 export const ALL_MODULE_KEYS = PLAN_MODULES.map((module) => module.key);

@@ -148,10 +148,10 @@ export function AiPanel({ integration, overview, onChanged }: PanelProps) {
           <strong>{own ? 'Usando a sua chave do Gemini' : overview.platformAi ? 'Usando a IA da Vórtice' : 'Nenhuma IA disponível'}</strong>
           <span>
             {own
-              ? 'O Atendente com IA, as legendas e as notas fiscais desta empresa usam a sua chave do Google.'
+              ? 'O Atendente com IA e as legendas desta empresa usam a sua chave do Google.'
               : overview.platformAi
                 ? 'Já está funcionando, sem configurar nada. Se preferir usar a sua própria conta do Google (e ter os seus limites), cadastre a chave abaixo.'
-                : 'Cadastre a sua chave do Gemini para usar o Atendente com IA, as legendas e as notas fiscais.'}
+                : 'Cadastre a sua chave do Gemini para usar o Atendente com IA e as legendas.'}
           </span>
         </div>
       </div>

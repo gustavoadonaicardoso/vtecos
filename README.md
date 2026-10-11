@@ -11,7 +11,7 @@
 ```
 
 **Plataforma comercial completa para equipes de vendas modernas.**  
-Gestão de leads, pipeline visual, WhatsApp, campanhas, IA fiscal e muito mais.
+Gestão de leads, pipeline visual, WhatsApp, campanhas, automações com IA e muito mais.
 
 <br/>
 
@@ -47,7 +47,6 @@ A infraestrutura é **100% brasileira**: aplicação hospedada em VPS Locaweb e 
 | 💬 **Chat** | Atendimento via WhatsApp (Meta / WhatsApp Web) com histórico persistido no banco |
 | 📣 **Disparos** | Campanhas em massa com upload de planilha XLSX, templates e roteamento automático |
 | 📨 **Messages** | Caixa unificada com templates de mensagem e variáveis dinâmicas |
-| 🧾 **Fiscal** | Geração e análise de documentos fiscais com IA (Google Gemini) |
 | ⚙️ **Automações** | Fluxos automáticos baseados em gatilhos do pipeline |
 | 📊 **Relatórios** | KPIs, funil de conversão e atividades da equipe |
 | 🏢 **Usuários** | Gestão de time com roles (Admin / Manager / Seller) e permissões granulares |
@@ -83,7 +82,7 @@ A infraestrutura é **100% brasileira**: aplicação hospedada em VPS Locaweb e 
 │  │  React 19    │    │  /api/leads               │  │
 │  │  CSS Modules │    │  /api/auth                │  │
 │  │  Framer      │    │  /api/disparos            │  │
-│  │  Motion      │    │  /api/fiscal              │  │
+│  │  Motion      │    │  /api/automations         │  │
 │  └──────────────┘    │  /api/webhooks            │  │
 │                      └───────────────────────────┘  │
 └──────────────────────┬──────────────────────────────┘
@@ -137,7 +136,6 @@ vortice-crm/
 │   │   │   ├── leads/              # CRUD de leads
 │   │   │   ├── disparos/           # campanhas · templates · upload
 │   │   │   ├── messages/           # templates de mensagem
-│   │   │   ├── fiscal/             # geração IA + exportação CSV
 │   │   │   ├── webhooks/meta/      # recebimento de mensagens
 │   │   │   └── audit/              # log de auditoria
 │   │   ├── pipeline/               # Kanban visual
@@ -145,7 +143,6 @@ vortice-crm/
 │   │   ├── chat/                   # Atendimento WhatsApp
 │   │   ├── messages/               # Caixa unificada
 │   │   ├── disparos/               # Campanhas em massa
-│   │   ├── fiscal/                 # Módulo fiscal com IA
 │   │   ├── automations/            # Fluxos de automação
 │   │   ├── relatorios/             # Dashboard e KPIs
 │   │   ├── users/                  # Gestão de equipe

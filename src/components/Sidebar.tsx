@@ -23,7 +23,6 @@ import {
   Calendar,
   Ticket,
   MessageCircle,
-  FileText,
   Megaphone,
   Phone,
   Bell,
@@ -70,7 +69,6 @@ const Sidebar = () => {
     { name: 'Relatórios', icon: BarChart3, path: '/relatorios', permission: 'dashboard.kpis' },
     { name: 'Agendamento', icon: Calendar, path: '/scheduling', permission: 'integrations.view' },
     { name: 'Senhas', icon: Ticket, path: '/queue', permission: 'integrations.view' },
-    { name: 'Notas Fiscais', icon: FileText, path: '/fiscal', permission: 'integrations.view' },
     { name: 'Disparos', icon: Megaphone, path: '/disparos', permission: 'messages.send' },
     { name: 'Discador', icon: Phone, path: '/discador', permission: 'leads.view' },
     

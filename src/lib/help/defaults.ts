@@ -214,9 +214,9 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     slug: 'integracao-ia',
     category: 'integracoes',
     title: 'Inteligência artificial',
-    summary: 'O Atendente com IA, as legendas das Redes Sociais e as notas fiscais já usam a IA da Vórtice. Se quiser, use a sua própria chave do Google Gemini.',
+    summary: 'O Atendente com IA e as legendas das Redes Sociais já usam a IA da Vórtice. Se quiser, use a sua própria chave do Google Gemini.',
     sections: [
-      { title: 'Sem configurar nada', text: 'Por padrão a sua empresa usa a **IA da Vórtice**. Não precisa cadastrar nada para usar o Atendente com IA, as legendas e as notas fiscais.' },
+      { title: 'Sem configurar nada', text: 'Por padrão a sua empresa usa a **IA da Vórtice**. Não precisa cadastrar nada para usar o Atendente com IA e as legendas.\n\nA IA da Vórtice tem uma **franquia de usos por mês**, conforme o plano. Veja quanto já usou em **Configurações > Plano e módulos**. Quando a franquia acaba, a IA volta no dia 1º; os administradores recebem um aviso aos 80% e no fim.' },
       { title: 'Usar a sua chave do Gemini (opcional)', text: 'Com a sua própria chave, a IA da sua empresa usa a sua conta do Google, com os seus limites e a sua cobrança:\n\n1. Acesse https://aistudio.google.com/app/apikey com a conta Google da empresa.\n2. Clique em **Criar chave de API** e copie a chave (começa com AIza).\n3. Em **Integrações > Inteligência artificial**, cole a chave e clique em **Salvar chave**. Ela é conferida na hora.' },
       { title: 'Voltar para a IA da Vórtice', text: 'Clique em **Voltar para a IA da Vórtice**: a chave é apagada e a empresa volta a usar a IA padrão.' },
     ],

@@ -2,7 +2,7 @@
  * IA do sistema: local (Ollama, na própria VPS) ou Google Gemini.
  *
  * Todas as partes que usam IA (blocos de IA das Automações, legendas das
- * Redes Sociais, notas fiscais) chamam callAI(). A IA da Vórtice é
+ * Redes Sociais) chamam callAI(). A IA da Vórtice é
  * escolhida no Painel Master > Plataforma (campo vazio cai para o .env):
  *
  *   AI_PROVIDER=ollama            usa a IA local (padrão: gemini)
@@ -16,8 +16,6 @@
  *
  * Com AI_PROVIDER=ollama e GEMINI_API_KEY preenchida, o Gemini vira
  * reserva: se a IA local falhar ou demorar demais, a resposta vem dele.
- * Tarefas pesadas (preferCloud, ex.: notas fiscais) vão direto para o
- * Gemini quando ele existe -- no processador da VPS levariam minutos.
  *
  * Só para o servidor.
  */
@@ -30,8 +28,6 @@ import { consumeAi } from '@/lib/plan-limits';
 export interface AiCallOptions {
   temperature?: number;
   maxOutputTokens?: number;
-  /** Texto longo/estruturado: usa o Gemini se houver chave. */
-  preferCloud?: boolean;
   /** Empresa que está usando: se ela tem chave própria do Gemini, usa a dela. */
   tenantId?: string;
 }
@@ -162,7 +158,6 @@ export async function callAI(prompt: string, options: AiCallOptions = {}): Promi
   const settings = await platformSettings();
   const platformKey = settings.geminiKey || undefined;
   if (settings.aiProvider !== 'ollama') return callGemini(prompt, { ...options, apiKey: platformKey });
-  if (options.preferCloud && platformKey) return callGemini(prompt, { ...options, apiKey: platformKey });
 
   const local = await callOllama(prompt, options);
   if (local.success || !platformKey) return local;
