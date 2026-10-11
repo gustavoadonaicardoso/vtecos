@@ -28,6 +28,7 @@ import {
   type SendWindow,
 } from '@/lib/disparos';
 import { companyOf, syncCounts } from '@/services/disparos.service';
+import { blastsLeftToday, tenantHasModule } from '@/lib/plan-limits';
 import { ChannelError, deliverWhatsApp, recordOutbound } from '@/lib/whatsapp-outbound';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -121,6 +122,24 @@ async function step(campaign: Row, company: Awaited<ReturnType<typeof companyOf>
       await updateCampaign(campaign, { next_send_at: next.toISOString(), status_detail: `Limite de ${campaign.daily_limit} por dia atingido. Volta ${timeLabel(next)}.` });
       return;
     }
+  }
+
+  // Plano da empresa: Disparos incluído e limite do dia (todas as campanhas somadas).
+  if (!(await tenantHasModule(campaign.tenant_id, 'disparos'))) {
+    await pause(campaign, 'Disparos não fazem parte do plano da empresa.');
+    return;
+  }
+  const { count: sentToday } = await db
+    .from('blast_contacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', campaign.tenant_id)
+    .in('status', ['sent', 'sending'])
+    .gte('sent_at', startOfTodaySP(now).toISOString());
+  const left = await blastsLeftToday(campaign.tenant_id, sentToday || 0);
+  if (left === 0) {
+    const next = nextDayStart(window, now);
+    await updateCampaign(campaign, { next_send_at: next.toISOString(), status_detail: `Limite do plano atingido (${sentToday} mensagens hoje). Volta ${timeLabel(next)}.` });
+    return;
   }
 
   // Próximo da fila, reivindicado (só um envio por contato).

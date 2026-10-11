@@ -22,6 +22,7 @@ import Image from 'next/image';
 import styles from './login.module.css';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/components/ThemeProvider';
+import { LIMIT_INFO, limitLabel, type PlanLimits } from '@/lib/plans';
 
 // Site comercial: usado quando a Vórtice ainda não cadastrou WhatsApp/e-mail
 // em Configurações > Dados da empresa.
@@ -34,6 +35,7 @@ interface PublicPlan {
   price: number;
   featured: boolean;
   modules: { key: string; label: string; description: string }[];
+  limits?: PlanLimits;
 }
 
 interface SalesContact {
@@ -390,6 +392,13 @@ export default function LoginPage() {
                           </li>
                         ))}
                       </ul>
+                      {plan.limits && (
+                        <ul className={styles.planLimits}>
+                          {LIMIT_INFO.filter((info) => plan.limits![info.key] !== null && plan.limits![info.key] !== 0).map((info) => (
+                            <li key={info.key}>{limitLabel(info.key, plan.limits![info.key])}</li>
+                          ))}
+                        </ul>
+                      )}
                       <a
                         href={contactLink(contact, plan.name)}
                         target="_blank"

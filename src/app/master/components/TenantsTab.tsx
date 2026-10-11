@@ -6,7 +6,7 @@ import {
   Building2, Check, ChevronDown, ChevronUp, KeyRound, Layers, LogIn, Pencil, Plus, Trash2, UserPlus, X,
 } from 'lucide-react';
 import styles from './TenantsTab.module.css';
-import { PLAN_MODULES, moduleByKey } from '@/lib/plans';
+import { LIMIT_INFO, PLAN_MODULES, limitLabel, moduleByKey, type PlanLimits } from '@/lib/plans';
 
 interface Plan {
   id: string;
@@ -18,7 +18,14 @@ interface Plan {
   show_on_login?: boolean;
   featured?: boolean;
   tenant_count?: number;
+  max_users?: number | null;
+  ai_monthly_limit?: number | null;
+  blast_daily_limit?: number | null;
 }
+
+type LimitDraft = Record<keyof PlanLimits, string>;
+const limitText = (value: number | null | undefined) => (value === null || value === undefined ? '' : String(value));
+const limitValue = (text: string) => (text.trim() === '' ? null : Math.max(0, Math.floor(Number(text.replace(/\D/g, '')) || 0)));
 
 interface Tenant {
   id: string;
@@ -51,7 +58,7 @@ const STATUS_LABEL: Record<string, string> = { ACTIVE: 'Ativa', INACTIVE: 'Inati
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const EMPTY_PLAN = { name: '', description: '', price: '', modules: ['crm'] as string[], active: true, show_on_login: true, featured: false };
+const EMPTY_PLAN = { name: '', description: '', price: '', modules: ['crm'] as string[], active: true, show_on_login: true, featured: false, limits: { max_users: '', ai_monthly_limit: '', blast_daily_limit: '' } as LimitDraft };
 const EMPTY_TENANT = { name: '', plan_id: '', adminName: '', adminEmail: '', adminPassword: '' };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -99,7 +106,14 @@ export default function TenantsTab() {
     event.preventDefault();
     if (!planForm) return;
     try {
-      const body = JSON.stringify({ ...planForm, price: Number(String(planForm.price).replace(',', '.')) || 0 });
+      const { limits, ...rest } = planForm;
+      const body = JSON.stringify({
+        ...rest,
+        price: Number(String(planForm.price).replace(',', '.')) || 0,
+        max_users: limitValue(limits.max_users),
+        ai_monthly_limit: limitValue(limits.ai_monthly_limit),
+        blast_daily_limit: limitValue(limits.blast_daily_limit),
+      });
       if (planForm.id) {
         const updated = await request<Plan>(`/api/plans/${planForm.id}`, { method: 'PUT', body });
         setPlans((list) => list.map((plan) => (plan.id === updated.id ? { ...updated, tenant_count: plan.tenant_count } : plan)));
@@ -206,7 +220,11 @@ export default function TenantsTab() {
                     <span className={styles.price}>{money(plan.price)}<small>/mês</small></span>
                   </div>
                   <div className={styles.rowActions}>
-                    <button className={styles.icon} title="Editar" onClick={() => setPlanForm({ ...plan, price: String(plan.price), show_on_login: plan.show_on_login !== false, featured: plan.featured === true })}><Pencil size={15} /></button>
+                    <button className={styles.icon} title="Editar" onClick={() => setPlanForm({
+                      id: plan.id, name: plan.name, description: plan.description, modules: plan.modules, active: plan.active,
+                      price: String(plan.price), show_on_login: plan.show_on_login !== false, featured: plan.featured === true,
+                      limits: { max_users: limitText(plan.max_users), ai_monthly_limit: limitText(plan.ai_monthly_limit), blast_daily_limit: limitText(plan.blast_daily_limit) },
+                    })}><Pencil size={15} /></button>
                     <button className={`${styles.icon} ${styles.iconDanger}`} title="Excluir" onClick={() => removePlan(plan)}><Trash2 size={15} /></button>
                   </div>
                 </header>
@@ -220,6 +238,11 @@ export default function TenantsTab() {
                   })}
                   {plan.modules.length === 0 && <span className={styles.muted}>Sem módulos</span>}
                 </div>
+                <ul className={styles.limitList}>
+                  {LIMIT_INFO.map((info) => (
+                    <li key={info.key}><span>{info.label}</span><strong>{limitLabel(info.key, plan[info.key] ?? null)}</strong></li>
+                  ))}
+                </ul>
                 <footer className={styles.muted}>
                   {plan.tenant_count || 0} empresa(s){plan.active ? '' : ' · plano inativo'}
                   {plan.active && plan.show_on_login !== false ? ' · na tela de login' : ''}
@@ -404,6 +427,25 @@ export default function TenantsTab() {
                   );
                 })}
               </div>
+            </div>
+            <div className={styles.field}>
+              <span>Limites (vazio = sem limite · 0 = não incluído)</span>
+              <div className={styles.formGrid3}>
+                {LIMIT_INFO.map((info) => (
+                  <label key={info.key} className={styles.field} title={info.hint}>
+                    <small>{info.label}</small>
+                    <input
+                      className={styles.input}
+                      inputMode="numeric"
+                      value={planForm.limits[info.key]}
+                      placeholder="Sem limite"
+                      onChange={(event) => setPlanForm({ ...planForm, limits: { ...planForm.limits, [info.key]: event.target.value.replace(/\D/g, '') } })}
+                      aria-label={info.label}
+                    />
+                  </label>
+                ))}
+              </div>
+              <small className={styles.muted}>IA: respostas do Atendente com IA, legendas e outros usos da IA da Vórtice (quem cadastra a própria chave do Gemini não tem limite). Disparos: soma de todas as campanhas no dia.</small>
             </div>
             <label className={styles.toggle}>
               <input type="checkbox" checked={planForm.active} onChange={(event) => setPlanForm({ ...planForm, active: event.target.checked })} />

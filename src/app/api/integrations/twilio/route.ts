@@ -10,7 +10,7 @@ import { connectTwilio, disconnectTwilio, listTwilioNumbers } from '@/services/t
  * action "connect": cria chave de API e TwiML App na conta e salva.
  */
 export async function POST(request: Request) {
-  const auth = await requireAdminProfile({ module: 'crm' });
+  const auth = await requireAdminProfile({ module: 'discador' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
 
   const body = await request.json().catch(() => ({}));
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
-  const auth = await requireAdminProfile({ module: 'crm' });
+  const auth = await requireAdminProfile({ module: 'discador' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const result = await disconnectTwilio(auth.tenantId);
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 });

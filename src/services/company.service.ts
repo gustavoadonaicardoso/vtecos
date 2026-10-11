@@ -10,6 +10,8 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { PLAN_MODULES, sanitizeModules } from '@/lib/plans';
 import type { ServiceResult } from '@/types';
+import { planUsage, type PlanUsage } from '@/lib/plan-limits';
+import { startOfTodaySP } from '@/lib/disparos';
 
 export interface CompanyProfile {
   name: string;
@@ -27,6 +29,8 @@ export interface CompanyPlan {
   price: number | null;
   active: boolean;
   modules: string[];
+  /** Limites do plano e o uso atual (null na empresa da plataforma). */
+  usage: PlanUsage | null;
 }
 
 const FIELDS: (keyof CompanyProfile)[] = ['name', 'document', 'contact_email', 'phone', 'website', 'address'];
@@ -48,12 +52,16 @@ export async function fetchCompany(tenantId: string): Promise<ServiceResult<{ co
     price: null,
     active: false,
     modules: tenant.is_platform ? PLAN_MODULES.map((item) => item.key) : [],
+    usage: null,
   };
   if (!tenant.is_platform && tenant.plan_id) {
-    const { data } = await supabaseAdmin.from('plans').select('name, price, modules, active').eq('id', tenant.plan_id).maybeSingle();
+    const { data } = await supabaseAdmin.from('plans').select('*').eq('id', tenant.plan_id).maybeSingle();
     if (data) {
       plan = { ...plan, name: data.name, price: Number(data.price) || 0, active: Boolean(data.active), modules: sanitizeModules(data.modules || []) };
     }
+  }
+  if (!tenant.is_platform) {
+    plan.usage = await planUsage(tenantId, startOfTodaySP(new Date())).catch(() => null);
   }
 
   const company = Object.fromEntries(FIELDS.map((key) => [key, (tenant[key] as string | null) || ''])) as unknown as CompanyProfile;

@@ -11,7 +11,8 @@ export interface CatalogItem {
   color: string;
   category: 'WhatsApp' | 'Leads' | 'Automação' | 'Marketing' | 'Telefonia' | 'IA';
   /** Módulo do plano que precisa estar liberado. */
-  module: string;
+  /** Módulo(s) do plano que mostram este cartão (basta um). */
+  module: string | string[];
   /** Artigo da Central de Ajuda com o passo a passo (editável no Painel Master). */
   helpSlug: string;
 }
@@ -91,7 +92,7 @@ export const CATALOG: CatalogItem[] = [
     icon: Phone,
     color: '#F22F46',
     category: 'Telefonia',
-    module: 'crm',
+    module: 'discador',
     helpSlug: 'integracao-twilio',
   },
   {
@@ -102,7 +103,7 @@ export const CATALOG: CatalogItem[] = [
     icon: Sparkles,
     color: '#8b5cf6',
     category: 'IA',
-    module: 'crm',
+    module: ['automacoes', 'social', 'fiscal'],
     helpSlug: 'integracao-ia',
   },
 ];

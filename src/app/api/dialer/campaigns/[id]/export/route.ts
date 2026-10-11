@@ -14,7 +14,7 @@ const cell = (value: unknown) => {
 
 /** Resultado da campanha em CSV (abre no Excel). */
 export async function GET(_request: Request, { params }: Context) {
-  const auth = await requireActiveProfile({ module: 'crm', permission: 'leads.view' });
+  const auth = await requireActiveProfile({ module: 'discador', permission: 'leads.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   if (!isDialerManager(auth.profile.role)) return NextResponse.json({ error: 'Só administradores e gerentes exportam campanhas.' }, { status: 403 });
   const { id } = await params;

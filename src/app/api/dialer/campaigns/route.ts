@@ -5,7 +5,7 @@ import { createCampaign, isDialerManager, listCampaigns } from '@/services/diale
 const FORBIDDEN = 'Só administradores e gerentes gerenciam as campanhas do Discador.';
 
 export async function GET() {
-  const auth = await requireActiveProfile({ module: 'crm', permission: 'leads.view' });
+  const auth = await requireActiveProfile({ module: 'discador', permission: 'leads.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   if (!isDialerManager(auth.profile.role)) return NextResponse.json({ error: FORBIDDEN }, { status: 403 });
   try {
@@ -17,7 +17,7 @@ export async function GET() {
 
 /** Nova campanha a partir da planilha (o navegador lê o arquivo e manda as linhas). */
 export async function POST(request: Request) {
-  const auth = await requireActiveProfile({ module: 'crm', permission: 'leads.view' });
+  const auth = await requireActiveProfile({ module: 'discador', permission: 'leads.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   if (!isDialerManager(auth.profile.role)) return NextResponse.json({ error: FORBIDDEN }, { status: 403 });
   const result = await createCampaign(auth.tenantId, auth.profile, await request.json().catch(() => ({})));
