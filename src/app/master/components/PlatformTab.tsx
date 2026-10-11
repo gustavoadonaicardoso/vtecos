@@ -164,7 +164,7 @@ export default function PlatformTab() {
 
       <div className={`${styles.card} ${styles.cardWide}`}>
         <div className={styles.cardHeader}><Sparkles size={20} /><h2>IA padrão da Vórtice</h2></div>
-        <p className={styles.hint}>Usada pelas empresas que não cadastraram a própria chave do Gemini (Atendente com IA, legendas e notas fiscais).</p>
+        <p className={styles.hint}>Usada pelas empresas que não cadastraram a própria chave do Gemini (Atendente com IA e legendas).</p>
         <div className={styles.field}>
           <span className={styles.fieldLabel}>Qual IA {badge("aiProvider")}</span>
           <select className={styles.input} value={provider} onChange={(event) => set('aiProvider', event.target.value)}>
@@ -172,7 +172,7 @@ export default function PlatformTab() {
             <option value="ollama">IA local na VPS (Ollama), com o Gemini de reserva</option>
           </select>
         </div>
-        {input("geminiKey", provider === 'ollama' ? 'Chave do Gemini (reserva e notas fiscais)' : 'Chave do Gemini', "AIza…", "Crie em aistudio.google.com/app/apikey.")}
+        {input("geminiKey", provider === 'ollama' ? 'Chave do Gemini (reserva)' : 'Chave do Gemini', "AIza…", "Crie em aistudio.google.com/app/apikey.")}
         {provider === 'ollama' && (
           <div className={styles.twoCols}>
             {input("ollamaUrl", "Endereço da IA local", "http://127.0.0.1:11434")}
