@@ -327,7 +327,7 @@ async function main() {
     console.log('✅ Banco em dia: tudo o que o sistema usa existe.');
     return;
   }
-  console.log('O que fazer (no Supabase > SQL Editor), e depois rode esta conferência outra vez:');
+  if (toRun.size || bucketSql.length) console.log('O que fazer (no Supabase > SQL Editor), e depois rode esta conferência outra vez:');
   if (toRun.size) {
     console.log('\n• Rode estes arquivos inteiros, nesta ordem. Se algum der erro, pare e mande o erro para o Claude:');
     [...toRun].sort().forEach((file, index) => console.log(`   ${index + 1}. ${file}`));
@@ -337,7 +337,7 @@ async function main() {
     for (const sql of bucketSql) console.log(sql.replace(/^/gm, '   ') + '\n');
   }
   if (noMigration.length) {
-    console.log(`\nSem migration no projeto para: ${noMigration.join(', ')}. Mande este resultado para o Claude.`);
+    console.log(`\nNenhuma migration do projeto cria: ${noMigration.join(', ')}. Mande este resultado para o Claude.`);
   }
   process.exit(1);
 }
