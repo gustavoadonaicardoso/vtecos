@@ -1,0 +1,51 @@
+/* Faixa de cobrança (teste acabando / fatura em atraso) no topo do conteúdo. */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 7px 16px;
+  color: #fff;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 48;
+}
+
+.trial { background: #1d4ed8; }
+.overdue { background: #b45309; }
+
+.icon { flex: none; }
+.text { flex: 1; min-width: 0; }
+
+.action {
+  flex: none;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #fff;
+  color: #111827;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.close:hover { background: rgba(255, 255, 255, 0.16); }
+
+@media (max-width: 640px) {
+  .bar { flex-wrap: wrap; }
+  .text { flex-basis: calc(100% - 40px); }
+}

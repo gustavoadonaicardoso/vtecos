@@ -26,6 +26,11 @@ export interface PlatformSettings {
   geminiKey: string;
   ollamaUrl: string;
   ollamaModel: string;
+  /** Cobrança automática: ambiente do Asaas (sandbox = teste). */
+  asaasEnv: 'sandbox' | 'production';
+  asaasApiKey: string;
+  /** Token que o Asaas manda em cada aviso (webhook) -- confere que veio dele. */
+  asaasWebhookToken: string;
 }
 
 export type PlatformKey = keyof PlatformSettings;
@@ -40,6 +45,9 @@ export const PLATFORM_FIELDS: { key: PlatformKey; env: string; secret: boolean; 
   { key: 'geminiKey', env: 'GEMINI_API_KEY', secret: true },
   { key: 'ollamaUrl', env: 'OLLAMA_URL', secret: false, fallback: 'http://127.0.0.1:11434' },
   { key: 'ollamaModel', env: 'OLLAMA_MODEL', secret: false, fallback: 'gemma3:4b' },
+  { key: 'asaasEnv', env: 'ASAAS_ENV', secret: false, fallback: 'sandbox' },
+  { key: 'asaasApiKey', env: 'ASAAS_API_KEY', secret: true },
+  { key: 'asaasWebhookToken', env: 'ASAAS_WEBHOOK_TOKEN', secret: true },
 ];
 
 const PROVIDER = 'platform';
@@ -73,7 +81,11 @@ function merge(stored: Stored): PlatformSettings {
   for (const field of PLATFORM_FIELDS) {
     out[field.key] = String(stored[field.key] || process.env[field.env] || field.fallback || '').trim();
   }
-  return { ...out, aiProvider: out.aiProvider.toLowerCase() === 'ollama' ? 'ollama' : 'gemini' } as PlatformSettings;
+  return {
+    ...out,
+    aiProvider: out.aiProvider.toLowerCase() === 'ollama' ? 'ollama' : 'gemini',
+    asaasEnv: out.asaasEnv.toLowerCase() === 'production' ? 'production' : 'sandbox',
+  } as PlatformSettings;
 }
 
 /** Configurações em uso (painel primeiro, depois .env). */
@@ -120,6 +132,12 @@ export async function savePlatformSettings(input: Record<string, unknown>, clear
   if (current.aiProvider && !['gemini', 'ollama'].includes(current.aiProvider)) return { error: 'Escolha Gemini ou IA local.' };
   if (current.metaAppId && !/^\d{5,20}$/.test(current.metaAppId)) return { error: 'O ID do app da Meta tem só números.' };
   if (current.ollamaUrl && !/^https?:\/\/[^\s]+$/.test(current.ollamaUrl)) return { error: 'O endereço da IA local começa com http:// (ex.: http://127.0.0.1:11434).' };
+  if (current.asaasEnv && !['sandbox', 'production'].includes(current.asaasEnv)) return { error: 'Escolha o ambiente do Asaas: teste (sandbox) ou produção.' };
+  // A chave do Asaas diz de qual ambiente ela é ($aact_hmlg_ = teste, $aact_prod_ = produção).
+  const env = current.asaasEnv || process.env.ASAAS_ENV || 'sandbox';
+  if (current.asaasApiKey && /^\$aact_prod_/.test(current.asaasApiKey) && env !== 'production') return { error: 'Esta chave do Asaas é de produção: escolha o ambiente "Produção".' };
+  if (current.asaasApiKey && /^\$aact_hmlg_/.test(current.asaasApiKey) && env === 'production') return { error: 'Esta chave do Asaas é de teste (sandbox): escolha o ambiente "Teste".' };
+  if (current.asaasWebhookToken && current.asaasWebhookToken.length < 32) return { error: 'O token do webhook do Asaas precisa de pelo menos 32 caracteres (use o botão Gerar).' };
 
   const { error } = await supabaseAdmin.from('integrations_config').upsert(
     { tenant_id: tenantId, provider: PROVIDER, config: current, updated_at: new Date().toISOString() },

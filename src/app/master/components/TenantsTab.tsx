@@ -3,9 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Building2, Check, ChevronDown, ChevronUp, KeyRound, Layers, LogIn, Pencil, Plus, Trash2, UserPlus, X,
+  Building2, Check, ChevronDown, ChevronUp, CreditCard, KeyRound, Layers, LogIn, Pencil, Plus, Trash2, UserPlus, X,
 } from 'lucide-react';
 import styles from './TenantsTab.module.css';
+import BillingModal, { BillingChip } from './BillingModal';
+import { brDate } from '@/lib/billing-labels';
 import { LIMIT_INFO, PLAN_MODULES, limitLabel, moduleByKey, type PlanLimits } from '@/lib/plans';
 
 interface Plan {
@@ -36,8 +38,13 @@ interface Tenant {
   document?: string | null;
   contact_email?: string | null;
   notes?: string | null;
+  phone?: string | null;
   created_at: string;
   user_count?: number;
+  billing_status?: string | null;
+  trial_ends_at?: string | null;
+  billing_next_due?: string | null;
+  billing_overdue_since?: string | null;
 }
 
 interface ClientUser {
@@ -68,11 +75,13 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const json = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(json.error || 'Não foi possível concluir.');
+  if (json.warning) alert(json.warning);
   return json.data as T;
 }
 
 export default function TenantsTab() {
   const [supportTarget, setSupportTarget] = useState<Tenant | null>(null);
+  const [billingTarget, setBillingTarget] = useState<Tenant | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -330,6 +339,11 @@ export default function TenantsTab() {
                     <KeyRound size={15} /> Acessos {expanded === tenant.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                   </button>
                   {!tenant.is_platform && (
+                    <button className={styles.secondary} title="Cobrança automática (Asaas)" onClick={() => setBillingTarget(tenant)}>
+                      <CreditCard size={15} /> Cobrança
+                    </button>
+                  )}
+                  {!tenant.is_platform && (
                     <button
                       className={styles.secondary}
                       title="Entrar nesta empresa como administrador (modo suporte)"
@@ -341,6 +355,14 @@ export default function TenantsTab() {
                   )}
                 </div>
               </div>
+              {!tenant.is_platform && tenant.billing_status && tenant.billing_status !== 'manual' && (
+                <p className={`${styles.muted} ${styles.billingLine}`}>
+                  <BillingChip status={tenant.billing_status} />
+                  {tenant.billing_status === 'trial' && tenant.trial_ends_at && <>teste até {brDate(tenant.trial_ends_at)}</>}
+                  {tenant.billing_status === 'active' && tenant.billing_next_due && <>próxima fatura {brDate(tenant.billing_next_due)}</>}
+                  {(tenant.billing_status === 'past_due' || tenant.billing_status === 'suspended') && tenant.billing_overdue_since && <>fatura vencida em {brDate(tenant.billing_overdue_since)}</>}
+                </p>
+              )}
               {(tenant.document || tenant.contact_email) && (
                 <p className={styles.muted} style={{ margin: 0 }}>
                   {[tenant.document && `CNPJ/CPF ${tenant.document}`, tenant.contact_email].filter(Boolean).join(' · ')}
@@ -356,6 +378,16 @@ export default function TenantsTab() {
       </section>
 
       {supportTarget && <SupportAccessModal tenant={supportTarget} onClose={() => setSupportTarget(null)} />}
+
+      {billingTarget && (
+        <BillingModal
+          tenant={billingTarget}
+          planName={billingTarget.plan_id ? planName.get(billingTarget.plan_id) ?? null : null}
+          planPrice={billingTarget.plan_id ? plans.find((plan) => plan.id === billingTarget.plan_id)?.price ?? null : null}
+          onClose={() => setBillingTarget(null)}
+          onChanged={load}
+        />
+      )}
 
       {tenantForm && (
         <div className={styles.overlay} onClick={() => setTenantForm(null)}>

@@ -38,6 +38,10 @@ export async function register() {
   const { startDialerWorker } = await import('./lib/dialer/engine');
   startDialerWorker();
 
+  // Cobrança: confere no Asaas quem pagou, atrasou ou deve ser suspenso.
+  const { startBillingWorker } = await import('./lib/billing/worker');
+  startBillingWorker();
+
   // Status do sistema: confere banco, IA, Meta e os agendadores acima.
   const { startHealthChecks } = await import('./lib/status/health');
   startHealthChecks();

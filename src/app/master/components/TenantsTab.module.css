@@ -325,6 +325,33 @@
 
 .modalActions { display: flex; justify-content: flex-end; gap: 10px; }
 
+/* ── Cobrança (Asaas) ── */
+
+.billing_ok { border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.billing_warn { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.1); color: #d97706; }
+.billing_bad { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+.billing_info { border-color: rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.billing_muted { color: var(--muted); }
+.spin { animation: billingSpin 0.9s linear infinite; }
+@keyframes billingSpin { to { transform: rotate(360deg); } }
+.billingBox { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 14px; border: 1px solid var(--card-border); }
+.billingHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.billingForm { display: flex; flex-direction: column; gap: 12px; }
+.billingForm h4, .invoiceList h4 { margin: 0; font-size: 0.95rem; }
+.billingActions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.billingActions .inlineField { flex-direction: row; align-items: center; gap: 6px; }
+.dangerLink { margin-left: auto; padding: 0; border: none; background: none; color: #ef4444; font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+.dangerLink:disabled { opacity: 0.5; cursor: default; }
+.invoiceList { display: flex; flex-direction: column; gap: 6px; }
+.invoiceRow { display: grid; grid-template-columns: 96px 100px 1fr 20px; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: rgba(148, 163, 184, 0.08); font-size: 0.84rem; }
+.invoiceRow a { color: var(--accent, #3b82f6); display: inline-flex; }
+.billingLine { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 0; }
+
+@media (max-width: 560px) {
+  .invoiceRow { grid-template-columns: 1fr 1fr; }
+  .dangerLink { margin-left: 0; }
+}
+
 @media (max-width: 900px) {
   .inlineForm,
   .createForm .inlineForm,

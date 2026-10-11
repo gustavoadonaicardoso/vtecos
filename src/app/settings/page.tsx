@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   BellRing,
   Building2,
   Check,
   CheckCircle2,
+  CreditCard,
+  ExternalLink,
   Eye,
   EyeOff,
   KeyRound,
@@ -26,6 +28,7 @@ import { useBrowserNotifications, showBrowserNotification, pushInAppToast, type 
 import { playNotificationSound } from '@/lib/notificationSound';
 import { getNotificationPrefs, setNotificationPrefs, DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from '@/lib/notificationPrefs';
 import { LIMIT_INFO, PLAN_MODULES, limitLabel, type PlanLimits } from '@/lib/plans';
+import { BILLING_STATUS_LABEL, BILLING_TONE, INVOICE_STATUS_LABEL, billingSentence, brDate, cycleText, isPaidInvoice, money as brl, type BillingSummaryView, type InvoiceView } from '@/lib/billing-labels';
 
 type TabId = 'profile' | 'security' | 'notifications' | 'company' | 'plan';
 
@@ -213,6 +216,17 @@ export default function SettingsPage() {
   const [companyBusy, setCompanyBusy] = useState(false);
   const [companyFeedback, setCompanyFeedback] = useState<Feedback>(null);
 
+  const [billing, setBilling] = useState<{ summary: BillingSummaryView; invoices: InvoiceView[] | null } | null>(null);
+
+  const loadBilling = async () => {
+    try {
+      const data = await api<{ summary: BillingSummaryView; invoices: InvoiceView[] | null } | null>('/api/billing?invoices=1');
+      setBilling(data);
+    } catch {
+      setBilling(null);
+    }
+  };
+
   const loadCompany = async () => {
     setCompanyFeedback(null);
     try {
@@ -229,7 +243,18 @@ export default function SettingsPage() {
     setActiveTab(tab);
     if (tab === 'notifications') setPrefs(getNotificationPrefs());
     if ((tab === 'company' || tab === 'plan') && !company) loadCompany();
+    if (tab === 'plan' && !billing && user?.workspace && !user.workspace.is_platform) loadBilling();
   };
+
+  // Link direto (ex.: aviso de cobrança): /settings?tab=plan
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get('tab') as TabId | null;
+    if (!wanted || !['profile', 'security', 'notifications', 'company', 'plan'].includes(wanted)) return;
+    if ((wanted === 'company' || wanted === 'plan') && !isAdmin) return;
+    const timer = window.setTimeout(() => openTab(wanted), 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   const tabs: { id: TabId; label: string; icon: typeof User; adminOnly?: boolean }[] = [
     { id: 'profile', label: 'Meu perfil', icon: User },
@@ -682,6 +707,40 @@ export default function SettingsPage() {
               {plan.is_platform ? 'Todos os módulos' : plan.status !== 'ACTIVE' ? 'Empresa suspensa' : !plan.name ? 'Sem plano' : plan.active ? 'Ativo' : 'Plano desativado'}
             </span>
           </div>
+
+          {billing && billing.summary.status !== 'manual' && (
+            <div className={styles.billingCard}>
+              <div className={styles.billingTop}>
+                <span className={styles.eyebrow}><CreditCard size={13} /> Cobrança</span>
+                <span className={`${styles.badge} ${BILLING_TONE[billing.summary.status] === 'ok' ? styles.badgeOk : BILLING_TONE[billing.summary.status] === 'info' ? styles.badgeInfo : styles.badgeWarn}`}>
+                  {BILLING_STATUS_LABEL[billing.summary.status]}
+                </span>
+              </div>
+              {billing.summary.value !== null && (
+                <span className={styles.planPrice}>{brl(billing.summary.value)}<small>/{billing.summary.cycle === 'YEARLY' ? 'ano' : 'mês'} · {cycleText(billing.summary.cycle)}</small></span>
+              )}
+              <p className={styles.hint}>{billingSentence(billing.summary)} Pix, boleto ou cartão: você escolhe na fatura.</p>
+              {billing.summary.invoiceUrl && (
+                <a className={styles.primaryBtn} href={billing.summary.invoiceUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink size={15} /> {billing.summary.status === 'past_due' || billing.summary.status === 'trial' ? 'Pagar fatura' : 'Ver fatura em aberto'}
+                </a>
+              )}
+              {billing.invoices && billing.invoices.length > 0 && (
+                <div className={styles.invoiceList}>
+                  {billing.invoices.map((invoice) => (
+                    <div key={invoice.id} className={styles.invoiceRow}>
+                      <span>{brDate(invoice.dueDate)}</span>
+                      <strong>{brl(invoice.value)}</strong>
+                      <span className={isPaidInvoice(invoice.status) ? styles.invoicePaid : invoice.status === 'OVERDUE' ? styles.invoiceLate : ''}>
+                        {INVOICE_STATUS_LABEL[invoice.status] || invoice.status}
+                      </span>
+                      {invoice.invoiceUrl ? <a href={invoice.invoiceUrl} target="_blank" rel="noreferrer" aria-label={`Fatura de ${brDate(invoice.dueDate)}`}><ExternalLink size={14} /></a> : <span />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {!plan.is_platform && (!plan.name || !plan.active) && (
             <div className={styles.error}><AlertTriangle size={16} /> Sem um plano ativo, a equipe só vê Início, Chat, Equipe, Integrações, Configurações e Ajuda.</div>
