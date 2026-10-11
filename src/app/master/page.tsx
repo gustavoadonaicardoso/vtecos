@@ -51,7 +51,7 @@ export default function MasterPage() {
     const params = new URLSearchParams(window.location.search);
     return { tab: params.get('tab'), article: params.get('article') };
   });
-  const [activeTab, setActiveTab] = useState<TabId>(() => (deepLink.tab === 'help' || deepLink.tab === 'platform' || deepLink.tab === 'status' ? deepLink.tab : 'modules'));
+  const [activeTab, setActiveTab] = useState<TabId>(() => (deepLink.tab === 'help' || deepLink.tab === 'platform' || deepLink.tab === 'status' || deepLink.tab === 'tenants' ? deepLink.tab : 'modules'));
   const [selectedRole, setSelectedRole] = useState<Role>('SELLER');
   const { refreshConfig, config: themeConfig } = useTheme();
   // Enquanto não há edição, a aba mostra o que está salvo.

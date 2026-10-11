@@ -80,7 +80,7 @@ Criados pela migration `202610310001_plans_modules_limits.sql` e editáveis no P
  │ │ Next.js 16 + React 19 — páginas e APIs (/api/*)               │ │
  │ │ Rotinas em segundo plano (src/instrumentation.ts):            │ │
  │ │   posts agendados · esperas das automações · agendamento      │ │
- │ │   disparos · discador automático · verificação de status      │ │
+ │ │   disparos · discador automático · cobrança · status          │ │
  │ │ Sessões do WhatsApp Web (Baileys) · IA local opcional (Ollama)│ │
  │ └──────────────────────────────────────────────────────────────┘ │
  └───────────────┬──────────────────────────────────┬───────────────┘
@@ -169,7 +169,8 @@ No `npm run dev` as rotinas em segundo plano ficam desligadas: posts, disparos, 
 
 - **Instalação nova:** rode [`supabase/base-schema.sql`](supabase/base-schema.sql) no SQL Editor do Supabase e depois todos os arquivos de [`supabase/migrations`](supabase/migrations), em ordem de nome.
 - **Produção:** a cada PR que traz migration nova, rode **só o arquivo novo** no SQL Editor **antes** do deploy. As migrations são escritas para poder rodar de novo sem estragar nada.
-- Últimas migrations: `202610310001_plans_modules_limits.sql` (módulos, limites e os 4 planos), `202611010001_remove_fiscal.sql` (remove o módulo de Notas Fiscais) e `202611020001_quick_reply_shortcuts.sql` (atalho das respostas rápidas).
+- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno) e `202611040001_billing_asaas.sql` (cobrança automática).
+- Depois de rodar uma migration, confira o banco com `npm run db:check-schema`.
 
 ---
 
@@ -188,6 +189,7 @@ O modelo completo, com comentários, está em [`.env.example`](.env.example). As
 | `WHATSAPP_*` | WhatsApp Cloud API e pasta das sessões do WhatsApp Web |
 | `CONTENT_SCHEDULER_ENABLED=true` | Liga as rotinas em segundo plano (só na VPS) |
 | `TWILIO_*` | Discador da Vórtice (cada empresa usa a própria conta Twilio, cadastrada em Integrações) |
+| `ASAAS_ENV`, `ASAAS_API_KEY`, `ASAAS_WEBHOOK_TOKEN` | Cobrança automática das empresas pelo Asaas (melhor configurar no Painel Master > Plataforma) |
 
 Várias configurações da plataforma também podem ser feitas no Painel Master > Plataforma, sem mexer no `.env.local`.
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isPlatformTenant, parseTenantInput, updateTenant } from '@/services/tenants.service';
 import { requirePlatformAdmin } from '@/lib/session';
+import { syncSubscriptionPrice } from '@/services/billing.service';
 
 // PATCH: altera nome, status, plano e dados de contato da empresa (só admin).
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +19,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const result = await updateTenant(id, parsed.data);
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
-    return NextResponse.json({ data: result.data });
+    // Trocou de plano: a assinatura no Asaas passa a cobrar o valor novo.
+    let warning: string | null = null;
+    if ('plan_id' in parsed.data) {
+      const synced = await syncSubscriptionPrice(id);
+      if (!synced.success) warning = `Plano trocado, mas a cobrança no Asaas não foi atualizada: ${synced.error}`;
+    }
+    return NextResponse.json({ data: result.data, warning });
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Erro interno.' }, { status: 500 });
   }

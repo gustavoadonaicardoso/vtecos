@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Copy, KeyRound, Link2, Loader2, PlugZap, Save, Sparkles, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Copy, CreditCard, KeyRound, Link2, Loader2, PlugZap, RefreshCw, Save, Sparkles, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import styles from '../master.module.css';
 
@@ -10,6 +10,13 @@ type Result = { ok: boolean; message: string } | null;
 const SOURCE_LABEL: Record<Source, string> = { painel: 'salvo aqui', env: 'vindo do .env', 'padrão': 'padrão', vazio: 'vazio' };
 
 const origin = () => (typeof window !== 'undefined' ? window.location.origin : '');
+
+/** Token aleatório para o webhook do Asaas (48 caracteres). */
+function randomToken() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 function CopyLine({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
@@ -39,6 +46,7 @@ export default function PlatformTab() {
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Result>(null);
   const [tests, setTests] = useState<Record<string, Result>>({});
+  const [generatedToken, setGeneratedToken] = useState('');
 
   const apply = useCallback((data: { fields: FieldView[] }) => {
     setFields(data.fields);
@@ -74,7 +82,7 @@ export default function PlatformTab() {
       return;
     }
     apply(json.data);
-    setFeedback({ ok: true, message: 'Configurações salvas. Valem para todas as empresas em até 30 segundos, sem deploy.' });
+    setFeedback({ ok: true, message: generatedToken ? 'Configurações salvas. Agora cole o token do webhook no Asaas (ele não aparece de novo depois que você sair desta tela).' : 'Configurações salvas. Valem para todas as empresas em até 30 segundos, sem deploy.' });
   };
 
   const test = async (target: string) => {
@@ -127,6 +135,7 @@ export default function PlatformTab() {
   }
 
   const provider = (values.aiProvider || 'gemini') === 'ollama' ? 'ollama' : 'gemini';
+  const asaasEnv = (values.asaasEnv || 'sandbox') === 'production' ? 'production' : 'sandbox';
 
   return (
     <motion.div key="platform" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className={styles.grid}>
@@ -191,6 +200,50 @@ export default function PlatformTab() {
         </div>
         {testResult("gemini")}
         {testResult("ollama")}
+      </div>
+
+      <div className={`${styles.card} ${styles.cardWide}`}>
+        <div className={styles.cardHeader}><CreditCard size={20} /><h2>Cobrança automática (Asaas)</h2></div>
+        <p className={styles.hint}>
+          A conta da Vórtice no Asaas cobra as empresas clientes: Pix, boleto ou cartão, que o cliente escolhe na fatura. Comece pelo ambiente de <strong>teste</strong> (sandbox.asaas.com, conta separada) e troque para produção quando estiver tudo certo.
+        </p>
+        <div className={styles.twoCols}>
+          <div className={styles.field}>
+            <span className={styles.fieldLabel}>Ambiente {badge("asaasEnv")}</span>
+            <select className={styles.input} value={asaasEnv} onChange={(event) => set('asaasEnv', event.target.value)}>
+              <option value="sandbox">Teste (sandbox) — não cobra de verdade</option>
+              <option value="production">Produção — cobra de verdade</option>
+            </select>
+          </div>
+          {input("asaasApiKey", "Chave da API", asaasEnv === 'production' ? '$aact_prod_…' : '$aact_hmlg_…', <>No Asaas: menu do usuário &gt; Integrações &gt; Chaves de API. A chave de teste começa com <code>$aact_hmlg_</code>, a de produção com <code>$aact_prod_</code>.</>)}
+        </div>
+        <CopyLine label="URL do webhook (Asaas > Integrações > Webhooks > Adicionar)" value={`${origin()}/api/webhooks/asaas`} />
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Token de autenticação do webhook {badge("asaasWebhookToken")}</span>
+          <div className={styles.copyRow}>
+            <input
+              className={styles.input}
+              type="password"
+              autoComplete="new-password"
+              value={values.asaasWebhookToken ?? ''}
+              placeholder={field('asaasWebhookToken')?.hasValue && !clear.includes('asaasWebhookToken') ? '•••••••• salvo — gere outro só se for trocar no Asaas também' : 'Clique em Gerar'}
+              onChange={(event) => set('asaasWebhookToken', event.target.value)}
+            />
+            <button type="button" className={styles.resetBtn} onClick={() => { const token = randomToken(); set('asaasWebhookToken', token); setGeneratedToken(token); }}>
+              <RefreshCw size={15} /> Gerar
+            </button>
+          </div>
+          {generatedToken && <CopyLine label="Token gerado: copie para o Asaas e salve aqui" value={generatedToken} />}
+          <small className={styles.fieldHint}>
+            No cadastro do webhook no Asaas: cole a URL acima e este token, versão da API <strong>v3</strong>, envio <strong>sequencial</strong>, e marque os eventos de <strong>Cobranças</strong>.
+          </small>
+        </div>
+        <div className={styles.inlineActions}>
+          <button type="button" className={styles.resetBtn} disabled={busy !== null} onClick={() => test('asaas')}>
+            {busy === 'asaas' ? <Loader2 size={15} className={styles.spin} /> : <PlugZap size={15} />} Testar chave do Asaas
+          </button>
+        </div>
+        {testResult("asaas")}
       </div>
 
       <div className={`${styles.card} ${styles.cardWide} ${styles.saveRow}`}>

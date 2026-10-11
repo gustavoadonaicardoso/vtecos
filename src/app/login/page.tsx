@@ -16,8 +16,10 @@ import {
   Sun,
   MessageCircle,
   Mail,
-  Globe
+  Globe,
+  CreditCard
 } from 'lucide-react';
+import Link from 'next/link';
 import Image from 'next/image';
 import styles from './login.module.css';
 import { useAuth } from '@/context/AuthContext';
@@ -69,6 +71,8 @@ export default function LoginPage() {
   const [resetMode, setResetMode] = useState(false);
   const [resetMsg, setResetMsg] = useState('');
   const [showPlans, setShowPlans] = useState(false);
+  const [trial, setTrial] = useState<{ available: boolean; days: number }>({ available: false, days: 7 });
+  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
 
   const currentYear = new Date().getFullYear();
 
@@ -76,6 +80,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setInvoiceUrl(null);
 
     try {
       const resp = await fetch('/api/auth/login', {
@@ -88,6 +93,7 @@ export default function LoginPage() {
 
       if (!resp.ok) {
         setError(json.error || 'Falha na autenticação.');
+        setInvoiceUrl(typeof json.invoiceUrl === 'string' ? json.invoiceUrl : null);
         setIsLoading(false);
         return;
       }
@@ -140,6 +146,7 @@ export default function LoginPage() {
       const json = await response.json();
       setPlans(json.data?.plans || []);
       setContact(json.data?.contact || null);
+      if (json.data?.trial) setTrial(json.data.trial);
     } catch {
       setPlans([]);
     }
@@ -240,7 +247,16 @@ export default function LoginPage() {
           </form>
         ) : (
           <form className={styles.loginForm} onSubmit={handleLogin}>
-            {error && <div className={styles.errorMessage}>{error}</div>}
+            {error && (
+              <div className={styles.errorMessage}>
+                {error}
+                {invoiceUrl && (
+                  <a className={styles.payInvoice} href={invoiceUrl} target="_blank" rel="noopener noreferrer">
+                    <CreditCard size={15} /> Pagar fatura
+                  </a>
+                )}
+              </div>
+            )}
 
             <div className={styles.inputGroup}>
               <label htmlFor="login-email">E-mail</label>
@@ -358,7 +374,10 @@ export default function LoginPage() {
 
               <div className={styles.plansHeader}>
                 <h2>Escolha o plano ideal para a sua empresa</h2>
-                <p>Cada empresa tem o próprio ambiente, a própria equipe e os módulos do plano contratado.</p>
+                <p>
+                  Cada empresa tem o próprio ambiente, a própria equipe e os módulos do plano contratado.
+                  {trial.available && ` Teste grátis por ${trial.days} dias, sem cartão: depois, Pix, boleto ou cartão.`}
+                </p>
               </div>
 
               {plans === null ? (
@@ -399,14 +418,25 @@ export default function LoginPage() {
                           ))}
                         </ul>
                       )}
-                      <a
-                        href={contactLink(contact, plan.name)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`${styles.planCta} ${plan.featured ? styles.planCtaHighlight : ''}`}
-                      >
-                        <Rocket size={16} /> Quero este plano
-                      </a>
+                      {trial.available && plan.price > 0 ? (
+                        <>
+                          <Link href={`/cadastro?plano=${encodeURIComponent(plan.id)}`} className={`${styles.planCta} ${plan.featured ? styles.planCtaHighlight : ''}`}>
+                            <Rocket size={16} /> Testar {trial.days} dias grátis
+                          </Link>
+                          <a href={contactLink(contact, plan.name)} target="_blank" rel="noopener noreferrer" className={styles.planTalk}>
+                            ou fale com a Vórtice
+                          </a>
+                        </>
+                      ) : (
+                        <a
+                          href={contactLink(contact, plan.name)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`${styles.planCta} ${plan.featured ? styles.planCtaHighlight : ''}`}
+                        >
+                          <Rocket size={16} /> Quero este plano
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>

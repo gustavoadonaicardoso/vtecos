@@ -5,10 +5,11 @@ import { requirePlatformAdmin } from '@/lib/session';
 import { checkGeminiKey } from '@/lib/ai';
 import { platformSettings, platformSettingsView, savePlatformSettings } from '@/lib/platform-settings';
 import { META_GRAPH_URL } from '@/lib/meta-graph-version';
+import { asaas, AsaasError } from '@/lib/asaas';
 
 /**
- * Painel Master > Plataforma: app da Meta, webhook do WhatsApp e IA
- * padrão da Vórtice. Só administradores da empresa da plataforma. Os
+ * Painel Master > Plataforma: app da Meta, webhook do WhatsApp, IA
+ * padrão da Vórtice e cobrança (Asaas). Só administradores da empresa da plataforma. Os
  * segredos nunca voltam para a tela.
  */
 export async function GET() {
@@ -63,6 +64,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ data: found ? { ok: true, message: `IA local funcionando com o modelo ${settings.ollamaModel}.` } : { ok: false, message: `A IA local respondeu, mas o modelo ${settings.ollamaModel} não foi baixado. Na VPS: ollama pull ${settings.ollamaModel}` } });
     } catch {
       return NextResponse.json({ data: { ok: false, message: `Não foi possível falar com a IA local em ${settings.ollamaUrl}. Confira se o Ollama está ligado (systemctl status ollama).` } });
+    }
+  }
+
+  if (target === 'asaas') {
+    if (!settings.asaasApiKey) return NextResponse.json({ data: { ok: false, message: 'Cole a chave da API do Asaas e salve antes de testar.' } });
+    try {
+      await asaas.ping();
+      return NextResponse.json({ data: { ok: true, message: `O Asaas aceitou a chave (ambiente de ${settings.asaasEnv === 'production' ? 'produção' : 'teste'}).` } });
+    } catch (error) {
+      return NextResponse.json({ data: { ok: false, message: error instanceof AsaasError ? error.message : 'Não foi possível falar com o Asaas agora.' } });
     }
   }
 

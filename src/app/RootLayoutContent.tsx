@@ -17,6 +17,7 @@ import WhatsAppNotificationListener from "@/components/WhatsAppNotificationListe
 import InAppToasts from "@/components/InAppToasts";
 import SupportAccessBar from "@/components/SupportAccessBar";
 import StatusBar from "@/components/StatusBar";
+import BillingBanner from "@/components/BillingBanner";
 import { isPublicRoute } from "@/lib/public-routes";
 // FIX #7: hook centralizado de permissões — sem duplicação
 import { usePermissions } from "@/lib/permissions";
@@ -118,6 +119,7 @@ function AppGuard({ children }: { children: React.ReactNode }) {
           <div className={`${styles.mainContent} ${isFullPage ? styles.mainContentFullPage : ''}`}>
             <SupportAccessBar />
             <StatusBar />
+            <BillingBanner />
             {!isFullPage && <Navbar />}
             <main className={isFullPage ? styles.fullPageContent : styles.pageScrollContainer}>
               {children}
