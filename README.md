@@ -35,7 +35,7 @@ Os módulos ficam em [`src/lib/plans.ts`](src/lib/plans.ts). Um módulo fora do 
 
 | Módulo (chave) | O que faz | Páginas |
 |---|---|---|
-| CRM e Atendimento (`crm`) | Leads, funil, conversas do WhatsApp (Web e API oficial), Instagram Direct e Messenger, metas, relatórios | `/leads` `/pipeline` `/messages` `/metas` `/relatorios` |
+| CRM e Atendimento (`crm`) | Leads, funil, conversas do WhatsApp (Web e API oficial), Instagram Direct e Messenger, respostas rápidas com atalho `/`, metas, relatórios | `/leads` `/pipeline` `/messages` `/metas` `/relatorios` |
 | Agendamento (`agendamento`) | Agenda, lembretes e mensagens programadas | `/scheduling` |
 | Custos e Precificação (`financeiro`) | Insumos, fichas técnicas, preço por canal, despesas em BRL/USD/EUR, lucro e ponto de equilíbrio | `/financeiro` |
 | Automações e IA (`automacoes`) | Fluxos automáticos e Atendente com IA no WhatsApp, Direct e Messenger | `/automations` |
@@ -169,7 +169,7 @@ No `npm run dev` as rotinas em segundo plano ficam desligadas: posts, disparos, 
 
 - **Instalação nova:** rode [`supabase/base-schema.sql`](supabase/base-schema.sql) no SQL Editor do Supabase e depois todos os arquivos de [`supabase/migrations`](supabase/migrations), em ordem de nome.
 - **Produção:** a cada PR que traz migration nova, rode **só o arquivo novo** no SQL Editor **antes** do deploy. As migrations são escritas para poder rodar de novo sem estragar nada.
-- Últimas migrations: `202610300001_finance_software.sql` (Custos SaaS), `202610310001_plans_modules_limits.sql` (módulos, limites e os 4 planos) e `202611010001_remove_fiscal.sql` (remove o módulo de Notas Fiscais).
+- Últimas migrations: `202610310001_plans_modules_limits.sql` (módulos, limites e os 4 planos), `202611010001_remove_fiscal.sql` (remove o módulo de Notas Fiscais) e `202611020001_quick_reply_shortcuts.sql` (atalho das respostas rápidas).
 
 ---
 
