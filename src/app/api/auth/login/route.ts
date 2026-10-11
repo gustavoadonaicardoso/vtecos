@@ -6,6 +6,7 @@ import { fetchProfileByEmail, fetchProfileById } from '@/services/profile-lookup
 import { setSessionCookies } from '@/lib/session';
 import { withWorkspace } from '@/services/workspace.service';
 import { clientIp, createLimiter } from '@/lib/rate-limit';
+import { billingSummary } from '@/services/billing.service';
 
 // Tentativas erradas: 8 por e-mail e 30 por IP a cada 15 minutos. O
 // Supabase vê todos os logins vindo do IP da VPS, então o limite dele
@@ -59,6 +60,14 @@ export async function POST(request: Request) {
     // sistema vazio, sem explicação. Agora nem cria a sessão.
     const workspace = user.workspace;
     if (workspace && !workspace.is_platform && workspace.tenant_status !== 'ACTIVE') {
+      // Suspensa por falta de pagamento: a própria pessoa paga e o acesso volta sozinho.
+      const billing = await billingSummary(workspace.tenant_id).catch(() => null);
+      if (billing?.status === 'suspended' && billing.invoiceUrl) {
+        return NextResponse.json(
+          { error: 'O acesso da sua empresa está suspenso por falta de pagamento. Pague a fatura em aberto: o acesso volta sozinho em poucos minutos.', invoiceUrl: billing.invoiceUrl },
+          { status: 403 }
+        );
+      }
       return NextResponse.json(
         { error: 'O acesso da sua empresa está suspenso. Fale com a Vórtice Tecnologia para reativar.' },
         { status: 403 }

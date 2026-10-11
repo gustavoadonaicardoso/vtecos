@@ -110,7 +110,8 @@ export interface BillingSummary {
 export function summarize(tenant: Row, plan?: { name: string; price: number } | null, now = new Date()): BillingSummary {
   const status = (tenant.billing_status as BillingStatus) || 'manual';
   const cycle = (tenant.billing_cycle as AsaasCycle) === 'YEARLY' ? 'YEARLY' : 'MONTHLY';
-  const trialEndsAt = (tenant.trial_ends_at as string) || null;
+  // Fim do teste como data de São Paulo (o banco guarda em UTC: 23:59 de SP já é o dia seguinte).
+  const trialEndsAt = tenant.trial_ends_at ? todaySP(new Date(String(tenant.trial_ends_at))) : null;
   const overdueSince = (tenant.billing_overdue_since as string) || null;
   const notified = (tenant.billing_notified as Row) || {};
   const graceUntil = typeof notified.grace_until === 'string' ? notified.grace_until : null;
@@ -123,7 +124,7 @@ export function summarize(tenant: Row, plan?: { name: string; price: number } | 
     planName: plan?.name ?? null,
     value: plan ? cyclePrice(Number(plan.price) || 0, cycle) : null,
     trialEndsAt,
-    trialDaysLeft: status === 'trial' && trialEndsAt ? Math.max(0, Math.ceil((Date.parse(trialEndsAt) - now.getTime()) / 86_400_000)) : null,
+    trialDaysLeft: status === 'trial' && trialEndsAt ? Math.max(0, Math.round((Date.parse(`${trialEndsAt}T12:00:00Z`) - Date.parse(`${todaySP(now)}T12:00:00Z`)) / 86_400_000)) : null,
     nextDue: (tenant.billing_next_due as string) || null,
     invoiceUrl: (tenant.billing_invoice_url as string) || null,
     overdueSince,
@@ -167,7 +168,7 @@ async function notifyTenantAdmins(tenantId: string, title: string, content: stri
   if (rows.length) await db.from('system_notifications').insert(rows);
 }
 
-async function notifyPlatform(title: string, content: string) {
+export async function notifyPlatform(title: string, content: string) {
   // tenant-scope: ok (avisos internos para a equipe da plataforma)
   const { data: platform } = await db.from('tenants').select('id').eq('is_platform', true).maybeSingle();
   if (!platform?.id) return;

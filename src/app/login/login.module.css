@@ -701,3 +701,28 @@
 
 .planLimits { list-style: none; margin: 0 0 14px; padding: 10px 0 0; border-top: 1px dashed rgba(148, 163, 184, 0.35); display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; opacity: 0.85; }
 .planLimits li::before { content: '• '; }
+
+/* Teste grátis e pagamento de empresa suspensa */
+.planTalk {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
+.planTalk:hover { color: var(--foreground); }
+
+.payInvoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border-radius: var(--glass-radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
