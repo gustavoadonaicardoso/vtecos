@@ -1,4 +1,5 @@
-import { Ban, Menu, Search, UserPlus } from 'lucide-react';
+import Link from 'next/link';
+import { Ban, Menu, Search, UserPlus, Zap } from 'lucide-react';
 import styles from '../messages.module.css';
 import type { Lead } from '@/types';
 import type { InboxTab } from '../types';
@@ -23,10 +24,12 @@ interface ConversationListProps {
   loaded: boolean;
   /** Celular: abre o menu lateral (a barra de cima fica escondida nesta tela). */
   onMenu: () => void;
+  /** Link para a aba de respostas rápidas (null = sem acesso). */
+  quickRepliesHref: string | null;
 }
 
 export default function ConversationList(props: ConversationListProps) {
-  const { hidden, conversations, counts, tab, onTab, query, onQuery, selectedId, onSelect, canAssign, ownerName, canCreate, onNewContact, now, loaded, onMenu } = props;
+  const { hidden, conversations, counts, tab, onTab, query, onQuery, selectedId, onSelect, canAssign, ownerName, canCreate, onNewContact, now, loaded, onMenu, quickRepliesHref } = props;
   const tabs: [InboxTab, string][] = [
     ['all', 'Todas'],
     ['unread', 'Não lidas'],
@@ -40,6 +43,11 @@ export default function ConversationList(props: ConversationListProps) {
         <div className={styles.listTitle}>
           <button type="button" className={`${styles.iconBtn} ${styles.menuBtn}`} onClick={onMenu} aria-label="Abrir menu"><Menu size={20} /></button>
           <h1>Mensagens</h1>
+          {quickRepliesHref && (
+            <Link href={quickRepliesHref} className={styles.newBtn} title="Respostas rápidas: mensagens prontas e atalhos com /">
+              <Zap size={15} /> Respostas
+            </Link>
+          )}
           {canCreate && (
             <button type="button" className={styles.newBtn} onClick={onNewContact} title="Novo contato">
               <UserPlus size={15} /> Novo

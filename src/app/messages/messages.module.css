@@ -121,7 +121,7 @@
 .listTitle { display: flex; align-items: center; gap: 8px; }
 .listTitle h1 { flex: 1; margin: 0; font-size: 1.35rem; font-weight: 800; }
 .menuBtn { display: none; }
-.newBtn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid var(--card-border); border-radius: 9px; background: var(--soft); color: var(--foreground); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.newBtn { text-decoration: none; display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid var(--card-border); border-radius: 9px; background: var(--soft); color: var(--foreground); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
 .newBtn:hover { border-color: var(--brand); }
 
 .search {
@@ -305,9 +305,36 @@
 .quickPop { width: 340px; max-height: 360px; overflow-y: auto; }
 .popHead { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 8px; font-size: 0.85rem; }
 .quickItem { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: none; color: var(--foreground); font: inherit; text-align: left; cursor: pointer; }
-.quickItem:hover { background: var(--soft); }
-.quickItem strong { font-size: 0.82rem; }
-.quickItem span { color: var(--muted); font-size: 0.78rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.quickItem:hover, .quickItemOn { background: var(--soft); }
+.quickItemOn { box-shadow: inset 3px 0 0 var(--brand); }
+.quickItemHead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.quickItem strong { font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quickItemText { color: var(--muted); font-size: 0.78rem; line-height: 1.4; white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.shortcutTag { flex-shrink: 0; padding: 1px 7px; border-radius: 6px; background: rgba(59, 130, 246, 0.14); color: var(--brand); font-family: inherit; font-size: 0.74rem; font-weight: 700; }
+.quickSearch { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--soft); color: var(--muted); }
+.quickSearch:focus-within { border-color: var(--brand); }
+.quickSearch input { flex: 1; min-width: 0; height: 34px; border: 0; background: none; color: var(--foreground); font: inherit; font-size: 0.84rem; outline: none; }
+.quickTip { margin: 8px 4px 0; color: var(--muted); font-size: 0.74rem; line-height: 1.4; }
+.quickTip code, .slashHead code { padding: 0 4px; border-radius: 4px; background: var(--soft); font-family: inherit; font-weight: 700; }
+
+/* Lista que abre ao digitar "/" no campo de mensagem */
+.slashPop {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: calc(100% + 6px);
+  z-index: 45;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: var(--background);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+}
+:global([data-theme='light']) .slashPop { background: #fff; }
+.slashHead { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 2px 6px 6px; color: var(--muted); font-size: 0.76rem; }
+.slashKeys { white-space: nowrap; }
 
 /* ── Vazio ── */
 
@@ -404,4 +431,7 @@
   .composerTools .iconBtn { width: 32px; }
   .signatureHint { left: 8px; }
   .emptyTools { display: none; }
+  .slashPop { left: 8px; right: 8px; }
+  .slashKeys { display: none; }
+  .quickPop { width: min(340px, calc(100vw - 32px)); }
 }

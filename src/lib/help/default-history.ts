@@ -23,7 +23,7 @@ export const DEFAULT_ARTICLE_HISTORY: Record<string, string[]> = {
   'integracao-webhooks': ['de10e7b7872b3904'],
   'integracao-whatsapp-api': ['4efef91340c7e641', '6d2dd9786756a6c7'],
   'integracao-whatsapp-web': ['901ac67603392908'],
-  'mensagens-whatsapp': ['0e5d16bfdf5a6861', '6f00341294ad56d9'],
+  'mensagens-whatsapp': ['0e5d16bfdf5a6861', '6f00341294ad56d9', 'e09ec1cd358f17c6'],
   'metas-relatorios-projetos': ['84d9d00d2e1c1ffa', 'c83d409445af7e2d', 'dc1828556a9b14db'],
   'primeiros-passos': ['7ff6b28a6ab50f36', 'bceafc1631a6a03d'],
   'seguranca-e-conta': ['0eb21e75c078bfd4'],
