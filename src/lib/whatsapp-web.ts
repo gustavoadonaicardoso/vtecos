@@ -4,6 +4,9 @@ import makeWASocket, {
   DisconnectReason,
   downloadMediaMessage,
   fetchLatestBaileysVersion,
+  isJidBroadcast,
+  isJidGroup,
+  isJidNewsletter,
   useMultiFileAuthState,
   type WAMessage,
   type WASocket,
@@ -173,7 +176,10 @@ export async function startWhatsAppWeb(tenantId: string) {
       const { supabaseAdmin } = await import('@/lib/supabase-admin');
 
       for (const item of messages) {
-        if (!item.key.remoteJid || item.key.remoteJid.endsWith('@g.us')) continue;
+        // Só conversas com uma pessoa: grupos, status (stories dos
+        // contatos), listas de transmissão e canais não viram conversa.
+        const chatJid = item.key.remoteJid;
+        if (!chatJid || !isPersonalChat(item)) continue;
         if (item.key.fromMe) {
           // Mandada pelo celular da empresa (as do sistema chegam como "append").
           await recordPhoneReply(tenantId, socket, item as WAMessage).catch((error) => console.error('[whatsapp-web] resposta pelo celular', error));
@@ -244,7 +250,7 @@ export async function startWhatsAppWeb(tenantId: string) {
         // cada mensagem. remoteJidAlt já vem preenchido com o JID de
         // telefone quando o Baileys conhece o par; se não vier, resolve
         // pelo mapeamento LID->PN da própria lib.
-        let phoneJid = item.key.remoteJidAlt || item.key.remoteJid;
+        let phoneJid = item.key.remoteJidAlt || chatJid;
         if (phoneJid.endsWith('@lid')) {
           const resolved = await socket.signalRepository.lidMapping.getPNForLID(phoneJid).catch(() => null);
           if (resolved) phoneJid = resolved;
@@ -397,6 +403,18 @@ async function contactPhone(socket: WASocket, item: WAMessage) {
  * conversa (para a equipe e a IA verem) e marca que um humano respondeu,
  * para o Atendente com IA ficar quieto.
  */
+/**
+ * Conversa individual? Fora: grupos (@g.us), status dos contatos
+ * (status@broadcast -- foto/vídeo que o contato posta), listas de
+ * transmissão (@broadcast) e canais (@newsletter).
+ */
+export function isPersonalChat(item: Pick<WAMessage, 'key' | 'broadcast'>) {
+  const jid = item.key.remoteJid;
+  if (!jid) return false;
+  if (item.broadcast) return false;
+  return !isJidGroup(jid) && !isJidBroadcast(jid) && !isJidNewsletter(jid);
+}
+
 async function recordPhoneReply(tenantId: string, socket: WASocket, item: WAMessage) {
   const content = item.message;
   if (!content) return;
