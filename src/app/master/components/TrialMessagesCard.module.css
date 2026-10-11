@@ -1,0 +1,68 @@
+/* Painel Master > Plataforma > Mensagens do teste grátis */
+.topRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.toggle input { width: 16px; height: 16px; accent-color: var(--brand, #3b82f6); }
+.ok, .warn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; }
+.ok { color: #10b981; }
+.warn { color: #f59e0b; }
+
+.tabs { display: flex; gap: 6px; margin: 12px 0; overflow-x: auto; padding-bottom: 2px; }
+.tabs button {
+  position: relative;
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tabs .tabOn { border-color: var(--brand, #3b82f6); background: rgba(59, 130, 246, 0.12); }
+.dot { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; }
+
+.editor { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.column { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.textarea { min-height: 220px; resize: vertical; line-height: 1.5; font-family: inherit; }
+
+.vars { display: flex; flex-wrap: wrap; gap: 6px; }
+.vars button {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px dashed var(--card-border);
+  background: transparent;
+  color: var(--muted, inherit);
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.vars button:hover { color: var(--foreground); border-color: var(--brand, #3b82f6); }
+.restore { align-self: flex-start; }
+
+.bubble {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 10px 12px 12px;
+  border-radius: 4px 14px 14px 14px;
+  background: #dcf8c6;
+  color: #111b21;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+:global([data-theme='dark']) .bubble { background: #005c4b; color: #e9edef; }
+
+.testRow { display: flex; gap: 8px; margin-top: 4px; }
+.testRow input { flex: 1; }
+
+.saveRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 14px; }
+.saveRow p { margin: 0; margin-right: auto; }
+
+@media (max-width: 760px) {
+  .editor { grid-template-columns: 1fr; }
+  .testRow { flex-direction: column; }
+}

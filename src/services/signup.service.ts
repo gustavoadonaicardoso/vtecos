@@ -7,7 +7,8 @@
  *   2. assinatura no Asaas em teste grátis -- a primeira fatura vence
  *      no fim do teste (TRIAL_DAYS); paga antes, vira assinatura;
  *      não paga, segue a regra normal (3 dias de atraso → suspensa);
- *   3. administrador com o e-mail e a senha informados.
+ *   3. administrador com o e-mail e a senha informados;
+ *   4. lead no CRM da Vórtice, que recebe os lembretes pelo WhatsApp.
  * Se um passo falha, os anteriores são desfeitos. Um CPF/CNPJ e um
  * e-mail só fazem um teste.
  * ============================================================
@@ -16,9 +17,11 @@
 import { supabaseAdmin as db } from '@/lib/supabase-admin';
 import { createTenant } from '@/services/tenants.service';
 import { createUserWithProfile } from '@/services/users.service';
+import { registerTrialLead } from '@/services/trial-messages.service';
 import {
   TRIAL_DAYS,
   addDays,
+  cyclePrice,
   disableBilling,
   enableBilling,
   notifyPlatform,
@@ -112,9 +115,22 @@ export async function startTrial(input: SignupInput, deps: { createUser: typeof 
     return { ok: false, status: user.status === 409 ? 409 : 400, error: user.status === 409 ? 'Já existe uma conta com este e-mail. Entre pela tela de login.' : user.error || 'Não foi possível criar o seu acesso.' };
   }
 
+  // Lead no CRM da Vórtice + lembretes pelo WhatsApp (boas-vindas sai na próxima conferência, em até 5 min).
+  await registerTrialLead(tenantId, {
+    name: input.name,
+    email: input.email,
+    phone: input.phone,
+    company: input.company,
+    cpfCnpj: input.cpfCnpj,
+    planName: String(plan.name),
+    value: cyclePrice(Number(plan.price) || 0, input.cycle),
+    cycle: input.cycle,
+    trialEndDate: trialEndDate,
+  });
+
   await notifyPlatform(
     'Novo teste grátis',
-    `${input.company} começou o teste do plano ${plan.name} (${input.cycle === 'YEARLY' ? 'anual' : 'mensal'}) até ${trialEndDate.split('-').reverse().join('/')}. Contato: ${input.name}, ${input.email}, WhatsApp ${input.phone}.`,
+    `${input.company} começou o teste do plano ${plan.name} (${input.cycle === 'YEARLY' ? 'anual' : 'mensal'}) até ${trialEndDate.split('-').reverse().join('/')}. Contato: ${input.name}, ${input.email}, WhatsApp ${input.phone}. Já está no CRM com a etiqueta "Teste grátis".`,
   ).catch(() => {});
   return { ok: true, tenantId, trialEndsAt };
 }

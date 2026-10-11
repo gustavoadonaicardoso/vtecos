@@ -33,7 +33,7 @@ import { usePresence } from '@/context/PresenceContext';
 import { usePermissions } from '@/lib/permissions';
 import { useUnreadCount } from '@/hooks/useUnreadCount';
 import { supabase } from '@/lib/supabase';
-import { BannerCarousel, PersonalActivityFeed } from '@/components/home';
+import { BannerCarousel, OnboardingChecklist, PersonalActivityFeed } from '@/components/home';
 import { isWon } from './relatorios/report-data';
 import { useReport } from './relatorios/useReport';
 import { useTheme } from '@/components/ThemeProvider';
@@ -412,6 +412,8 @@ export default function HomePage() {
       </header>
 
       <BannerCarousel banners={banners} />
+
+      {user?.role === 'ADMIN' && !user.workspace?.is_platform && <OnboardingChecklist companyName={user.workspace?.tenant_name} />}
 
       {hasCrm && (
         <>

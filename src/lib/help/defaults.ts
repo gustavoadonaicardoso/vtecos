@@ -58,6 +58,7 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     title: 'Primeiros passos no vtec os',
     summary: 'O que fazer no primeiro dia para deixar o sistema pronto para a equipe.',
     sections: [
+      { title: 'O quadro "Primeiros passos" do Início', text: 'Nas primeiras semanas, o administrador vê no **Início** um quadro com os passos que deixam o sistema pronto: conectar o WhatsApp, cadastrar a equipe, trazer os clientes, montar o funil e criar uma resposta rápida. Cada passo marca sozinho quando é feito, e o botão ao lado leva direto para a tela certa. Quando terminar (ou se já souber usar), feche o quadro no **X**.' },
       { title: '1. Complete seu perfil', text: 'Clique no seu nome no rodapé do menu (ou em **Configurações**) e envie uma foto, confira o nome e o telefone. A foto aparece no chat interno e na equipe.' },
       { title: '2. Revise os dados da empresa', text: 'Administradores: em **Configurações > Dados da empresa**, preencha nome, CNPJ, telefone e endereço. O nome aparece no totem, na TV de senhas e nas mensagens de chamada.' },
       { title: '3. Cadastre a equipe', text: 'Em **Equipe**, clique em novo membro, escolha o cargo (Administrador, Gerente ou Vendedor) e defina uma senha inicial. Cada pessoa troca a própria senha depois em Configurações > Senha e segurança.' },
