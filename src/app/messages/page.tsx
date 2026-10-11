@@ -19,9 +19,8 @@ import { fillTemplate, mapMessage } from './format';
 import ConversationList from './components/ConversationList';
 import ChatHeader from './components/ChatHeader';
 import MessageList from './components/MessageList';
-import Composer from './components/Composer';
+import Composer, { QUICK_REPLIES_PAGE } from './components/Composer';
 import TransferModal from './components/TransferModal';
-import QuickRepliesModal from './components/QuickRepliesModal';
 import SystemToolsBar from './components/SystemToolsBar';
 
 const HISTORY_LIMIT = 300;
@@ -47,7 +46,6 @@ function MessagesContent() {
   const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
-  const [showQuick, setShowQuick] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const unreadNotifications = useNotificationCount(user);
   const [now, setNow] = useState(() => Date.now());
@@ -295,6 +293,7 @@ function MessagesContent() {
         now={now}
         loaded={loaded}
         onMenu={toggleMobileMenu}
+        quickRepliesHref={hasPermission('messages.templates') ? QUICK_REPLIES_PAGE : null}
       />
 
       <section className={`${styles.chat} ${selectedId ? '' : styles.hideMobile}`} aria-label="Conversa">
@@ -330,7 +329,6 @@ function MessagesContent() {
               sending={sending}
               onSend={sendText}
               onSendFile={sendFile}
-              onManageQuickReplies={() => setShowQuick(true)}
             />
           </>
         ) : (
@@ -376,8 +374,6 @@ function MessagesContent() {
       {showTransfer && lead && user && (
         <TransferModal leadName={lead.name} currentOwner={lead.assignedTo || null} team={team} selfId={user.id} onClose={() => setShowTransfer(false)} onTransfer={transfer} />
       )}
-
-      {showQuick && <QuickRepliesModal replies={quickReplies} onChanged={loadQuickReplies} onClose={() => setShowQuick(false)} />}
 
       {notice && (
         <div className={`${styles.toast} ${notice.type === 'error' ? styles.toastError : ''}`} role="status">

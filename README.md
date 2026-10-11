@@ -1,560 +1,261 @@
 <div align="center">
 
-```
-██╗   ██╗ ██████╗ ██████╗ ████████╗██╗ ██████╗███████╗
-██║   ██║██╔═══██╗██╔══██╗╚══██╔══╝██║██╔════╝██╔════╝
-██║   ██║██║   ██║██████╔╝   ██║   ██║██║     █████╗  
-╚██╗ ██╔╝██║   ██║██╔══██╗   ██║   ██║██║     ██╔══╝  
- ╚████╔╝ ╚██████╔╝██║  ██║   ██║   ██║╚██████╗███████╗
-  ╚═══╝   ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝ ╚═════╝╚══════╝
-                    C  R  M
-```
+# vtec os · Vórtice CRM
 
-**Plataforma comercial completa para equipes de vendas modernas.**  
-Gestão de leads, pipeline visual, WhatsApp, campanhas, automações com IA e muito mais.
+**Sistema da Vórtice Tecnologia para pequenas empresas que vendem e atendem pelo WhatsApp e pelas redes sociais.**
+Leads, funil de vendas, WhatsApp da equipe, atendente com IA, agenda, disparos e precificação, num lugar só.
 
 <br/>
 
 ![Next.js](https://img.shields.io/badge/Next.js_16-black?style=flat-square&logo=next.js)
 ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript_5-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase_São_Paulo-3ECF8E?style=flat-square&logo=supabase&logoColor=white)
-![VPS](https://img.shields.io/badge/Servidor-Locaweb_VPS-FF6B35?style=flat-square)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Produção-10b981?style=flat-square)
 
 <br/>
 
-[Módulos](#-módulos) · [Arquitetura](#-arquitetura) · [Instalação Local](#-instalação-local) · [Deploy VPS](#-deploy-na-vps-locaweb) · [Variáveis de Ambiente](#-variáveis-de-ambiente) · [Atualizações](#-publicar-atualizações)
+[Módulos e planos](#-módulos-e-planos) · [Arquitetura](#-arquitetura) · [Rodar localmente](#-rodar-localmente) · [Banco de dados](#-banco-de-dados) · [Deploy](#-deploy) · [Verificações](#-verificações)
 
 </div>
 
 ---
 
-## 📌 Sobre o Projeto
+## 📌 Sobre
 
-O **Vórtice CRM** é uma plataforma B2B de gestão comercial desenvolvida pela [Vórtice Tecnologia](https://vorticetecnologia.com.br). Construída para equipes de vendas que precisam de velocidade, controle e inteligência em um único sistema.
+O **vtec os** roda em produção em `app.vorticetecnologia.com.br`. Cada cliente é uma **empresa** separada: toda consulta filtra pela empresa (`tenant_id`) e o **plano** da empresa define quais módulos ela vê e quais limites tem. A Vórtice é a empresa da plataforma: tem todos os módulos, sem limites, e o **Painel Master** para cadastrar clientes, planos, banners, avisos de status e a Central de Ajuda.
 
-A infraestrutura é **100% brasileira**: aplicação hospedada em VPS Locaweb e banco de dados no Supabase com servidor físico em São Paulo — em conformidade com os requisitos de soberania de dados de órgãos públicos e prefeituras.
+📄 **Fluxograma do sistema** (jornada do cliente, módulos e planos, arquitetura): [`docs/fluxograma-vtec-os.pdf`](docs/fluxograma-vtec-os.pdf)
 
 ---
 
-## ✨ Módulos
+## ✨ Módulos e planos
 
-| Módulo | Descrição |
-|--------|-----------|
-| 🎯 **Pipeline** | Kanban visual com drag & drop, stages customizáveis e atualização em tempo real |
-| 👥 **Leads** | Cadastro completo, tags, filtros avançados, histórico e exportação |
-| 💬 **Chat** | Atendimento via WhatsApp (Meta / WhatsApp Web) com histórico persistido no banco |
-| 📣 **Disparos** | Campanhas em massa com upload de planilha XLSX, templates e roteamento automático |
-| 📨 **Messages** | Caixa unificada com templates de mensagem e variáveis dinâmicas |
-| ⚙️ **Automações** | Fluxos automáticos baseados em gatilhos do pipeline |
-| 📊 **Relatórios** | KPIs, funil de conversão e atividades da equipe |
-| 🏢 **Usuários** | Gestão de time com roles (Admin / Manager / Seller) e permissões granulares |
-| 🔌 **Integrações** | WhatsApp Web (Baileys), Meta (Instagram/Messenger), WhatsApp Business API |
-| 🗓️ **Agendamentos** | Fila de atendimento e scheduling |
-| 🔐 **Admin** | Banners, logs de auditoria completos e configurações globais |
-| 👑 **Master** | Painel super admin para gestão multi-tenant |
+Os módulos ficam em [`src/lib/plans.ts`](src/lib/plans.ts). Um módulo fora do plano some do menu e a página responde "Acesso negado".
+
+| Módulo (chave) | O que faz | Páginas |
+|---|---|---|
+| CRM e Atendimento (`crm`) | Leads, funil, conversas do WhatsApp (Web e API oficial), Instagram Direct e Messenger, respostas rápidas com atalho `/`, metas, relatórios | `/leads` `/pipeline` `/messages` `/metas` `/relatorios` |
+| Agendamento (`agendamento`) | Agenda, lembretes e mensagens programadas | `/scheduling` |
+| Custos e Precificação (`financeiro`) | Insumos, fichas técnicas, preço por canal, despesas em BRL/USD/EUR, lucro e ponto de equilíbrio | `/financeiro` |
+| Automações e IA (`automacoes`) | Fluxos automáticos e Atendente com IA no WhatsApp, Direct e Messenger | `/automations` |
+| Disparos (`disparos`) | Campanhas de mensagens em massa | `/disparos` |
+| Redes Sociais (`social`) | Calendário, posts agendados, aprovação e insights no Instagram e Facebook | `/social` |
+| Discador (`discador`) | Ligações pelo navegador e discagem automática (Twilio da empresa) | `/discador` |
+| Senhas, Totem e TV (`senhas`) | Fila de atendimento presencial | `/queue` (+ telas públicas `/totem` e `/display`) |
+| Planejamentos e Projetos (`planejamentos`) | Funis, mapas de estratégia e projetos | `/planejamentos` `/projetos` |
+
+**Toda empresa tem:** Início, Chat interno, Equipe, Integrações, Configurações, Notificações, Central de Ajuda e Chamados (`BASE_ROUTES`).
+
+### Planos de venda
+
+Criados pela migration `202610310001_plans_modules_limits.sql` e editáveis no Painel Master > Empresas e Planos. Cada plano soma módulos ao anterior. No anual, o cliente paga 10 meses.
+
+| Plano | Mensal | Módulos | Usuários | IA da Vórtice/mês | Disparos/dia |
+|---|---|---|---|---|---|
+| Precificação | R$ 29 | Custos e Precificação | 1 | — | — |
+| Essencial | R$ 59 | + CRM e Atendimento, Agendamento | 2 | — | — |
+| **Profissional** (destaque) | R$ 119 | + Automações e IA, Disparos, Redes Sociais | 5 | 500 | 100 |
+| Completo | R$ 229 | + Discador, Senhas, Planejamentos e Projetos | 10 | 2.000 | 300 |
+
+**Limites** ([`src/lib/plan-limits.ts`](src/lib/plan-limits.ts)): vazio = sem limite, `0` = não incluído.
+
+- **Usuários:** checado ao criar ou reativar alguém (conta só usuários ativos).
+- **IA por mês:** contador atômico no banco (`consume_tenant_usage`), zera no dia 1º (horário de Brasília); admins são avisados em 80% e 100%. Empresa com chave própria do Gemini não gasta a franquia.
+- **Disparos por dia:** soma de todas as campanhas da empresa; ao bater o limite, o envio continua no dia seguinte.
+- Sem o módulo, as automações não rodam e as campanhas de disparo são pausadas.
+- O uso aparece para o cliente em Configurações > Plano.
 
 ---
 
 ## 🏗 Arquitetura
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    USUÁRIO FINAL                    │
-│           (navegador — qualquer dispositivo)        │
-└──────────────────────┬──────────────────────────────┘
-                       │ HTTPS
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│              NGINX — Proxy Reverso                  │
-│                  VPS Locaweb                        │
-│              Servidor: São Paulo, BR                │
-└──────────────────────┬──────────────────────────────┘
-                       │ localhost:3000
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│           NEXT.JS 16 — App Router                   │
-│         PM2 — Process Manager (24/7)                │
-│                                                     │
-│  ┌──────────────┐    ┌───────────────────────────┐  │
-│  │  Frontend    │    │  API Routes (Server-side)  │  │
-│  │  React 19    │    │  /api/leads               │  │
-│  │  CSS Modules │    │  /api/auth                │  │
-│  │  Framer      │    │  /api/disparos            │  │
-│  │  Motion      │    │  /api/automations         │  │
-│  └──────────────┘    │  /api/webhooks            │  │
-│                      └───────────────────────────┘  │
-└──────────────────────┬──────────────────────────────┘
-                       │ TLS / HTTPS
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│              SUPABASE — São Paulo, BR               │
-│              (AWS sa-east-1)                        │
-│                                                     │
-│  PostgreSQL · Realtime · Auth · Storage             │
-│                                                     │
-│  Tabelas: leads · pipeline_stages · profiles        │
-│           chat_messages · audit_logs                │
-│           integrations_config · blast_campaigns     │
-└─────────────────────────────────────────────────────┘
+ Navegador (clientes, equipe, Vórtice)      Telas públicas (totem, TV)
+                     │ HTTPS                          │
+                     ▼                                ▼
+ ┌──────────────────────────────────────────────────────────────────┐
+ │ nginx (443 → 3000)                      VPS · PM2 "vtec-os"        │
+ │ ┌──────────────────────────────────────────────────────────────┐ │
+ │ │ Next.js 16 + React 19 — páginas e APIs (/api/*)               │ │
+ │ │ Rotinas em segundo plano (src/instrumentation.ts):            │ │
+ │ │   posts agendados · esperas das automações · agendamento      │ │
+ │ │   disparos · discador automático · verificação de status      │ │
+ │ │ Sessões do WhatsApp Web (Baileys) · IA local opcional (Ollama)│ │
+ │ └──────────────────────────────────────────────────────────────┘ │
+ └───────────────┬──────────────────────────────────┬───────────────┘
+                 │                                  │
+                 ▼                                  ▼
+ ┌───────────────────────────────┐   ┌──────────────────────────────┐
+ │ Supabase                      │   │ Serviços externos            │
+ │ Postgres (dados por empresa)  │   │ Meta Graph API (WhatsApp API,│
+ │ Auth · Storage · Realtime     │   │   Instagram, Messenger, posts│
+ └───────────────────────────────┘   │   e webhooks) · Twilio ·     │
+                                     │ Google Gemini · Banco Central│
+                                     │ (PTAX) / AwesomeAPI          │
+                                     └──────────────────────────────┘
 ```
 
-> ✅ Dados armazenados fisicamente no Brasil — conformidade com LGPD e requisitos de soberania de dados para órgãos públicos e prefeituras.
+- As rotinas em segundo plano só ligam com `NODE_ENV=production` **e** `CONTENT_SCHEDULER_ENABLED=true`. Assim elas rodam na VPS, mas não no `npm run dev` nem nos previews da Vercel (que só testam o build).
+- As sessões do WhatsApp Web religam sozinhas quando o servidor sobe (desligue com `WHATSAPP_WEB_AUTOSTART=false`).
+- Grupos, status e canais do WhatsApp Web são ignorados: só conversas individuais viram mensagens.
 
 ---
 
-## 🛠 Stack Técnica
+## 🛠 Stack
 
 ```
-Runtime         Node.js 20 LTS
-Framework       Next.js 16 (App Router + SSR + API Routes)
-Frontend        React 19 + TypeScript 5
-Estilo          CSS Modules + Framer Motion
-Drag & Drop     @hello-pangea/dnd
-Gráficos        Recharts
-Banco           Supabase (PostgreSQL 15) — região São Paulo
-Realtime        Supabase Realtime (WebSockets)
-Auth            JWT + localStorage session
-IA              Google Gemini 2.0 Flash
-WhatsApp        Meta Cloud API + WhatsApp Web (Baileys)
-Planilhas       SheetJS (xlsx)
-Servidor        Nginx + PM2
-Hospedagem      VPS Locaweb — Brasil
+Runtime       Node.js 20 LTS
+Framework     Next.js 16 (App Router, Route Handlers)
+Frontend      React 19 + TypeScript 5, CSS Modules, Framer Motion, lucide-react
+Funil/mapas   @hello-pangea/dnd (Pipeline) · @xyflow/react (Planejamentos)
+Gráficos      Recharts
+Banco         Supabase: Postgres, Auth (sessão por cookie), Storage, Realtime
+IA            Google Gemini (padrão) ou Ollama local (AI_PROVIDER=ollama)
+WhatsApp      Meta Cloud API + WhatsApp Web (@whiskeysockets/baileys)
+Telefonia     Twilio (Voice SDK no navegador)
+Planilhas     SheetJS (xlsx)
+Imagens       jimp (posts das Redes Sociais em JPEG)
+Servidor      nginx + PM2 numa VPS
 ```
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Estrutura do projeto
 
 ```
-vortice-crm/
+vtecos/
 ├── src/
-│   ├── app/
-│   │   ├── api/                    # Route Handlers (server-side only)
-│   │   │   ├── auth/               # login · logout · refresh
-│   │   │   ├── leads/              # CRUD de leads
-│   │   │   ├── disparos/           # campanhas · templates · upload
-│   │   │   ├── messages/           # templates de mensagem
-│   │   │   ├── webhooks/meta/      # recebimento de mensagens
-│   │   │   └── audit/              # log de auditoria
-│   │   ├── pipeline/               # Kanban visual
-│   │   ├── leads/                  # Listagem e gestão
-│   │   ├── chat/                   # Atendimento WhatsApp
-│   │   ├── messages/               # Caixa unificada
-│   │   ├── disparos/               # Campanhas em massa
-│   │   ├── automations/            # Fluxos de automação
-│   │   ├── relatorios/             # Dashboard e KPIs
-│   │   ├── users/                  # Gestão de equipe
-│   │   ├── settings/               # Configurações
-│   │   ├── integrations/           # Painel de integrações
-│   │   ├── admin/                  # Área administrativa
-│   │   └── master/                 # Super admin
-│   ├── components/                 # Sidebar · Navbar · Modais
-│   ├── context/                    # AuthContext · LeadContext
-│   ├── hooks/                      # usePermissions · useNotifications
-│   ├── lib/                        # supabase · gemini · messaging · audit
-│   ├── services/                   # auth.service · leads.service
-│   └── types/                      # Interfaces TypeScript centralizadas
-├── .env.local                      # ⚠️ Variáveis secretas (não commitado)
-├── .env.example                    # Template das variáveis
-├── next.config.ts                  # Headers de segurança + domínios
-├── package.json
-└── tsconfig.json
+│   ├── app/                  # Páginas (uma pasta por módulo) e src/app/api/* (Route Handlers)
+│   │   ├── master/           # Painel Master (só a empresa da plataforma)
+│   │   ├── suporte/          # Chamados (cliente e Vórtice)
+│   │   ├── totem/ display/   # Telas públicas da fila de senhas
+│   │   └── …                 # leads, pipeline, messages, automations, disparos, social, financeiro…
+│   ├── components/           # Sidebar, Navbar, discador flutuante, barra de status, modais
+│   ├── context/              # AuthContext, LeadContext
+│   ├── lib/                  # Regras do servidor: plans, plan-limits, permissions, whatsapp-web,
+│   │                         #   automations/, disparos/, social/, finance/, scheduling/, dialer/, status/
+│   ├── services/             # Acesso ao banco por módulo (*.service.ts)
+│   ├── types/                # Tipos compartilhados
+│   └── instrumentation.ts    # Liga as rotinas em segundo plano
+├── supabase/
+│   ├── base-schema.sql       # Esquema inicial (só instalação nova)
+│   └── migrations/           # Mudanças do banco, em ordem de nome
+├── scripts/                  # check-tenant-scope, check-route-permissions, seed-admin, check-schema
+├── docs/                     # Fluxograma em PDF
+├── deploy.sh                 # Deploy para a VPS (rodar no Mac)
+└── .env.example              # Modelo das variáveis de ambiente
 ```
 
 ---
 
-## ⚙️ Instalação Local
+## ⚙️ Rodar localmente
 
-### Pré-requisitos
-
-- [Node.js 20 LTS](https://nodejs.org)
-- [Git](https://git-scm.com)
-- Conta no [Supabase](https://supabase.com) (gratuita)
-
-### 1. Clone o repositório
+Pré-requisitos: Node.js 20 LTS, Git e um projeto no Supabase.
 
 ```bash
-git clone https://github.com/seu-usuario/vortice-crm.git
-cd vortice-crm
-```
-
-### 2. Instale as dependências
-
-```bash
+git clone https://github.com/gustavoadonaicardoso/vtecos.git
+cd vtecos
 npm install
+cp .env.example .env.local   # preencha as chaves (veja abaixo)
+npm run dev                  # http://localhost:3000
 ```
 
-### 3. Configure as variáveis de ambiente
-
-```bash
-cp .env.example .env.local
-# Edite o .env.local com suas chaves (veja seção abaixo)
-```
-
-### 4. Configure o banco (Supabase)
-
-No painel do Supabase → **SQL Editor** → execute o script abaixo:
-
-<details>
-<summary>Ver SQL completo de criação do banco</summary>
-
-```sql
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- 1. Estágios do Funil / Pipeline
-CREATE TABLE IF NOT EXISTS pipeline_stages (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  color TEXT NOT NULL,
-  position INTEGER NOT NULL
-);
-
-INSERT INTO pipeline_stages (id, name, color, position) VALUES
-('novo',       'Novos Leads',      '#3b82f6', 1),
-('contato',    'Primeiro Contato', '#8b5cf6', 2),
-('proposta',   'Proposta Enviada', '#8b5cf6', 3),
-('negociacao', 'Negociação',       '#f59e0b', 4),
-('ganho',      'Ganhos',           '#10b981', 5)
-ON CONFLICT (id) DO NOTHING;
-
--- 2. Perfis de Usuário
-CREATE TABLE IF NOT EXISTS profiles (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  password TEXT,
-  role TEXT DEFAULT 'SELLER',
-  status TEXT DEFAULT 'ACTIVE',
-  permissions JSONB DEFAULT '{}',
-  allowed_templates TEXT[] DEFAULT '{}',
-  phone TEXT,
-  avatar_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 3. Leads (Contatos / Oportunidades)
-CREATE TABLE IF NOT EXISTS leads (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  cpf_cnpj TEXT,
-  value NUMERIC DEFAULT 0,
-  stage_id TEXT NOT NULL REFERENCES pipeline_stages(id),
-  tags TEXT[] DEFAULT '{}',
-  last_msg TEXT,
-  source TEXT DEFAULT 'Manual',
-  assigned_to UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  wait_time_minutes INTEGER DEFAULT 0,
-  handling_time_minutes INTEGER DEFAULT 0,
-  channels TEXT[] DEFAULT '{}',
-  last_activity_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 4. Mensagens de Chat com Leads (Meta / WhatsApp Web)
-CREATE TABLE IF NOT EXISTS chat_messages (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
-  text TEXT,
-  sent_by_me BOOLEAN DEFAULT FALSE,
-  type TEXT DEFAULT 'text',
-  audio_url TEXT,
-  status TEXT DEFAULT 'sent',
-  external_id TEXT,
-  provider TEXT,
-  phone_number_id TEXT,
-  raw_payload JSONB,
-  error_details JSONB,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 5. Logs de Auditoria
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID,
-  user_name TEXT,
-  action TEXT NOT NULL,
-  details TEXT,
-  entity_type TEXT,
-  entity_id TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 6. Configurações de Integração (Meta / WhatsApp Web / Webhook)
-CREATE TABLE IF NOT EXISTS integrations_config (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  provider TEXT NOT NULL UNIQUE,
-  config JSONB DEFAULT '{}',
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 7. Notificações do Sistema (Demandas, Chat, Alertas)
-CREATE TABLE IF NOT EXISTS system_notifications (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  type TEXT NOT NULL, -- 'chat' | 'automation' | 'lead' | 'task' | 'system'
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  link TEXT,
-  is_read BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 8. Campanhas em Massa (Disparos/Blast)
-CREATE TABLE IF NOT EXISTS blast_campaigns (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  name TEXT NOT NULL,
-  template TEXT NOT NULL,
-  columns_config JSONB DEFAULT '[]',
-  delay_min INTEGER DEFAULT 3,
-  delay_max INTEGER DEFAULT 8,
-  status TEXT DEFAULT 'draft',
-  total_contacts INTEGER DEFAULT 0,
-  sent_count INTEGER DEFAULT 0,
-  failed_count INTEGER DEFAULT 0,
-  route_type TEXT DEFAULT 'none',
-  route_to_id TEXT,
-  route_to_label TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS blast_contacts (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  campaign_id UUID REFERENCES blast_campaigns(id) ON DELETE CASCADE,
-  phone TEXT NOT NULL,
-  data JSONB DEFAULT '{}',
-  rendered_message TEXT NOT NULL,
-  status TEXT DEFAULT 'pending',
-  sent_at TIMESTAMP WITH TIME ZONE,
-  error_msg TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 9. Chat Interno (Comunicação da Equipe)
-CREATE TABLE IF NOT EXISTS internal_chat (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  sender_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  receiver_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  text TEXT NOT NULL,
-  is_read BOOLEAN DEFAULT FALSE,
-  is_edited BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS chat_groups (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  name TEXT NOT NULL,
-  created_by UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  avatar_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS chat_group_members (
-  group_id UUID REFERENCES chat_groups(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  is_admin BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  PRIMARY KEY (group_id, user_id)
-);
-
-CREATE TABLE IF NOT EXISTS chat_group_messages (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  group_id UUID REFERENCES chat_groups(id) ON DELETE CASCADE,
-  sender_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  text TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Desativa RLS para simplificação/compatibilidade local
-ALTER TABLE leads DISABLE ROW LEVEL SECURITY;
-ALTER TABLE pipeline_stages DISABLE ROW LEVEL SECURITY;
-ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs DISABLE ROW LEVEL SECURITY;
-ALTER TABLE integrations_config DISABLE ROW LEVEL SECURITY;
-ALTER TABLE system_notifications DISABLE ROW LEVEL SECURITY;
-ALTER TABLE blast_campaigns DISABLE ROW LEVEL SECURITY;
-ALTER TABLE blast_contacts DISABLE ROW LEVEL SECURITY;
-ALTER TABLE internal_chat DISABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_groups DISABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_group_members DISABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_group_messages DISABLE ROW LEVEL SECURITY;
-```
-
-</details>
-
-### 5. Rode localmente
-
-```bash
-npm run dev
-```
-
-Acesse [http://localhost:3000](http://localhost:3000)
+No `npm run dev` as rotinas em segundo plano ficam desligadas: posts, disparos, lembretes e esperas das automações não saem sozinhos.
 
 ---
 
-## 🔑 Variáveis de Ambiente
+## 🗄 Banco de dados
 
-Crie o arquivo `.env.local` na raiz do projeto:
-
-```env
-# ── Supabase ──────────────────────────────────────────────────────
-# Obtenha em: Project Settings > API
-
-# URL do projeto
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-
-# Chave pública (usada no frontend)
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5c...
-
-# Chave secreta (usada apenas nas API Routes — NUNCA expor no frontend)
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5c...
-
-# ── Google Gemini ─────────────────────────────────────────────────
-# Obtenha em: https://aistudio.google.com/app/apikey
-GEMINI_API_KEY=AIzaSy...
-```
-
-> ⚠️ `.env.local` está no `.gitignore` e **nunca deve ser commitado**.
+- **Instalação nova:** rode [`supabase/base-schema.sql`](supabase/base-schema.sql) no SQL Editor do Supabase e depois todos os arquivos de [`supabase/migrations`](supabase/migrations), em ordem de nome.
+- **Produção:** a cada PR que traz migration nova, rode **só o arquivo novo** no SQL Editor **antes** do deploy. As migrations são escritas para poder rodar de novo sem estragar nada.
+- Últimas migrations: `202610310001_plans_modules_limits.sql` (módulos, limites e os 4 planos), `202611010001_remove_fiscal.sql` (remove o módulo de Notas Fiscais) e `202611020001_quick_reply_shortcuts.sql` (atalho das respostas rápidas).
 
 ---
 
-## 🚀 Deploy na VPS Locaweb
+## 🔑 Variáveis de ambiente
 
-### Pré-requisitos no servidor
+O modelo completo, com comentários, está em [`.env.example`](.env.example). As principais:
 
-```bash
-# Node.js 20
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs
+| Variável | Para quê |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Conexão do navegador com o Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Acesso do servidor ao banco (nunca vai ao navegador) |
+| `NEXT_PUBLIC_APP_URL` | Endereço público do sistema |
+| `GEMINI_API_KEY` | IA da Vórtice (as empresas podem cadastrar a própria chave em Integrações) |
+| `AI_PROVIDER`, `OLLAMA_URL`, `OLLAMA_MODEL` | IA local opcional na VPS |
+| `META_APP_ID`, `META_APP_SECRET`, `META_GRAPH_VERSION` | App da Meta: WhatsApp API, Instagram, Messenger e Redes Sociais |
+| `WHATSAPP_*` | WhatsApp Cloud API e pasta das sessões do WhatsApp Web |
+| `CONTENT_SCHEDULER_ENABLED=true` | Liga as rotinas em segundo plano (só na VPS) |
+| `TWILIO_*` | Discador da Vórtice (cada empresa usa a própria conta Twilio, cadastrada em Integrações) |
 
-# PM2 — mantém o processo rodando 24/7
-npm install -g pm2
-
-# Nginx — proxy reverso
-apt-get install -y nginx
-```
-
-### 1. Clonar e instalar
-
-```bash
-cd /var/www
-git clone https://github.com/seu-usuario/vortice-crm.git
-cd vortice-crm
-npm install
-```
-
-### 2. Variáveis de ambiente na VPS
-
-```bash
-nano .env.local
-# Cole as variáveis · Salvar: Ctrl+X → Y → Enter
-```
-
-### 3. Build e inicialização com PM2
-
-```bash
-npm run build
-pm2 start npm --name "vortice-crm" -- start
-pm2 save
-pm2 startup
-# Execute o comando gerado pelo pm2 startup
-```
-
-### 4. Configurar Nginx
-
-```bash
-nano /etc/nginx/sites-available/vortice-crm
-```
-
-```nginx
-server {
-    listen 80;
-    server_name SEU_DOMINIO_OU_IP;
-
-    location / {
-        proxy_pass         http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade $http_upgrade;
-        proxy_set_header   Connection 'upgrade';
-        proxy_set_header   Host $host;
-        # IP real de quem acessa (limite de tentativas do login). Sobrescreve,
-        # não acrescenta: assim ninguém consegue inventar o próprio IP.
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_set_header   X-Forwarded-For $remote_addr;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-```bash
-ln -s /etc/nginx/sites-available/vortice-crm /etc/nginx/sites-enabled/
-nginx -t && systemctl restart nginx
-```
-
-### 5. HTTPS com Let's Encrypt
-
-```bash
-apt-get install -y certbot python3-certbot-nginx
-certbot --nginx -d crm.seudominio.com.br
-```
+Várias configurações da plataforma também podem ser feitas no Painel Master > Plataforma, sem mexer no `.env.local`.
 
 ---
 
-## 🔄 Publicar Atualizações
+## 🚀 Deploy
 
-**Máquina local — enviar alterações:**
+Produção: VPS `179.199.143.217`, pasta `/root/vtec-os`, processo PM2 `vtec-os`, atrás do nginx com HTTPS.
+
+**No Mac, na pasta do projeto:**
+
 ```bash
-git add .
-git commit -m "descrição da alteração"
-git push
+git checkout main && git pull origin main && ./deploy.sh
 ```
 
-**VPS — aplicar em produção:**
-```bash
-cd /var/www/vortice-crm
-git pull
-npm run build
-pm2 restart vortice-crm
-```
+O [`deploy.sh`](deploy.sh):
+
+1. Confere se a pasta está na `main` e atualizada com o GitHub (oferece o `git pull`).
+2. Apaga a `.next` e compila do zero.
+3. Monta um pacote **sem** `.next/cache` e `.next/dev` (≈ 22 MB).
+4. Envia por `scp`, com até 3 tentativas, numa única conexão SSH.
+5. Na VPS: abre o pacote numa pasta à parte, confere o `BUILD_ID`, roda `npm install --omit=dev` e troca `.next` e `public` de uma vez, guardando a versão anterior.
+6. Reinicia o PM2 e testa `http://127.0.0.1:3000/login` por até 60 s. Se o sistema não responder, volta sozinho para a versão anterior.
+7. No fim, compara o `BUILD_ID` local com o da VPS.
+
+Use `./deploy.sh --sem-git` para pular a conferência do GitHub. Depois do deploy, recarregue o navegador com Cmd + Shift + R.
+
+**nginx:** mantenha `proxy_set_header X-Forwarded-Proto $scheme;` no bloco do site. Sem ele, o "Conectar com Facebook" monta o endereço de retorno com `http` e a Meta recusa.
+
+**Problemas comuns:**
+
+| Sintoma | O que fazer |
+|---|---|
+| A mudança não apareceu | Conferir se o deploy terminou com o mesmo `BUILD_ID` e recarregar com Cmd + Shift + R |
+| Tela nova com "Acesso negado" | O módulo não está no plano da empresa, ou a migration não foi rodada |
+| Posts, disparos ou lembretes não saem | Conferir `CONTENT_SCHEDULER_ENABLED=true` e `pm2 logs vtec-os` |
+| WhatsApp Web desconectado | Integrações > WhatsApp > ler o QR Code de novo |
+
+---
+
+## ✅ Verificações
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | Servidor de desenvolvimento |
+| `npm run build` | Build de produção |
+| `npm run start` | Sobe o build (porta 3000) |
+| `npm run lint` | ESLint |
+| `npm run check:tenant-scope` | Garante que toda consulta do servidor filtra pela empresa (exceções marcadas com `// tenant-scope: ok`) |
+| `npm run check:permissions` | Garante que toda rota de API checa uma permissão |
+| `npm run db:seed-admin` | Cria o primeiro administrador |
+| `npm run db:check-schema` | Confere se o banco tem as tabelas esperadas |
+
+Antes de abrir uma PR: `npx tsc --noEmit`, `npm run lint`, os dois `check:*` e `npm run build`.
 
 ---
 
 ## 🔐 Segurança
 
-- **Dados no Brasil** — banco hospedado na AWS `sa-east-1` (São Paulo) via Supabase. Conformidade com LGPD e exigências de soberania de dados para órgãos públicos
-- **Chaves server-only** — `SUPABASE_SERVICE_ROLE_KEY` e `GEMINI_API_KEY` processadas exclusivamente no servidor, nunca expostas ao browser
-- **Headers HTTP** — `X-Frame-Options DENY`, `X-Content-Type-Options`, `Referrer-Policy` e `Permissions-Policy` configurados em `next.config.ts`
-- **Auditoria completa** — todas as ações (login, logout, criação/edição/exclusão de leads) registradas na tabela `audit_logs` com usuário, timestamp e detalhes
-- **Permissões granulares** — controle por rota e por feature (`dashboard.view`, `leads.delete`, `admin.root`, etc.) para cada perfil de usuário
-- **HTTPS** — certificado SSL gratuito via Let's Encrypt com renovação automática a cada 90 dias
-
----
-
-## 📜 Scripts Disponíveis
-
-| Comando | Descrição |
-|---------|-----------|
-| `npm run dev` | Servidor de desenvolvimento com hot-reload |
-| `npm run build` | Compilação otimizada para produção |
-| `npm run start` | Inicia o servidor em modo produção |
-| `npm run lint` | Verifica erros de lint e tipagem |
-| `npm run db:seed-admin` | Cria o usuário administrador inicial |
-| `npm run db:check-schema` | Verifica consistência do schema do banco |
-
----
-
-## 🏢 Sobre
-
-Desenvolvido pela **[Vórtice Tecnologia](https://vorticetecnologia.com.br)**  
-Especialista em estratégia comercial, CRM e treinamento de equipes de vendas.
+- **Separação por empresa:** toda consulta do servidor filtra `tenant_id`, conferido pelo `check:tenant-scope`.
+- **Sessão no servidor:** login pelo Supabase Auth com cookie; as APIs checam sessão e permissão (`check:permissions`).
+- **Chaves só no servidor:** `SUPABASE_SERVICE_ROLE_KEY`, tokens da Meta, do Twilio e do Gemini nunca vão ao navegador.
+- **Webhooks assinados:** Meta e Twilio só são aceitos com assinatura válida.
+- **Modo suporte auditado:** a Vórtice só entra na empresa de um cliente informando o motivo, que fica registrado.
+- **Cabeçalhos HTTP** de segurança em `next.config.ts` e HTTPS no nginx.
 
 ---
 
 <div align="center">
-  <sub>© 2026 Vórtice Tecnologia · Todos os direitos reservados</sub>
+  <sub>© 2026 <a href="https://vorticetecnologia.com.br">Vórtice Tecnologia</a> · Todos os direitos reservados</sub>
 </div>

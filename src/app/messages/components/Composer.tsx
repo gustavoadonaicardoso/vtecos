@@ -1,8 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { FileText, Loader2, Mic, Paperclip, PenLine, Send, Settings2, Smile, Square, Trash2 } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Loader2, Mic, Paperclip, PenLine, Search, Send, Settings2, Smile, Square, Trash2, Zap } from 'lucide-react';
 import styles from '../messages.module.css';
 import type { QuickReply } from '../types';
 import { EMOJIS } from '../format';
+import { matchQuickReplies, slashQueryAt } from '@/lib/quick-replies';
 
 interface ComposerProps {
   disabledReason: string | null;
@@ -14,7 +16,29 @@ interface ComposerProps {
   sending: boolean;
   onSend: (text: string) => Promise<boolean>;
   onSendFile: (file: File, caption?: string) => Promise<void>;
-  onManageQuickReplies: () => void;
+}
+
+export const QUICK_REPLIES_PAGE = '/messages/respostas-rapidas';
+
+/** Uma resposta rápida na lista: atalho, nome e começo da mensagem já preenchida. */
+function QuickOption({ reply, preview, active, onPick, onHover }: { reply: QuickReply; preview: string; active?: boolean; onPick: () => void; onHover?: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`${styles.quickItem} ${active ? styles.quickItemOn : ''}`}
+      // mousedown: escolhe antes de a caixa de texto perder o foco.
+      onMouseDown={(event) => { event.preventDefault(); onPick(); }}
+      onMouseEnter={onHover}
+      role="option"
+      aria-selected={active}
+    >
+      <span className={styles.quickItemHead}>
+        {reply.shortcut && <code className={styles.shortcutTag}>/{reply.shortcut}</code>}
+        <strong>{reply.name}</strong>
+      </span>
+      <span className={styles.quickItemText}>{preview}</span>
+    </button>
+  );
 }
 
 const SIGNATURE_KEY = 'vtec_chat_signature';
@@ -34,9 +58,14 @@ function recorderMime() {
 }
 
 export default function Composer(props: ComposerProps) {
-  const { disabledReason, canUseQuickReplies, canManageQuickReplies, quickReplies, fill, agentName, sending, onSend, onSendFile, onManageQuickReplies } = props;
+  const { disabledReason, canUseQuickReplies, canManageQuickReplies, quickReplies, fill, agentName, sending, onSend, onSendFile } = props;
   const [text, setText] = useState('');
   const [popover, setPopover] = useState<'emoji' | 'quick' | null>(null);
+  const [quickSearch, setQuickSearch] = useState('');
+  // "/termo" sendo digitado antes do cursor; dismissed = Esc fechou a lista daquela "/".
+  const [slash, setSlash] = useState<{ start: number; term: string } | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [dismissed, setDismissed] = useState<number | null>(null);
   const [signature, setSignature] = useState(readSignaturePref);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -71,6 +100,55 @@ export default function Composer(props: ComposerProps) {
     }
   }, []);
 
+  const quickEnabled = canUseQuickReplies && quickReplies.length > 0;
+  const slashMatches = useMemo(
+    () => (slash && quickEnabled && dismissed !== slash.start ? matchQuickReplies(quickReplies, slash.term) : []),
+    [slash, quickEnabled, dismissed, quickReplies],
+  );
+  const searchMatches = useMemo(() => matchQuickReplies(quickReplies, quickSearch, 200), [quickReplies, quickSearch]);
+  const slashOpen = slashMatches.length > 0;
+
+  /** Confere se o cursor está logo depois de uma "/termo". */
+  const readSlash = (value: string, caret: number) => {
+    const found = slashQueryAt(value, caret);
+    if (!found || slash?.start !== found.start || slash.term !== found.term) setSlashIndex(0);
+    setSlash(found);
+    if (!found || (dismissed !== null && found.start !== dismissed)) setDismissed(null);
+  };
+
+  /** Coloca o texto da resposta no lugar de [from, to) e põe o cursor no fim dele. */
+  const placeText = (from: number, to: number, insert: string) => {
+    const next = text.slice(0, from) + insert + text.slice(to);
+    setText(next.slice(0, 4096));
+    setSlash(null);
+    const caret = Math.min(from + insert.length, 4096);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
+  };
+
+  /** Escolha pela "/": troca a "/termo" pela mensagem. */
+  const pickSlash = (reply: QuickReply) => {
+    if (!slash) return;
+    const caret = textareaRef.current?.selectionStart ?? text.length;
+    placeText(slash.start, Math.max(caret, slash.start + 1 + slash.term.length), fill(reply.content));
+  };
+
+  /** Escolha pelo botão: entra onde está o cursor (ou no fim). */
+  const pickFromMenu = (reply: QuickReply) => {
+    const el = textareaRef.current;
+    const from = el ? el.selectionStart : text.length;
+    const to = el ? el.selectionEnd : text.length;
+    const before = text.slice(0, from);
+    const spacer = before && !/\s$/.test(before) ? ' ' : '';
+    setPopover(null);
+    setQuickSearch('');
+    placeText(from, to, spacer + fill(reply.content));
+  };
+
   const toggleSignature = () => {
     setSignature((value) => {
       try {
@@ -86,6 +164,7 @@ export default function Composer(props: ComposerProps) {
     const final = signature && agentName ? `*${agentName}:*\n${body}` : body;
     setText('');
     setPopover(null);
+    setSlash(null);
     const ok = await onSend(final);
     if (!ok) setText(body);
   };
@@ -177,20 +256,45 @@ export default function Composer(props: ComposerProps) {
 
         {canUseQuickReplies && (
           <div className={styles.popWrap}>
-            <button type="button" className={`${styles.iconBtn} ${popover === 'quick' ? styles.iconOn : ''}`} onClick={() => setPopover(popover === 'quick' ? null : 'quick')} title="Respostas rápidas" aria-label="Respostas rápidas"><FileText size={18} /></button>
+            <button
+              type="button"
+              className={`${styles.iconBtn} ${popover === 'quick' ? styles.iconOn : ''}`}
+              onClick={() => { setQuickSearch(''); setPopover(popover === 'quick' ? null : 'quick'); }}
+              title="Respostas rápidas (ou digite / no campo de mensagem)"
+              aria-label="Respostas rápidas"
+            >
+              <Zap size={18} />
+            </button>
             {popover === 'quick' && (
               <div className={`${styles.popover} ${styles.quickPop}`}>
                 <div className={styles.popHead}>
                   <strong>Respostas rápidas</strong>
-                  {canManageQuickReplies && <button type="button" className={styles.linkBtn} onClick={() => { setPopover(null); onManageQuickReplies(); }}><Settings2 size={13} /> Gerenciar</button>}
+                  <Link href={QUICK_REPLIES_PAGE} className={styles.linkBtn}><Settings2 size={13} /> {canManageQuickReplies ? 'Configurar' : 'Ver todas'}</Link>
                 </div>
-                {quickReplies.length === 0 && <p className={styles.muted}>{canManageQuickReplies ? 'Nenhuma ainda. Clique em Gerenciar para criar.' : 'Nenhuma resposta rápida liberada para você.'}</p>}
-                {quickReplies.map((reply) => (
-                  <button key={reply.id} type="button" className={styles.quickItem} onClick={() => { setText(fill(reply.content)); setPopover(null); textareaRef.current?.focus(); }}>
-                    <strong>{reply.name}</strong>
-                    <span>{fill(reply.content)}</span>
-                  </button>
-                ))}
+                {quickReplies.length > 0 && (
+                  <label className={styles.quickSearch}>
+                    <Search size={14} />
+                    <input
+                      autoFocus
+                      value={quickSearch}
+                      onChange={(e) => setQuickSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && searchMatches[0]) { e.preventDefault(); pickFromMenu(searchMatches[0]); }
+                        if (e.key === 'Escape') setPopover(null);
+                      }}
+                      placeholder="Buscar por nome ou atalho"
+                      aria-label="Buscar resposta rápida"
+                    />
+                  </label>
+                )}
+                {quickReplies.length === 0 && <p className={styles.muted}>{canManageQuickReplies ? 'Nenhuma ainda. Clique em Configurar para criar.' : 'Nenhuma resposta rápida liberada para você.'}</p>}
+                {quickReplies.length > 0 && searchMatches.length === 0 && <p className={styles.muted}>Nada encontrado.</p>}
+                <div role="listbox" aria-label="Respostas rápidas">
+                  {searchMatches.map((reply) => (
+                    <QuickOption key={reply.id} reply={reply} preview={fill(reply.content)} onPick={() => pickFromMenu(reply)} />
+                  ))}
+                </div>
+                <p className={styles.quickTip}>Dica: digite <code>/</code> no campo de mensagem para buscar sem tirar a mão do teclado.</p>
               </div>
             )}
           </div>
@@ -201,16 +305,50 @@ export default function Composer(props: ComposerProps) {
         </button>
       </div>
 
+      {slashOpen && (
+        <div className={styles.slashPop} role="listbox" aria-label="Respostas rápidas">
+          <div className={styles.slashHead}>
+            <span>Respostas rápidas{slash?.term ? <> para <code>/{slash.term}</code></> : ''}</span>
+            <span className={styles.slashKeys}>↑↓ escolher · Enter inserir · Esc fechar</span>
+          </div>
+          {slashMatches.map((reply, index) => (
+            <QuickOption key={reply.id} reply={reply} preview={fill(reply.content)} active={index === slashIndex} onPick={() => pickSlash(reply)} onHover={() => setSlashIndex(index)} />
+          ))}
+        </div>
+      )}
+
       <textarea
         ref={textareaRef}
         rows={1}
         className={styles.textarea}
-        placeholder="Escreva uma mensagem"
+        placeholder={quickEnabled ? 'Escreva uma mensagem ou / para respostas rápidas' : 'Escreva uma mensagem'}
         title="Enter envia, Shift+Enter quebra linha"
         value={text}
         maxLength={4096}
-        onChange={(e) => setText(e.target.value)}
+        aria-autocomplete={quickEnabled ? 'list' : undefined}
+        onChange={(e) => { setText(e.target.value); readSlash(e.target.value, e.target.selectionStart); }}
+        onClick={(e) => readSlash(e.currentTarget.value, e.currentTarget.selectionStart)}
+        onKeyUp={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End') readSlash(e.currentTarget.value, e.currentTarget.selectionStart); }}
+        onBlur={() => setSlash(null)}
         onKeyDown={(e) => {
+          if (slashOpen && !e.nativeEvent.isComposing) {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              const step = e.key === 'ArrowDown' ? 1 : -1;
+              setSlashIndex((index) => (index + step + slashMatches.length) % slashMatches.length);
+              return;
+            }
+            if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+              e.preventDefault();
+              pickSlash(slashMatches[Math.min(slashIndex, slashMatches.length - 1)]);
+              return;
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              setDismissed(slash?.start ?? null);
+              return;
+            }
+          }
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             void submit();

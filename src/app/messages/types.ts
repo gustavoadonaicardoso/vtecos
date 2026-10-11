@@ -13,10 +13,6 @@ export interface ChatMessage {
   provider: string | null;
 }
 
-export interface QuickReply {
-  id: string;
-  name: string;
-  content: string;
-}
+export type { QuickReplyItem as QuickReply } from '@/lib/quick-replies';
 
 export type InboxTab = 'all' | 'unread' | 'mine' | 'unassigned';
