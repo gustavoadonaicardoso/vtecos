@@ -13,6 +13,7 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { checkUserSlots } from '@/lib/plan-limits';
 import type { ServiceResult } from '@/types';
 
 type Row = Record<string, unknown>;
@@ -94,6 +95,8 @@ export async function createUserWithProfile(params: {
 
   const { data: tenant } = await supabaseAdmin.from('tenants').select('id, is_platform').eq('id', tenantId).maybeSingle();
   if (!tenant) return { success: false, status: 400, error: 'Empresa não encontrada.' };
+  const slots = await checkUserSlots(tenantId);
+  if (!slots.ok) return { success: false, status: 403, error: slots.error };
 
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
@@ -194,6 +197,12 @@ export async function updateTeamMember(
 
   const current = await fetchTenantProfile(tenantId, userId);
   if (!current) return { success: false, error: 'Membro não encontrado.' };
+
+  // Reativar alguém ocupa uma vaga do plano.
+  if (current.status !== 'ACTIVE' && updates.status === 'ACTIVE') {
+    const slots = await checkUserSlots(tenantId);
+    if (!slots.ok) return { success: false, error: slots.error };
+  }
 
   // O login é feito pelo e-mail do Supabase Auth: trocar só no perfil
   // fazia a pessoa continuar entrando com o e-mail antigo.

@@ -72,7 +72,7 @@ export default function IntegrationsPage() {
   }, [isAdmin, apply]);
 
   // Só o que o plano da empresa libera.
-  const available = useMemo(() => CATALOG.filter((item) => !modules || modules.includes(item.module)), [modules]);
+  const available = useMemo(() => CATALOG.filter((item) => !modules || [item.module].flat().some((key) => modules.includes(key))), [modules]);
 
   const cards = useMemo(() => {
     const term = search.trim().toLowerCase();

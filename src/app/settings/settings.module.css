@@ -445,3 +445,11 @@
   .avatarRow { flex-direction: column; align-items: flex-start; }
   .planCard { flex-direction: column; }
 }
+
+.usageGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 14px 0; }
+.usageCard { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--card-border, var(--glass-border)); }
+.usageCard > span { font-size: 0.78rem; color: var(--muted); }
+.usageCard > strong { font-size: 1.05rem; }
+.usageCard > small { font-size: 0.74rem; color: var(--muted); }
+.usageBar { height: 6px; border-radius: 999px; background: var(--soft, rgba(148, 163, 184, 0.2)); overflow: hidden; }
+.usageBar > div { height: 100%; border-radius: 999px; }

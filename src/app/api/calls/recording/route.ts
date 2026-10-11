@@ -8,7 +8,7 @@ import { recordingFor } from '@/services/dialer.service';
  * ?contact=ID (campanha) ou ?log=ID (histórico); &download=1 baixa.
  */
 export async function GET(request: Request) {
-  const auth = await requireActiveProfile({ module: 'crm', permission: 'leads.view' });
+  const auth = await requireActiveProfile({ module: 'discador', permission: 'leads.view' });
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
   const query = new URL(request.url).searchParams;
   const found = await recordingFor(auth.tenantId, auth.profile, { contactId: query.get('contact'), logId: query.get('log') });

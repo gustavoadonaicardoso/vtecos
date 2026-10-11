@@ -70,7 +70,7 @@ export const PERMISSION_ITEMS: PermissionItem[] = [
   item('leads.view', 'Leads e Discador', 'Lista de contatos e ligações.', 'crm'),
   item('messages.view', 'Mensagens', 'Conversas do WhatsApp com os clientes.', 'crm'),
   item('messages.send', 'Chat interno e Disparos', 'Conversa com a equipe e campanhas em massa.', null),
-  item('automations.view', 'Automações', 'Ver os fluxos automáticos (editar é de admin e gerente).', 'crm'),
+  item('automations.view', 'Automações', 'Ver os fluxos automáticos (editar é de admin e gerente).', 'automacoes'),
   item('planejamentos.view', 'Planejamentos', 'Funis, mapas de estratégia e quadros.', 'planejamentos'),
   item('admin.projects', 'Projetos', 'Planos de ação e projetos.', 'planejamentos'),
   item('social.view', 'Redes Sociais', 'Calendário e posts do Instagram e Facebook.', 'social'),

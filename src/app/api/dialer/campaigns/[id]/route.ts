@@ -6,7 +6,7 @@ const FORBIDDEN = 'Só administradores e gerentes gerenciam as campanhas do Disc
 type Context = { params: Promise<{ id: string }> };
 
 async function manager() {
-  const auth = await requireActiveProfile({ module: 'crm', permission: 'leads.view' });
+  const auth = await requireActiveProfile({ module: 'discador', permission: 'leads.view' });
   if ('error' in auth) return { response: NextResponse.json({ error: auth.error.message }, { status: auth.error.status }) };
   if (!isDialerManager(auth.profile.role)) return { response: NextResponse.json({ error: FORBIDDEN }, { status: 403 }) };
   return { auth };

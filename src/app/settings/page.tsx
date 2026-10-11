@@ -25,7 +25,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useBrowserNotifications, showBrowserNotification, pushInAppToast, type NotificationOutcome } from '@/hooks/useBrowserNotifications';
 import { playNotificationSound } from '@/lib/notificationSound';
 import { getNotificationPrefs, setNotificationPrefs, DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from '@/lib/notificationPrefs';
-import { PLAN_MODULES } from '@/lib/plans';
+import { LIMIT_INFO, PLAN_MODULES, limitLabel, type PlanLimits } from '@/lib/plans';
 
 type TabId = 'profile' | 'security' | 'notifications' | 'company' | 'plan';
 
@@ -45,7 +45,11 @@ interface CompanyPlan {
   price: number | null;
   active: boolean;
   modules: string[];
+  usage: { limits: PlanLimits; users: number; aiThisMonth: number; blastsToday: number } | null;
 }
+
+const USAGE_KEY: Record<keyof PlanLimits, 'users' | 'aiThisMonth' | 'blastsToday'> = { max_users: 'users', ai_monthly_limit: 'aiThisMonth', blast_daily_limit: 'blastsToday' };
+const USAGE_WHEN: Record<keyof PlanLimits, string> = { max_users: 'ativos agora', ai_monthly_limit: 'neste mês', blast_daily_limit: 'hoje' };
 
 type Feedback = { type: 'success' | 'error'; text: string } | null;
 
@@ -683,6 +687,26 @@ export default function SettingsPage() {
             <div className={styles.error}><AlertTriangle size={16} /> Sem um plano ativo, a equipe só vê Início, Chat, Equipe, Integrações, Configurações e Ajuda.</div>
           )}
 
+          {plan.usage && plan.name && (
+            <div className={styles.usageGrid}>
+              {LIMIT_INFO.map((info) => {
+                const limit = plan.usage!.limits[info.key];
+                const used = plan.usage![USAGE_KEY[info.key]];
+                const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
+                return (
+                  <div key={info.key} className={styles.usageCard} title={info.hint}>
+                    <span>{info.label}</span>
+                    <strong>{limit === 0 ? 'Não incluído' : limit === null ? `${used.toLocaleString('pt-BR')} ${USAGE_WHEN[info.key]}` : `${used.toLocaleString('pt-BR')} de ${limit.toLocaleString('pt-BR')}`}</strong>
+                    {limit !== null && limit > 0 && (
+                      <div className={styles.usageBar}><div style={{ width: `${pct}%`, background: pct >= 100 ? 'var(--danger, #ef4444)' : pct >= 80 ? 'var(--warning, #f59e0b)' : 'var(--primary, #3b82f6)' }} /></div>
+                    )}
+                    <small>{limit === null ? 'Sem limite' : limit === 0 ? limitLabel(info.key, 0) : USAGE_WHEN[info.key]}</small>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <ul className={styles.moduleList}>
             {PLAN_MODULES.map((item) => {
               const included = plan.modules.includes(item.key) && (plan.is_platform || plan.active);
@@ -698,7 +722,12 @@ export default function SettingsPage() {
             })}
           </ul>
 
-          {!plan.is_platform && <p className={styles.hint}>Para mudar de plano ou liberar outro módulo, fale com a Vórtice Tecnologia.</p>}
+          {!plan.is_platform && (
+            <p className={styles.hint}>
+              Para mudar de plano ou liberar outro módulo, fale com a Vórtice Tecnologia.
+              {plan.usage && plan.usage.limits.ai_monthly_limit !== null && ' A franquia de IA não vale para quem cadastra a própria chave do Gemini em Integrações.'}
+            </p>
+          )}
         </>
       )}
     </div>

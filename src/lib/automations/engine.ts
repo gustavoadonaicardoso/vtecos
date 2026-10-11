@@ -21,6 +21,7 @@
 import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { beat } from '@/lib/heartbeat';
+import { tenantHasModule } from '@/lib/plan-limits';
 import { assertPublicHttpsUrl } from '@/lib/integrations/safe-url';
 import { deliverWhatsApp, sendToLead } from '@/lib/whatsapp-outbound';
 import {
@@ -796,6 +797,8 @@ async function enqueueMany(flow: LoadedFlow, leads: { id: string; since?: string
 }
 
 async function activeFlows(tenantId: string, event: TriggerEvent) {
+  // Sem o módulo Automações no plano, nenhum fluxo dispara.
+  if (!(await tenantHasModule(tenantId, 'automacoes'))) return [];
   const { data } = await supabaseAdmin
     .from('automation_flows')
     .select(FLOW_COLUMNS)
@@ -1163,6 +1166,7 @@ async function aiChatTurn(run: RunRow, flow: LoadedFlow, node: FlowNode) {
  */
 export async function onInboundMessage(tenantId: string, leadId: string, text: string, options: { isNewContact: boolean }) {
   try {
+    if (!(await tenantHasModule(tenantId, 'automacoes'))) return;
     const { data: waiting } = await supabaseAdmin
       .from('automation_runs')
       .select('id, tenant_id')
@@ -1279,6 +1283,7 @@ export async function handleAutomationWebhook(token: string, payload: Record<str
   // tenant-scope: ok (situação da empresa dona do fluxo)
   const { data: tenant } = await supabaseAdmin.from('tenants').select('status, is_platform').eq('id', flow.tenant_id).maybeSingle();
   if (!tenant || (!tenant.is_platform && tenant.status !== 'ACTIVE')) return { status: 403, body: { error: 'Empresa com acesso suspenso.' } };
+  if (!(await tenantHasModule(flow.tenant_id, 'automacoes'))) return { status: 403, body: { error: 'Automações não fazem parte do plano da empresa.' } };
 
   const c = triggerOf(flow.graphParsed)!.config;
   const pick = (path: string | undefined, ...fallbacks: string[]) => [path, ...fallbacks].filter(Boolean).map((item) => readPath(payload, item!)).find(Boolean) || '';

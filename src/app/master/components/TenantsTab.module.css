@@ -335,3 +335,9 @@
   .userList li { grid-template-columns: 1fr auto auto auto; }
   .userList li select { grid-column: 1 / -1; grid-row: 2; }
 }
+
+.limitList { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; }
+.limitList li { display: flex; justify-content: space-between; gap: 8px; color: var(--muted, #94a3b8); }
+.limitList strong { color: var(--foreground); font-weight: 600; }
+.formGrid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 560px) { .formGrid3 { grid-template-columns: 1fr; } }

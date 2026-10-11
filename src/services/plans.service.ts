@@ -5,10 +5,11 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { PLAN_MODULES, sanitizeModules } from '@/lib/plans';
+import { PLAN_MODULES, limitsOf, parseLimit, sanitizeModules, type PlanLimits } from '@/lib/plans';
+import { forgetTenantPlans } from '@/lib/plan-limits';
 import type { ServiceResult } from '@/types';
 
-export interface Plan {
+export interface Plan extends PlanLimits {
   id: string;
   name: string;
   description: string;
@@ -21,7 +22,7 @@ export interface Plan {
   tenant_count?: number;
 }
 
-export interface PlanInput {
+export interface PlanInput extends PlanLimits {
   name: string;
   description: string;
   price: number;
@@ -45,6 +46,9 @@ export function parsePlanInput(body: Record<string, unknown>): { data: PlanInput
       active: body.active !== false,
       show_on_login: body.show_on_login !== false,
       featured: body.featured === true,
+      max_users: parseLimit(body.max_users),
+      ai_monthly_limit: parseLimit(body.ai_monthly_limit),
+      blast_daily_limit: parseLimit(body.blast_daily_limit),
     },
   };
 }
@@ -62,17 +66,20 @@ export async function listPlans(): Promise<ServiceResult<Plan[]>> {
   }
   return {
     success: true,
-    data: (data || []).map((plan) => ({ ...plan, price: Number(plan.price), tenant_count: counts.get(plan.id) || 0 })),
+    data: (data || []).map((plan) => ({ ...plan, ...limitsOf(plan), price: Number(plan.price), tenant_count: counts.get(plan.id) || 0 })),
   };
 }
 
-// Sem a migration 202610070001 as colunas da tela de login não existem:
-// grava o resto do plano em vez de falhar.
-const missingLoginColumns = (message?: string) => Boolean(message && /show_on_login|featured/.test(message));
+// Sem as migrations 202610070001 (tela de login) e 202610310001 (limites)
+// essas colunas não existem: grava o resto do plano em vez de falhar.
+const missingLoginColumns = (message?: string) => Boolean(message && /show_on_login|featured|max_users|ai_monthly_limit|blast_daily_limit/.test(message));
 const withoutLoginFields = (input: PlanInput): Partial<PlanInput> => {
   const rest: Partial<PlanInput> = { ...input };
   delete rest.show_on_login;
   delete rest.featured;
+  delete rest.max_users;
+  delete rest.ai_monthly_limit;
+  delete rest.blast_daily_limit;
   return rest;
 };
 
@@ -82,7 +89,7 @@ export async function createPlan(input: PlanInput): Promise<ServiceResult<Plan>>
     ({ data, error } = await supabaseAdmin.from('plans').insert(withoutLoginFields(input)).select().single());
   }
   if (error) return { success: false, error: error.message };
-  return { success: true, data: { ...data, price: Number(data.price) } };
+  return { success: true, data: { ...data, ...limitsOf(data), price: Number(data.price) } };
 }
 
 export async function updatePlan(id: string, input: PlanInput): Promise<ServiceResult<Plan>> {
@@ -96,13 +103,15 @@ export async function updatePlan(id: string, input: PlanInput): Promise<ServiceR
   if (error && missingLoginColumns(error.message)) ({ data, error } = await run(withoutLoginFields(input)));
   if (error) return { success: false, error: error.message };
   if (!data) return { success: false, error: 'Plano não encontrado.' };
-  return { success: true, data: { ...data, price: Number(data.price) } };
+  forgetTenantPlans();
+  return { success: true, data: { ...data, ...limitsOf(data), price: Number(data.price) } };
 }
 
 /** Empresas no plano excluído ficam sem plano (on delete set null). */
 export async function deletePlan(id: string): Promise<ServiceResult> {
   const { error } = await supabaseAdmin.from('plans').delete().eq('id', id);
   if (error) return { success: false, error: error.message };
+  forgetTenantPlans();
   return { success: true };
 }
 
@@ -113,6 +122,7 @@ export interface PublicPlan {
   price: number;
   featured: boolean;
   modules: { key: string; label: string; description: string }[];
+  limits: PlanLimits;
 }
 
 export interface SalesContact {
@@ -140,6 +150,7 @@ export async function listPublicPlans(): Promise<PublicPlan[]> {
         const item = PLAN_MODULES.find((module) => module.key === key)!;
         return { key, label: item.label, description: item.description };
       }),
+      limits: limitsOf(plan),
     }));
 }
 

@@ -9,6 +9,7 @@
 
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import type { ServiceResult } from '@/types';
+import { forgetTenantPlans } from '@/lib/plan-limits';
 
 export const TENANT_STATUSES = ['ACTIVE', 'INACTIVE', 'SUSPENDED'] as const;
 
@@ -82,6 +83,7 @@ export async function updateTenant(id: string, input: TenantInput): Promise<Serv
   const { data, error } = await supabase.from('tenants').update(input).eq('id', id).select().maybeSingle();
   if (error) return { success: false, error: error.message };
   if (!data) return { success: false, error: 'Empresa não encontrada.' };
+  forgetTenantPlans(id);
   return { success: true, data };
 }
 

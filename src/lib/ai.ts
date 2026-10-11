@@ -25,6 +25,7 @@
 import { callGemini, type GeminiResult, type GeminiError } from '@/lib/gemini';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { platformSettings } from '@/lib/platform-settings';
+import { consumeAi } from '@/lib/plan-limits';
 
 export interface AiCallOptions {
   temperature?: number;
@@ -154,6 +155,9 @@ export async function callAI(prompt: string, options: AiCallOptions = {}): Promi
       const result = await callGemini(prompt, { ...options, apiKey: own });
       return result.success ? result : { ...result, error: `Chave do Gemini da empresa: ${result.error.replace(/ ?Confira a chave do Gemini\.?/, '')} Confira a chave em Integrações > Inteligência artificial.` };
     }
+    // IA da Vórtice: conta na franquia do plano (chave própria não conta).
+    const quota = await consumeAi(options.tenantId);
+    if (!quota.ok) return { success: false, error: quota.error, status: 429 };
   }
   const settings = await platformSettings();
   const platformKey = settings.geminiKey || undefined;
