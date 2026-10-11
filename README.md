@@ -66,6 +66,13 @@ Criados pela migration `202610310001_plans_modules_limits.sql` e editáveis no P
 - Sem o módulo, as automações não rodam e as campanhas de disparo são pausadas.
 - O uso aparece para o cliente em Configurações > Plano.
 
+### Cobrança, teste grátis e primeiros passos
+
+- **Cobrança automática (Asaas):** assinatura por empresa, fatura com Pix, boleto ou cartão. Atrasou mais de 3 dias: suspensa; pagou: volta sozinha ([`src/services/billing.service.ts`](src/services/billing.service.ts)).
+- **Teste grátis de 7 dias:** botão nos planos da tela de login → `/cadastro`. Cria empresa, assinatura (1ª fatura no fim do teste) e administrador, sem cartão ([`src/services/signup.service.ts`](src/services/signup.service.ts)).
+- **Lembretes pelo WhatsApp da Vórtice:** quem faz o teste vira lead no CRM da Vórtice (etiqueta "Teste grátis") e recebe boas-vindas, dica do 3º dia, lembrete do 5º, fatura no 6º e obrigado ao pagar. Textos editáveis em Painel Master > Plataforma ([`src/services/trial-messages.service.ts`](src/services/trial-messages.service.ts)).
+- **Primeiros passos:** quadro no Início para o administrador de empresa nova (WhatsApp, equipe, leads, funil, respostas rápidas), que marca sozinho cada passo feito ([`src/services/onboarding.service.ts`](src/services/onboarding.service.ts)).
+
 ---
 
 ## 🏗 Arquitetura

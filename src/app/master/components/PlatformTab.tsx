@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Copy, CreditCard, KeyRound, Link2, Loader2, PlugZap, RefreshCw, Save, Sparkles, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import styles from '../master.module.css';
+import TrialMessagesCard from './TrialMessagesCard';
 
 type Source = 'painel' | 'env' | 'padrão' | 'vazio';
 interface FieldView { key: string; env: string; secret: boolean; source: Source; value: string; hasValue: boolean }
@@ -252,6 +253,8 @@ export default function PlatformTab() {
           {busy === 'save' ? <Loader2 size={16} className={styles.spin} /> : <Save size={16} />} Salvar configurações
         </button>
       </div>
+
+      <TrialMessagesCard />
     </motion.div>
   );
 }
