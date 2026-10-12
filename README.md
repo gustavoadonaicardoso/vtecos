@@ -44,6 +44,7 @@ Os módulos ficam em [`src/lib/plans.ts`](src/lib/plans.ts). Um módulo fora do 
 | Discador (`discador`) | Ligações pelo navegador e discagem automática (Twilio da empresa) | `/discador` |
 | Senhas, Totem e TV (`senhas`) | Fila de atendimento presencial | `/queue` (+ telas públicas `/totem` e `/display`) |
 | Planejamentos e Projetos (`planejamentos`) | Funis, mapas de estratégia e projetos | `/planejamentos` `/projetos` |
+| E-mail (`email`) | Caixas da empresa (ex.: contato@) e pessoais por IMAP/SMTP: ler, responder, encaminhar, anexos, assinatura e modelos; busca os novos a cada 2 min | `/email` |
 
 **Toda empresa tem:** Início, Chat interno, Equipe, Integrações, Configurações, Notificações, Central de Ajuda e Chamados (`BASE_ROUTES`).
 
@@ -182,7 +183,7 @@ No `npm run dev` as rotinas em segundo plano ficam desligadas: posts, disparos, 
 
 - **Instalação nova:** rode [`supabase/base-schema.sql`](supabase/base-schema.sql) no SQL Editor do Supabase e depois todos os arquivos de [`supabase/migrations`](supabase/migrations), em ordem de nome.
 - **Produção:** a cada PR que traz migration nova, rode **só o arquivo novo** no SQL Editor **antes** do deploy. As migrations são escritas para poder rodar de novo sem estragar nada.
-- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno), `202611040001_billing_asaas.sql` (cobrança automática) `202611050001_lead_extra_fields.sql` (campos extras dos leads), `202611060001_leads_phone_key.sql` (achar o lead pelo telefone em qualquer formato) `202611070001_signup_email_codes.sql` (código de confirmação do e-mail no cadastro) e `202611080001_vortice_contact_email.sql` (contato@vorticetecnologia.tech).
+- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno), `202611040001_billing_asaas.sql` (cobrança automática) `202611050001_lead_extra_fields.sql` (campos extras dos leads), `202611060001_leads_phone_key.sql` (achar o lead pelo telefone em qualquer formato) `202611070001_signup_email_codes.sql` (código de confirmação do e-mail no cadastro) `202611080001_vortice_contact_email.sql` (contato@vorticetecnologia.tech) e `202611090001_email_module.sql` (módulo E-mail).
 - Depois de rodar uma migration, confira o banco com `npm run db:check-schema`.
 
 ---
@@ -196,6 +197,7 @@ O modelo completo, com comentários, está em [`.env.example`](.env.example). As
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Conexão do navegador com o Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Acesso do servidor ao banco (nunca vai ao navegador) |
 | `SUPABASE_DB_URL` | Endereço do banco com senha (Session pooler), só para o backup diário |
+| `SECRET_BOX_KEY` | Opcional. Chave para cifrar as senhas das caixas de e-mail (sem ela, usa a `SUPABASE_SERVICE_ROLE_KEY`). Trocar a chave pede para digitar as senhas das caixas de novo |
 | `NEXT_PUBLIC_APP_URL` | Endereço público do sistema |
 | `GEMINI_API_KEY` | IA da Vórtice (as empresas podem cadastrar a própria chave em Integrações) |
 | `AI_PROVIDER`, `OLLAMA_URL`, `OLLAMA_MODEL` | IA local opcional na VPS |

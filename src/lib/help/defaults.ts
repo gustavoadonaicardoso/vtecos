@@ -122,6 +122,21 @@ export const DEFAULT_ARTICLES: DefaultArticle[] = [
     ],
   },
   {
+    slug: 'email',
+    category: 'atendimento',
+    title: 'E-mail (caixas da empresa e pessoais)',
+    summary: 'Receba, leia e responda os e-mails da empresa dentro do sistema: caixa compartilhada para a equipe e caixa pessoal de cada um.',
+    sections: [
+      { title: 'Conectar uma caixa', text: 'Em **E-mail > Caixas > Conectar caixa**:\n\n1. Escolha **Da empresa** (ex.: contato@, a equipe com a permissão E-mail vê e responde; só administradores e gerentes conectam) ou **Pessoal** (só você vê).\n2. Escolha o provedor (Hostinger, Titan, Gmail, Zoho, Locaweb ou **Outro**), o e-mail e a senha da caixa.\n3. Clique em **Conectar**: o sistema testa a entrada (IMAP) e a saída (SMTP) antes de salvar.\n\nOs e-mails dos **últimos 14 dias** chegam logo em seguida; depois, os novos chegam sozinhos **a cada 2 minutos** (ou na hora, no botão de atualizar).' },
+      { title: 'Gmail e Google Workspace', text: 'O Google não aceita a senha normal: crie uma **senha de app** em myaccount.google.com/apppasswords (precisa da verificação em duas etapas ligada) e use ela no lugar da senha.' },
+      { title: 'Ler e responder', text: '- Clique no e-mail para abrir a **conversa inteira** (as respostas ficam juntas).\n- **Responder**, **Responder a todos** e **Encaminhar** saem pela mesma caixa do e-mail original, com a mensagem citada abaixo.\n- Por privacidade, **imagens de fora** ficam bloqueadas até você clicar em **Mostrar imagens** (elas avisam ao remetente que o e-mail foi aberto).\n- Anexos de até 20 MB por e-mail. O que você envia também fica na pasta **Enviados** do seu provedor.' },
+      { title: 'Assinatura e modelos', text: 'A **assinatura** fica em cada caixa (Caixas > Editar) e vai no fim de todo e-mail. Em **Modelos**, salve textos prontos (ex.: envio de orçamento) e use no campo **Modelo** ao escrever.' },
+      { title: 'Lixeira e exclusão', text: 'Mover para a lixeira e excluir de vez valem **só no sistema**: no seu provedor de e-mail nada é apagado. Desconectar uma caixa apaga do sistema os e-mails guardados dela.' },
+      { title: 'Quando a caixa para', text: 'Se a senha mudar ou o servidor recusar, a caixa aparece com aviso vermelho e quem conectou é avisado no sino. Em **Caixas > Editar**, digite a senha de novo e salve.' },
+    ],
+    tip: 'Quem não vê o menu E-mail: o módulo precisa estar no plano da empresa e a permissão E-mail ligada em Equipe.',
+  },
+  {
     slug: 'disparos',
     category: 'atendimento',
     title: 'Disparos (campanhas de WhatsApp)',
