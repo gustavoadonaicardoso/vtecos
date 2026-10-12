@@ -9,6 +9,7 @@ import TagPicker from '@/components/leads/TagPicker';
 import type { TeamMember } from '@/components/leads/useTeam';
 import { formatDateTime, initials, moneyInput, parseMoneyInput } from '../format';
 import LeadExtraFields from './LeadExtraFields';
+import LeadEmails from './LeadEmails';
 import { useCustomFields } from '@/components/leads/useCustomFields';
 import type { LeadExtra } from '@/lib/lead-fields';
 
@@ -197,6 +198,8 @@ export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, o
             onPassword={(value) => set('password', value)}
             canManageFields={canAssign}
           />
+
+          <LeadEmails leadId={lead.id} email={lead.email || ''} />
 
           <label className={styles.field}>
             <span>Observações</span>

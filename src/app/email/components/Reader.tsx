@@ -1,10 +1,13 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ArchiveRestore, ArrowLeft, Forward, ImageOff, Loader2, MailOpen, Paperclip, Reply, ReplyAll, Star, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { ArchiveRestore, ArrowLeft, Forward, ImageOff, Loader2, MailOpen, Paperclip, Reply, ReplyAll, Star, Trash2, UserPlus, UserRound } from 'lucide-react';
 import { displayName, formatAddressList, sizeLabel } from '@/lib/email/format';
+import { usePermissions } from '@/hooks/usePermissions';
+import { isRouteAllowed } from '@/lib/plans';
 import styles from '../email.module.css';
-import { fullDate, type MessageFull, type Thread } from '../types';
+import { api, fullDate, jsonInit, type MessageFull, type Thread } from '../types';
 
 const REMOTE_IMAGES = /(src|background)\s*=\s*["']?\s*https?:|url\(\s*["']?https?:/i;
 
@@ -98,6 +101,84 @@ interface ReaderProps {
   onBack: () => void;
   onReply: (message: MessageFull, mode: 'reply' | 'replyAll' | 'forward') => void;
   onAction: (action: 'star' | 'unstar' | 'unread' | 'trash' | 'restore' | 'delete') => void;
+  onLeadLinked: () => void;
+}
+
+/** Faixa do contato: já é lead (link) ou "Criar lead" com nome e e-mail já preenchidos. */
+function LeadBar({ thread, onLeadLinked }: { thread: Thread; onLeadLinked: () => void }) {
+  const { hasPermission, user } = usePermissions();
+  const modules = user?.workspace?.modules;
+  const canCreate = (!modules || isRouteAllowed('/leads', modules)) && ['leads.view', 'leads.create', 'pipeline.view'].some((key) => hasPermission(key));
+  const contact = thread.contact;
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(contact ? displayName(contact) : '');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  if (thread.lead) {
+    return (
+      <div className={styles.leadBar}>
+        <UserRound size={15} />
+        {thread.lead.canOpen ? (
+          <span>Lead: <Link href={`/leads?lead=${thread.lead.id}`} className={styles.leadLink}>{thread.lead.name}</Link></span>
+        ) : (
+          <span>Este contato já é lead {thread.lead.name}.</span>
+        )}
+      </div>
+    );
+  }
+  if (!contact || !canCreate) return null;
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !phone.trim()) {
+      setError('Preencha o nome e o WhatsApp.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const lead = await api<{ id: string }>('/api/leads', jsonInit('POST', { name: name.trim(), phone: phone.trim(), email: contact.address }));
+      await api('/api/email/lead', jsonInit('POST', { leadId: lead.id })).catch(() => null);
+      setOpen(false);
+      onLeadLinked();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível criar o lead.');
+    }
+    setSaving(false);
+  };
+
+  if (!open) {
+    return (
+      <div className={styles.leadBar}>
+        <UserRound size={15} />
+        <span>{contact.address} ainda não é lead.</span>
+        <button type="button" className={styles.linkBtn} onClick={() => setOpen(true)}><UserPlus size={13} /> Criar lead</button>
+      </div>
+    );
+  }
+
+  return (
+    <form className={styles.leadForm} onSubmit={save}>
+      <strong>Novo lead com {contact.address}</strong>
+      <div className={styles.leadFields}>
+        <label className={styles.field}>
+          <span>Nome</span>
+          <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required />
+        </label>
+        <label className={styles.field}>
+          <span>WhatsApp</span>
+          <input className={styles.input} value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="(11) 99999-9999" maxLength={30} required />
+        </label>
+      </div>
+      {error && <p className={styles.errorBox}>{error}</p>}
+      <div className={styles.leadActions}>
+        <button type="button" className={styles.secondaryBtn} onClick={() => setOpen(false)} disabled={saving}>Cancelar</button>
+        <button type="submit" className={styles.primaryBtn} disabled={saving}>{saving && <Loader2 size={15} className={styles.spin} />} Criar lead</button>
+      </div>
+    </form>
+  );
 }
 
 export default function Reader(props: ReaderProps) {
@@ -109,7 +190,7 @@ export default function Reader(props: ReaderProps) {
   return <ThreadView key={`${thread.openedId}:${thread.messages.length}`} {...props} thread={thread} />;
 }
 
-function ThreadView({ thread, onBack, onReply, onAction }: ReaderProps & { thread: Thread }) {
+function ThreadView({ thread, onBack, onReply, onAction, onLeadLinked }: ReaderProps & { thread: Thread }) {
   // Abre a última e a que foi clicada; as outras ficam resumidas.
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set([thread.openedId, thread.messages[thread.messages.length - 1]?.id].filter(Boolean) as string[]));
 
@@ -142,6 +223,8 @@ function ThreadView({ thread, onBack, onReply, onAction }: ReaderProps & { threa
           )}
         </div>
       </div>
+
+      <LeadBar thread={thread} onLeadLinked={onLeadLinked} />
 
       <div className={styles.threadList}>
         {thread.messages.map((message) => (

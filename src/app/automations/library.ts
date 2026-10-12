@@ -13,6 +13,7 @@ import {
   Hourglass,
   ListOrdered,
   ListTodo,
+  Mail,
   MessageSquare,
   MoveRight,
   Reply,
@@ -103,6 +104,7 @@ export const BLOCK_GROUPS: { title: string; items: BlockDefinition[] }[] = [
       { type: 'add-note', description: 'Registra uma observação no lead', icon: StickyNote, color: '#eab308' },
       { type: 'create-task', description: 'Tarefa na Agenda para a equipe', icon: ListTodo, color: '#0891b2' },
       { type: 'notify-team', description: 'Aviso no sino (e no WhatsApp)', icon: Bell, color: '#f59e0b' },
+      { type: 'send-email', description: 'Manda um e-mail pela caixa da empresa (módulo E-mail)', icon: Mail, color: '#0284c7' },
       { type: 'webhook', description: 'Envia ou busca dados em outro sistema', icon: Globe, color: '#6366f1' },
     ],
   },
@@ -235,6 +237,8 @@ export function describeNode(node: FlowNode, options: EditorOptions | null): str
       return c.note || 'Escreva a anotação';
     case 'create-task':
       return `${c.taskTitle || 'Tarefa'} · ${Number(c.dueMinutes) > 0 ? `para daqui a ${formatMinutes(Number(c.dueMinutes))}` : 'para agora'}`;
+    case 'send-email':
+      return `Para ${c.emailTo || '…'}: ${c.emailSubject || '(sem assunto)'}`;
     case 'notify-team': {
       const target = { assigned: 'Responsável', admins: 'Admins e gerentes', everyone: 'Toda a equipe', specific: names(stringList(c.targetUsers), options) || 'Pessoas escolhidas' }[c.target || 'assigned'];
       return `${target}${c.alsoWhatsApp ? ' (+WhatsApp)' : ''}: ${c.message || '…'}`;

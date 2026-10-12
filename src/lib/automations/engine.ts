@@ -518,6 +518,23 @@ async function runNode(node: FlowNode, run: RunRow, flow: LoadedFlow, ctx: RunCo
       return { kind: 'next', port: 'default', detail: `Avisou ${recipients.length} pessoa(s)${c.alsoWhatsApp ? ` (${whatsapp} pelo WhatsApp)` : ''}.` };
     }
 
+    case 'send-email': {
+      if (!(await tenantHasModule(tenantId, 'email'))) return failOrBranch(graph, node, 'O módulo E-mail não faz parte do plano da empresa.');
+      const { sendAutomatedEmail } = await import('@/services/email.service');
+      const sent = await sendAutomatedEmail({
+        tenantId,
+        tenantName: ctx.company.name,
+        accountId: c.emailAccountId || '',
+        to: renderTemplate(c.emailTo || '', ctx),
+        subject: renderTemplate(c.emailSubject || '', ctx),
+        body: renderTemplate(c.message || '', ctx),
+        leadId,
+      });
+      // O texto não vai para o histórico (pode ter a senha de acesso do lead).
+      if (!sent.ok) return failOrBranch(graph, node, sent.error);
+      return { kind: 'next', port: 'default', detail: `E-mail enviado para ${sent.to}: ${renderTemplate(c.emailSubject || '', ctx).slice(0, 120)}` };
+    }
+
     case 'webhook': {
       const method = ['GET', 'PUT', 'PATCH'].includes(c.method || '') ? c.method! : 'POST';
       const headers: Record<string, string> = { 'User-Agent': 'vtec-os-automations/2.0' };

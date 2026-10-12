@@ -1,7 +1,7 @@
 /** Automações: variáveis, respostas e validação do fluxo (sem banco). */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { emptyContext, inBusinessHours, matchMenuOption, normalizeGraph, renderTemplate, validateAnswer, validateFlow, DEFAULT_HOURS } from '@/lib/automations/flow';
+import { emptyContext, inBusinessHours, matchMenuOption, normalizeGraph, portsFor, renderTemplate, validateAnswer, validateFlow, DEFAULT_HOURS } from '@/lib/automations/flow';
 import { renderMessageTemplate, unknownMessageVariables, usesAccessPassword } from '@/lib/message-variables';
 
 const ctx = emptyContext({
@@ -59,4 +59,22 @@ test('validação do fluxo antes de ativar', () => {
   const result = validateFlow(graph);
   assert.deepEqual(result.errors, []);
   assert.ok(result.warnings.some((warning) => warning.includes('nunca vai rodar')));
+});
+
+test('bloco Enviar e-mail', () => {
+  const build = (config: Record<string, unknown>) => normalizeGraph({
+    nodes: [
+      { id: 't', type: 'trigger-lead', config: {} },
+      { id: 'e', type: 'send-email', config },
+    ],
+    connections: [{ fromId: 't', toId: 'e' }],
+  });
+  const empty = build({});
+  const node = empty.nodes.find((item) => item.id === 'e')!;
+  assert.equal(node.config.emailTo, '{{lead.email}}', 'vai para o e-mail do lead por padrão');
+  assert.deepEqual(portsFor(node).map((port) => port.id), ['default', 'no']);
+  assert.match(validateFlow(empty).errors.join(' '), /caixa/i, 'pede a caixa de e-mail');
+  const ok = build({ emailAccountId: '0b6f3c1e-8d7a-4f1e-9a51-1c2d3e4f5a6b', emailTo: '{{lead.email}}', emailSubject: 'Oi', message: 'Bem-vindo, {{lead.first_name}}' });
+  assert.deepEqual(validateFlow(ok).errors, []);
+  assert.match(validateFlow(build({ emailAccountId: '0b6f3c1e-8d7a-4f1e-9a51-1c2d3e4f5a6b', emailTo: '', emailSubject: 'Oi', message: 'x' })).errors.join(' '), /para quem/i);
 });

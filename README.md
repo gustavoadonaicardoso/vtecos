@@ -44,7 +44,7 @@ Os módulos ficam em [`src/lib/plans.ts`](src/lib/plans.ts). Um módulo fora do 
 | Discador (`discador`) | Ligações pelo navegador e discagem automática (Twilio da empresa) | `/discador` |
 | Senhas, Totem e TV (`senhas`) | Fila de atendimento presencial | `/queue` (+ telas públicas `/totem` e `/display`) |
 | Planejamentos e Projetos (`planejamentos`) | Funis, mapas de estratégia e projetos | `/planejamentos` `/projetos` |
-| E-mail (`email`) | Caixas da empresa (ex.: contato@) e pessoais por IMAP/SMTP: ler, responder, encaminhar, anexos, assinatura e modelos; busca os novos a cada 2 min | `/email` |
+| E-mail (`email`) | Caixas da empresa (ex.: contato@) e pessoais por IMAP/SMTP: ler, responder, encaminhar, anexos, assinatura e modelos; busca os novos a cada 2 min, avisa no sino, liga cada conversa ao lead e tem o bloco "Enviar e-mail" nas Automações | `/email` |
 
 **Toda empresa tem:** Início, Chat interno, Equipe, Integrações, Configurações, Notificações, Central de Ajuda e Chamados (`BASE_ROUTES`).
 
@@ -183,7 +183,7 @@ No `npm run dev` as rotinas em segundo plano ficam desligadas: posts, disparos, 
 
 - **Instalação nova:** rode [`supabase/base-schema.sql`](supabase/base-schema.sql) no SQL Editor do Supabase e depois todos os arquivos de [`supabase/migrations`](supabase/migrations), em ordem de nome.
 - **Produção:** a cada PR que traz migration nova, rode **só o arquivo novo** no SQL Editor **antes** do deploy. As migrations são escritas para poder rodar de novo sem estragar nada.
-- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno), `202611040001_billing_asaas.sql` (cobrança automática) `202611050001_lead_extra_fields.sql` (campos extras dos leads), `202611060001_leads_phone_key.sql` (achar o lead pelo telefone em qualquer formato) `202611070001_signup_email_codes.sql` (código de confirmação do e-mail no cadastro) `202611080001_vortice_contact_email.sql` (contato@vorticetecnologia.tech) e `202611090001_email_module.sql` (módulo E-mail).
+- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno), `202611040001_billing_asaas.sql` (cobrança automática) `202611050001_lead_extra_fields.sql` (campos extras dos leads), `202611060001_leads_phone_key.sql` (achar o lead pelo telefone em qualquer formato) `202611070001_signup_email_codes.sql` (código de confirmação do e-mail no cadastro) `202611080001_vortice_contact_email.sql` (contato@vorticetecnologia.tech), `202611090001_email_module.sql` (módulo E-mail) e `202611100001_email_leads_notify.sql` (e-mails ligados aos leads e aviso no sino).
 - Depois de rodar uma migration, confira o banco com `npm run db:check-schema`.
 
 ---

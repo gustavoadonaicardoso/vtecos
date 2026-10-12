@@ -397,6 +397,13 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .extraCount { padding: 1px 7px; border-radius: 99px; background: rgba(59, 130, 246, 0.14); color: var(--brand, #3b82f6); font-size: 0.72rem; }
 .secretRow { display: flex; gap: 6px; align-items: center; }
 .secretRow .input { flex: 1; min-width: 0; }
+.emailList { display: flex; flex-direction: column; gap: 6px; }
+.emailRow { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid var(--card-border); border-radius: 10px; color: var(--foreground); text-decoration: none; font-size: 0.82rem; }
+.emailRow:hover { border-color: var(--brand, #3b82f6); }
+.emailRow > svg { flex-shrink: 0; margin-top: 2px; color: var(--muted); }
+.emailRow > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.emailRow strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emailRow small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.74rem; }
 .hintText { margin: 0; font-size: 0.76rem; line-height: 1.45; color: var(--muted); }
 .varHint { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; color: var(--muted); }
 
