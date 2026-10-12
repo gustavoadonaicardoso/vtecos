@@ -162,7 +162,7 @@ export async function billingInvoices(tenantId: string): Promise<{ id: string; v
 
 // ── Avisos ───────────────────────────────────────────────────
 
-async function notifyTenantAdmins(tenantId: string, title: string, content: string) {
+export async function notifyTenantAdmins(tenantId: string, title: string, content: string) {
   const { data } = await db.from('profiles').select('id').eq('tenant_id', tenantId).eq('role', 'ADMIN').eq('status', 'ACTIVE');
   const rows = (data || []).map((row) => ({ user_id: row.id, type: 'plan', title, content, is_read: false, link: '/settings?tab=plan' }));
   if (rows.length) await db.from('system_notifications').insert(rows);

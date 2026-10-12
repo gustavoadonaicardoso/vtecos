@@ -6,7 +6,8 @@
  * a rede de segurança: confere as atrasadas e os testes a cada 30 min
  * e as em dia uma vez por dia, suspende quem passou da tolerância e
  * reativa quem pagou (mesmo que o aviso tenha se perdido). Também manda
- * os lembretes do teste grátis pelo WhatsApp da Vórtice.
+ * os lembretes do teste grátis pelo WhatsApp da Vórtice e aplica as
+ * trocas de plano agendadas.
  * Ligada pelo src/instrumentation.ts só na VPS (produção com
  * CONTENT_SCHEDULER_ENABLED=true).
  * ============================================================
@@ -16,6 +17,7 @@ import { beat } from '@/lib/heartbeat';
 import { asaasReady } from '@/lib/asaas';
 import { runBillingCycle } from '@/services/billing.service';
 import { runTrialMessages } from '@/services/trial-messages.service';
+import { applyScheduledPlanChanges } from '@/services/plan-change.service';
 
 const log = (...args: unknown[]) => console.log('[cobranca]', ...args);
 
@@ -39,6 +41,12 @@ export function startBillingWorker() {
           return null;
         });
         if (messages?.sent.length) log(`lembretes do teste enviados: ${messages.sent.length}`);
+        // Trocas de plano agendadas pelo cliente (descer de plano vale no vencimento da fatura).
+        const changed = await applyScheduledPlanChanges().catch((error) => {
+          log('erro nas trocas de plano agendadas', error);
+          return 0;
+        });
+        if (changed) log(`trocas de plano aplicadas: ${changed}`);
       }
       beat('cobranca');
     } catch (error) {
