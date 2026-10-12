@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Copy, CreditCard, KeyRound, Link2, Loader2, PlugZap, RefreshCw, Save, Sparkles, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Copy, CreditCard, KeyRound, Link2, Loader2, Mail, PlugZap, RefreshCw, Save, Sparkles, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import styles from '../master.module.css';
 import TrialMessagesCard from './TrialMessagesCard';
@@ -245,6 +245,26 @@ export default function PlatformTab() {
           </button>
         </div>
         {testResult("asaas")}
+      </div>
+
+      <div className={`${styles.card} ${styles.cardWide}`}>
+        <div className={styles.cardHeader}><Mail size={20} /><h2>E-mail da Vórtice (SMTP)</h2></div>
+        <p className={styles.hint}>
+          Manda o código de 6 números que confirma o e-mail de quem se cadastra no teste grátis. Sem isto preenchido, o cadastro continua funcionando, mas sem confirmar o e-mail.
+        </p>
+        <div className={styles.twoCols}>
+          {input("smtpHost", "Servidor", 'smtp.gmail.com')}
+          {input("smtpPort", "Porta", '587', <>587 (mais comum) ou 465.</>)}
+          {input("smtpUser", "Usuário", 'nao-responda@suaempresa.com.br', <>Geralmente o próprio e-mail.</>)}
+          {input("smtpPassword", "Senha", '', <>No Gmail/Google Workspace, use uma <strong>senha de app</strong> (Conta Google &gt; Segurança &gt; Senhas de app), não a senha normal.</>)}
+        </div>
+        {input("smtpFrom", "Remetente", 'Vórtice Tecnologia <nao-responda@suaempresa.com.br>', <>Nome e e-mail que aparecem para o cliente. Use um e-mail da mesma conta do usuário acima.</>)}
+        <div className={styles.inlineActions}>
+          <button type="button" className={styles.resetBtn} disabled={busy !== null} onClick={() => test('smtp')}>
+            {busy === 'smtp' ? <Loader2 size={15} className={styles.spin} /> : <PlugZap size={15} />} Mandar e-mail de teste para mim
+          </button>
+        </div>
+        {testResult("smtp")}
       </div>
 
       <div className={`${styles.card} ${styles.cardWide} ${styles.saveRow}`}>

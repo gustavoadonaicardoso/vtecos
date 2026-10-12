@@ -59,6 +59,51 @@
 
 .honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
 
+.codeIntro { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: var(--accent); }
+.card .codeIntro p { margin: 0; font-size: 0.92rem; line-height: 1.5; color: var(--foreground); }
+.codeIntro strong { word-break: break-all; }
+.card .codeIntro small { font-size: 0.78rem; color: var(--text-muted); }
+
+.notice {
+  padding: 12px;
+  border-radius: var(--glass-radius-sm);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+  font-size: 0.85rem;
+}
+
+.codeInput {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--glass-radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-input);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.codeInput:focus { outline: none; border-color: var(--accent); }
+
+.codeActions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.codeActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.codeActions button:disabled { color: var(--text-muted); cursor: default; }
+
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr; }
 }

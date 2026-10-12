@@ -6,10 +6,11 @@ import { checkGeminiKey } from '@/lib/ai';
 import { platformSettings, platformSettingsView, savePlatformSettings } from '@/lib/platform-settings';
 import { META_GRAPH_URL } from '@/lib/meta-graph-version';
 import { asaas, AsaasError } from '@/lib/asaas';
+import { smtpConfigured, verifyMailer } from '@/lib/mailer';
 
 /**
  * Painel Master > Plataforma: app da Meta, webhook do WhatsApp, IA
- * padrão da Vórtice e cobrança (Asaas). Só administradores da empresa da plataforma. Os
+ * padrão da Vórtice, cobrança (Asaas) e e-mail (SMTP). Só administradores da empresa da plataforma. Os
  * segredos nunca voltam para a tela.
  */
 export async function GET() {
@@ -29,7 +30,7 @@ export async function PUT(request: Request) {
   return NextResponse.json({ data: await platformSettingsView() });
 }
 
-/** Testa o que está salvo: app da Meta, chave do Gemini ou IA local. */
+/** Testa o que está salvo: app da Meta, chave do Gemini, IA local, Asaas ou e-mail (SMTP). */
 export async function POST(request: Request) {
   const auth = await requirePlatformAdmin();
   if ('error' in auth) return NextResponse.json({ error: auth.error.message }, { status: auth.error.status });
@@ -75,6 +76,11 @@ export async function POST(request: Request) {
     } catch (error) {
       return NextResponse.json({ data: { ok: false, message: error instanceof AsaasError ? error.message : 'Não foi possível falar com o Asaas agora.' } });
     }
+  }
+
+  if (target === 'smtp') {
+    if (!smtpConfigured(settings)) return NextResponse.json({ data: { ok: false, message: 'Preencha servidor, usuário, senha e remetente e salve antes de testar.' } });
+    return NextResponse.json({ data: await verifyMailer(auth.profile.email || undefined) });
   }
 
   return NextResponse.json({ error: 'Teste desconhecido.' }, { status: 400 });
