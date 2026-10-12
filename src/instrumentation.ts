@@ -42,6 +42,10 @@ export async function register() {
   const { startBillingWorker } = await import('./lib/billing/worker');
   startBillingWorker();
 
+  // E-mail: busca os e-mails novos das caixas conectadas.
+  const { startEmailWorker } = await import('./lib/email/worker');
+  startEmailWorker();
+
   // Status do sistema: confere banco, IA, Meta e os agendadores acima.
   const { startHealthChecks } = await import('./lib/status/health');
   startHealthChecks();

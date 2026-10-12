@@ -17,6 +17,7 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
   '/financeiro': 'financeiro.view',
   '/metas': 'dashboard.view',
   '/messages': 'messages.view',
+  '/email': 'email.view',
   '/chat': 'messages.send',
   '/pipeline': 'pipeline.view',
   '/leads': 'leads.view',
@@ -69,6 +70,7 @@ export const PERMISSION_ITEMS: PermissionItem[] = [
   item('pipeline.view', 'Pipeline', 'Funil de vendas em colunas (Kanban).', 'crm'),
   item('leads.view', 'Leads e Discador', 'Lista de contatos e ligações.', 'crm'),
   item('messages.view', 'Mensagens', 'Conversas do WhatsApp com os clientes.', 'crm'),
+  item('email.view', 'E-mail', 'Caixas de e-mail da empresa (e a pessoal): ler, responder e enviar.', 'email'),
   item('messages.send', 'Chat interno e Disparos', 'Conversa com a equipe e campanhas em massa.', null),
   item('automations.view', 'Automações', 'Ver os fluxos automáticos (editar é de admin e gerente).', 'automacoes'),
   item('planejamentos.view', 'Planejamentos', 'Funis, mapas de estratégia e quadros.', 'planejamentos'),
@@ -100,7 +102,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<TeamRole, PermissionMap> = {
   MANAGER: permissionsFrom(ALL_IDS),
   SELLER: permissionsFrom([
     'dashboard.view', 'pipeline.view', 'leads.view', 'messages.view', 'messages.send',
-    'planejamentos.view', 'social.view', 'leads.create', 'messages.templates',
+    'planejamentos.view', 'social.view', 'leads.create', 'messages.templates', 'email.view',
   ]),
 };
 

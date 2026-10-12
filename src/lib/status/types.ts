@@ -69,6 +69,7 @@ export const STATUS_SERVICES: { key: string; label: string }[] = [
   { key: 'agendamento', label: 'Agendamento' },
   { key: 'redes', label: 'Redes Sociais' },
   { key: 'discador', label: 'Discador' },
+  { key: 'email', label: 'E-mail' },
   { key: 'integracoes', label: 'Integrações' },
 ];
 
@@ -95,6 +96,7 @@ export const HEALTH_CHECKS: { key: string; label: string; services: string[] }[]
   { key: 'agendamento', label: 'Envios do Agendamento', services: ['agendamento'] },
   { key: 'redes', label: 'Publicação das Redes Sociais', services: ['redes'] },
   { key: 'discador', label: 'Motor do Discador', services: ['discador'] },
+  { key: 'email', label: 'Sincronização dos e-mails', services: ['email'] },
   { key: 'cobranca', label: 'Conferência da cobrança (Asaas)', services: [] },
   { key: 'backup', label: 'Backup diário do banco', services: [] },
 ];
