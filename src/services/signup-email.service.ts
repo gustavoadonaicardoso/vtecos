@@ -13,6 +13,7 @@
 
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { supabaseAdmin as db } from '@/lib/supabase-admin';
+import { VORTICE_CONTACT_EMAIL } from '@/lib/contact';
 
 const VALID_MINUTES = 15;
 const MAX_ATTEMPTS = 5;
@@ -29,14 +30,14 @@ const sameHash = (a: string, b: string) => a.length === b.length && timingSafeEq
 
 function emailBody(name: string, code: string) {
   const first = name.trim().split(/\s+/)[0] || '';
-  const text = `Olá${first ? `, ${first}` : ''}!\n\nSeu código para confirmar o e-mail no vtec os é: ${code}\n\nEle vale por ${VALID_MINUTES} minutos. Se não foi você que pediu, é só ignorar este e-mail.\n\nVórtice Tecnologia`;
+  const text = `Olá${first ? `, ${first}` : ''}!\n\nSeu código para confirmar o e-mail no vtec os é: ${code}\n\nEle vale por ${VALID_MINUTES} minutos. Se não foi você que pediu, é só ignorar este e-mail.\n\nVórtice Tecnologia · ${VORTICE_CONTACT_EMAIL}`;
   const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f1f5f9;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a">
 <div style="max-width:440px;margin:0 auto;padding:28px;border-radius:16px;background:#ffffff;box-shadow:0 8px 24px rgba(15,23,42,.08)">
 <p style="margin:0 0 12px;font-size:16px">Olá${first ? `, ${first}` : ''}!</p>
 <p style="margin:0 0 18px;font-size:15px;line-height:1.5">Seu código para confirmar o e-mail no <strong>vtec os</strong> é:</p>
 <p style="margin:0 0 18px;font-size:34px;font-weight:700;letter-spacing:8px;text-align:center;color:#2563eb">${code}</p>
 <p style="margin:0;font-size:13px;line-height:1.5;color:#64748b">Ele vale por ${VALID_MINUTES} minutos. Se não foi você que pediu, é só ignorar este e-mail.</p>
-</div><p style="text-align:center;font-size:12px;color:#94a3b8;margin-top:16px">Vórtice Tecnologia</p></body></html>`;
+</div><p style="text-align:center;font-size:12px;color:#94a3b8;margin-top:16px">Vórtice Tecnologia · <a href="mailto:${VORTICE_CONTACT_EMAIL}" style="color:#94a3b8">${VORTICE_CONTACT_EMAIL}</a></p></body></html>`;
   return { text, html };
 }
 

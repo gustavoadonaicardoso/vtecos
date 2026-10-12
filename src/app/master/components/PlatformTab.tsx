@@ -255,10 +255,10 @@ export default function PlatformTab() {
         <div className={styles.twoCols}>
           {input("smtpHost", "Servidor", 'smtp.gmail.com')}
           {input("smtpPort", "Porta", '587', <>587 (mais comum) ou 465.</>)}
-          {input("smtpUser", "Usuário", 'nao-responda@suaempresa.com.br', <>Geralmente o próprio e-mail.</>)}
+          {input("smtpUser", "Usuário", 'contato@vorticetecnologia.tech', <>Geralmente o próprio e-mail.</>)}
           {input("smtpPassword", "Senha", '', <>No Gmail/Google Workspace, use uma <strong>senha de app</strong> (Conta Google &gt; Segurança &gt; Senhas de app), não a senha normal.</>)}
         </div>
-        {input("smtpFrom", "Remetente", 'Vórtice Tecnologia <nao-responda@suaempresa.com.br>', <>Nome e e-mail que aparecem para o cliente. Use um e-mail da mesma conta do usuário acima.</>)}
+        {input("smtpFrom", "Remetente", 'Vórtice Tecnologia <contato@vorticetecnologia.tech>', <>Nome e e-mail que aparecem para o cliente. Use um e-mail da mesma conta do usuário acima.</>)}
         <div className={styles.inlineActions}>
           <button type="button" className={styles.resetBtn} disabled={busy !== null} onClick={() => test('smtp')}>
             {busy === 'smtp' ? <Loader2 size={15} className={styles.spin} /> : <PlugZap size={15} />} Mandar e-mail de teste para mim
