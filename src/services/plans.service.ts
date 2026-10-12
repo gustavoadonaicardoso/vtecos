@@ -4,6 +4,7 @@
  * ============================================================
  */
 
+import { VORTICE_CONTACT_EMAIL } from '@/lib/contact';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { PLAN_MODULES, limitsOf, parseLimit, sanitizeModules, type PlanLimits } from '@/lib/plans';
 import { forgetTenantPlans } from '@/lib/plan-limits';
@@ -154,7 +155,7 @@ export async function listPublicPlans(): Promise<PublicPlan[]> {
     }));
 }
 
-/** Contato comercial: telefone, e-mail e site da empresa da plataforma (Configurações > Empresa). */
+/** Contato comercial: telefone e site da empresa da plataforma (Configurações > Empresa); e-mail sempre o contato@ da Vórtice. */
 export async function fetchSalesContact(): Promise<SalesContact> {
   // tenant-scope: ok (dados públicos de contato da empresa dona da plataforma)
   const { data } = await supabaseAdmin.from('tenants').select('*').eq('is_platform', true).maybeSingle();
@@ -162,7 +163,7 @@ export async function fetchSalesContact(): Promise<SalesContact> {
   const whatsapp = digits.length >= 12 ? digits : digits.length >= 10 ? `55${digits}` : null;
   return {
     whatsapp,
-    email: (data?.contact_email as string) || null,
+    email: VORTICE_CONTACT_EMAIL,
     website: (data?.website as string) || null,
   };
 }

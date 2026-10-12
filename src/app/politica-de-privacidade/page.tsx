@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { VORTICE_CONTACT_EMAIL } from '@/lib/contact';
 
 export const metadata = {
   title: 'Política de Privacidade | Vórtice CRM',
@@ -26,6 +27,11 @@ export default function PoliticaPrivacidade() {
       <p style={{ marginBottom: '20px' }}>
         Trabalhamos em conformidade com as leis de proteção de dados e nos comprometemos 
         com a segurança e transparência no tratamento das suas informações pessoais.
+      </p>
+
+      <p style={{ marginBottom: '20px' }}>
+        Dúvidas, pedidos de acesso, correção ou exclusão dos seus dados: escreva para{' '}
+        <a href={`mailto:${VORTICE_CONTACT_EMAIL}`} style={{ color: '#3b82f6' }}>{VORTICE_CONTACT_EMAIL}</a>.
       </p>
 
       <div style={{ marginTop: '40px', padding: '20px', borderTop: '1px solid #eaeaea' }}>

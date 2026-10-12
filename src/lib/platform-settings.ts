@@ -36,7 +36,7 @@ export interface PlatformSettings {
   smtpPort: string;
   smtpUser: string;
   smtpPassword: string;
-  /** Remetente: "Vórtice Tecnologia <nao-responda@vorticetecnologia.com.br>". */
+  /** Remetente: "Vórtice Tecnologia <contato@vorticetecnologia.tech>". */
   smtpFrom: string;
 }
 
