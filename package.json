@@ -10,7 +10,9 @@
     "db:seed-admin": "node scripts/seed-admin.js",
     "db:check-schema": "node scripts/check-schema.js",
     "check:tenant-scope": "node scripts/check-tenant-scope.js",
-    "check:permissions": "node scripts/check-route-permissions.js"
+    "check:permissions": "node scripts/check-route-permissions.js",
+    "check:lint": "node scripts/check-lint.js",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -44,6 +46,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
     "playwright": "^1.63.0",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

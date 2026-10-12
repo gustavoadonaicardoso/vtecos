@@ -1,0 +1,130 @@
+{
+  "src/app/admin/logs/page.tsx": {
+    "@typescript-eslint/no-explicit-any": 1,
+    "react-hooks/immutability": 1
+  },
+  "src/app/api/whatsapp/send/route.ts": {
+    "@typescript-eslint/no-explicit-any": 5
+  },
+  "src/app/automations/components/FlowEditor.tsx": {
+    "react-hooks/refs": 2
+  },
+  "src/app/chat/components/MessageInput.tsx": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "src/app/chat/page.tsx": {
+    "@typescript-eslint/no-explicit-any": 5,
+    "prefer-const": 1,
+    "react-hooks/set-state-in-effect": 4
+  },
+  "src/app/disparos/nova/page.tsx": {
+    "react-hooks/refs": 1
+  },
+  "src/app/display/DisplayMedia.tsx": {
+    "react-hooks/refs": 7,
+    "react-hooks/set-state-in-effect": 2
+  },
+  "src/app/financeiro/page.tsx": {
+    "react-hooks/set-state-in-effect": 2
+  },
+  "src/app/master/components/HelpTab.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/master/components/TenantsTab.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/metas/page.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/notificacoes/page.tsx": {
+    "@typescript-eslint/no-explicit-any": 1,
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/page.tsx": {
+    "react-hooks/set-state-in-effect": 2
+  },
+  "src/app/planejamentos/components/FunnelNode.tsx": {
+    "react-hooks/static-components": 1
+  },
+  "src/app/planejamentos/components/NewPlanningModal.tsx": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "src/app/planejamentos/page.tsx": {
+    "react-hooks/immutability": 1
+  },
+  "src/app/queue/DisplayMediaSettings.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/queue/page.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/relatorios/useReport.ts": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/scheduling/page.tsx": {
+    "react-hooks/preserve-manual-memoization": 1,
+    "react-hooks/set-state-in-effect": 3
+  },
+  "src/app/social/components/InsightsPanel.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/social/page.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/totem/page.tsx": {
+    "react-hooks/set-state-in-effect": 2
+  },
+  "src/components/HelpFAB.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/components/NotificationDropdown.tsx": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "src/components/Sidebar.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/components/SidebarProvider.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/components/ThemeProvider.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/components/WhatsAppNotificationListener.tsx": {
+    "react-hooks/refs": 1
+  },
+  "src/components/home/PersonalActivityFeed.tsx": {
+    "@typescript-eslint/no-explicit-any": 1,
+    "react-hooks/set-state-in-effect": 1,
+    "react/no-unescaped-entities": 2
+  },
+  "src/context/AuthContext.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/context/PresenceContext.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/hooks/useUnreadCount.ts": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/lib/audit.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "src/lib/notificationSound.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "src/lib/social/input.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "src/lib/whatsapp.ts": {
+    "@typescript-eslint/no-explicit-any": 3
+  },
+  "src/services/goals.service.ts": {
+    "@typescript-eslint/no-explicit-any": 2
+  },
+  "src/services/planning.service.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "src/types/whatsapp.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  }
+}
