@@ -72,6 +72,7 @@ Criados pela migration `202610310001_plans_modules_limits.sql` e editáveis no P
 - **Teste grátis de 7 dias:** botão nos planos da tela de login → `/cadastro`. Cria empresa, assinatura (1ª fatura no fim do teste) e administrador, sem cartão ([`src/services/signup.service.ts`](src/services/signup.service.ts)).
 - **Lembretes pelo WhatsApp da Vórtice:** quem faz o teste vira lead no CRM da Vórtice (etiqueta "Teste grátis") e recebe boas-vindas, dica do 3º dia, lembrete do 5º, fatura no 6º e obrigado ao pagar. Textos editáveis em Painel Master > Plataforma ([`src/services/trial-messages.service.ts`](src/services/trial-messages.service.ts)).
 - **Primeiros passos:** quadro no Início para o administrador de empresa nova (WhatsApp, equipe, leads, funil, respostas rápidas), que marca sozinho cada passo feito ([`src/services/onboarding.service.ts`](src/services/onboarding.service.ts)).
+- **Painel Master > Vendas:** MRR (anual conta 1/12), clientes pagantes, testes em andamento, conversão do teste (90 dias), inadimplência, recebido por mês (avisos do Asaas, sem estornos) e receita por plano ([`src/services/sales-dashboard.service.ts`](src/services/sales-dashboard.service.ts)).
 
 ---
 
