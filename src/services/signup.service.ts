@@ -64,7 +64,11 @@ export function parseSignup(body: Record<string, unknown>): { ok: true; value: S
 
 type Result = { ok: true; tenantId: string; trialEndsAt: string } | { ok: false; status: number; error: string };
 
-export async function startTrial(input: SignupInput, deps: { createUser: typeof createUserWithProfile } = { createUser: createUserWithProfile }): Promise<Result> {
+/**
+ * Confere o que dá para conferir antes de mandar o código por e-mail:
+ * plano à venda, e-mail e CPF/CNPJ ainda sem conta.
+ */
+export async function precheckSignup(input: SignupInput): Promise<{ ok: true; plan: { id: string; name: string; price: number } } | { ok: false; status: number; error: string }> {
   const { data: plan } = await db.from('plans').select('id, name, price, active, show_on_login').eq('id', input.planId).maybeSingle();
   if (!plan || !plan.active || !plan.show_on_login || Number(plan.price) < 5) {
     return { ok: false, status: 400, error: 'Este plano não está disponível para teste grátis. Escolha outro ou fale com a Vórtice.' };
@@ -79,6 +83,14 @@ export async function startTrial(input: SignupInput, deps: { createUser: typeof 
   if (sameDocument && sameDocument.length) {
     return { ok: false, status: 409, error: 'Este CPF/CNPJ já tem uma conta ou já usou o teste grátis. Entre pela tela de login ou fale com a Vórtice.' };
   }
+
+  return { ok: true, plan: { id: String(plan.id), name: String(plan.name), price: Number(plan.price) } };
+}
+
+export async function startTrial(input: SignupInput, deps: { createUser: typeof createUserWithProfile } = { createUser: createUserWithProfile }): Promise<Result> {
+  const checked = await precheckSignup(input);
+  if (!checked.ok) return checked;
+  const plan = checked.plan;
 
   const created = await createTenant({
     name: input.company,

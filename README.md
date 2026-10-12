@@ -179,7 +179,7 @@ No `npm run dev` as rotinas em segundo plano ficam desligadas: posts, disparos, 
 
 - **Instalação nova:** rode [`supabase/base-schema.sql`](supabase/base-schema.sql) no SQL Editor do Supabase e depois todos os arquivos de [`supabase/migrations`](supabase/migrations), em ordem de nome.
 - **Produção:** a cada PR que traz migration nova, rode **só o arquivo novo** no SQL Editor **antes** do deploy. As migrations são escritas para poder rodar de novo sem estragar nada.
-- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno), `202611040001_billing_asaas.sql` (cobrança automática) `202611050001_lead_extra_fields.sql` (campos extras dos leads) e `202611060001_leads_phone_key.sql` (achar o lead pelo telefone em qualquer formato).
+- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno), `202611040001_billing_asaas.sql` (cobrança automática) `202611050001_lead_extra_fields.sql` (campos extras dos leads), `202611060001_leads_phone_key.sql` (achar o lead pelo telefone em qualquer formato) e `202611070001_signup_email_codes.sql` (código de confirmação do e-mail no cadastro).
 - Depois de rodar uma migration, confira o banco com `npm run db:check-schema`.
 
 ---
@@ -200,6 +200,7 @@ O modelo completo, com comentários, está em [`.env.example`](.env.example). As
 | `CONTENT_SCHEDULER_ENABLED=true` | Liga as rotinas em segundo plano (só na VPS) |
 | `TWILIO_*` | Discador da Vórtice (cada empresa usa a própria conta Twilio, cadastrada em Integrações) |
 | `ASAAS_ENV`, `ASAAS_API_KEY`, `ASAAS_WEBHOOK_TOKEN` | Cobrança automática das empresas pelo Asaas (melhor configurar no Painel Master > Plataforma) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | E-mail da Vórtice: código de confirmação do cadastro do teste grátis (melhor configurar no Painel Master > Plataforma) |
 
 Várias configurações da plataforma também podem ser feitas no Painel Master > Plataforma, sem mexer no `.env.local`.
 

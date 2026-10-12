@@ -4,7 +4,7 @@ import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Building2, Eye, EyeOff, FileText, Lock, Mail, Phone, ShieldCheck, User } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, Eye, EyeOff, FileText, Lock, Mail, MailCheck, Phone, RotateCw, ShieldCheck, User } from 'lucide-react';
 import login from '../login/login.module.css';
 import styles from './cadastro.module.css';
 import { useAuth } from '@/context/AuthContext';
@@ -46,7 +46,7 @@ function SignupForm() {
   const router = useRouter();
   const { theme, config } = useTheme();
   const [plans, setPlans] = useState<PublicPlan[] | null>(null);
-  const [trial, setTrial] = useState<{ available: boolean; days: number }>({ available: false, days: 7 });
+  const [trial, setTrial] = useState<{ available: boolean; days: number; emailCode?: boolean }>({ available: false, days: 7 });
   const [contactLink, setContactLink] = useState<string | null>(null);
   const [planId, setPlanId] = useState(params.get('plano') || '');
   const [cycle, setCycle] = useState<'MONTHLY' | 'YEARLY'>(params.get('ciclo') === 'anual' ? 'YEARLY' : 'MONTHLY');
@@ -55,6 +55,18 @@ function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Confirmação do e-mail: o código de 6 dígitos chega antes de criar a conta.
+  const [step, setStep] = useState<'form' | 'code'>('form');
+  const [code, setCode] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+  const [notice, setNotice] = useState('');
+  const [sentTo, setSentTo] = useState('');
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
 
   useEffect(() => {
     fetch('/api/public/plans')
@@ -74,6 +86,41 @@ function SignupForm() {
   const value = plan ? (cycle === 'YEARLY' ? plan.price * 10 : plan.price) : 0;
   const set = (key: keyof typeof form, next: string) => setForm((current) => ({ ...current, [key]: next }));
 
+  const createAccount = async (withCode?: string) => {
+    const response = await fetch('/api/public/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, planId, cycle, accepted, ...(withCode ? { code: withCode } : {}) }),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError(json.error || 'Não foi possível criar a conta agora.');
+      setBusy(false);
+      return;
+    }
+    if (json.data) enter(json.data);
+    else router.push('/login');
+  };
+
+  /** Pede o código; devolve true quando ele foi mandado e a tela deve pedir os 6 dígitos. */
+  const sendCode = async (): Promise<boolean | null> => {
+    const response = await fetch('/api/public/signup/code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, planId, cycle, accepted }),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError(json.error || 'Não foi possível mandar o código agora.');
+      if (json.retryInSeconds) setResendIn(Number(json.retryInSeconds));
+      return null;
+    }
+    if (!json.data?.required) return false;
+    setResendIn(60);
+    setSentTo(form.email.trim().toLowerCase());
+    return true;
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!accepted) {
@@ -82,24 +129,73 @@ function SignupForm() {
     }
     setBusy(true);
     setError('');
+    setNotice('');
     try {
-      const response = await fetch('/api/public/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, planId, cycle, accepted }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setError(json.error || 'Não foi possível criar a conta agora.');
-        setBusy(false);
-        return;
+      if (trial.emailCode) {
+        // Voltou sem trocar o e-mail e o código ainda é recente: usa o mesmo.
+        if (sentTo === form.email.trim().toLowerCase() && resendIn > 0) {
+          setStep('code');
+          setBusy(false);
+          return;
+        }
+        const sent = await sendCode();
+        if (sent === null) {
+          setBusy(false);
+          return;
+        }
+        if (sent) {
+          setCode('');
+          setStep('code');
+          setBusy(false);
+          return;
+        }
       }
-      if (json.data) enter(json.data);
-      else router.push('/login');
+      await createAccount();
     } catch {
       setError('Sem conexão. Tente de novo.');
       setBusy(false);
     }
+  };
+
+  const confirmCode = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (code.length !== 6) {
+      setError('Digite os 6 números do código.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await createAccount(code);
+    } catch {
+      setError('Sem conexão. Tente de novo.');
+      setBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    if (resendIn > 0 || busy) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const sent = await sendCode();
+      if (sent) {
+        setCode('');
+        setNotice('Mandamos um código novo. Use o mais recente.');
+      }
+    } catch {
+      setError('Sem conexão. Tente de novo.');
+    }
+    setBusy(false);
+  };
+
+  const backToForm = () => {
+    setStep('form');
+    setError('');
+    setNotice('');
+    setCode('');
   };
 
   return (
@@ -124,6 +220,42 @@ function SignupForm() {
             {contactLink && <a className={login.loginBtn} href={contactLink} target="_blank" rel="noopener noreferrer">Falar com a Vórtice</a>}
             <Link href="/login" className={styles.back}><ArrowLeft size={15} /> Voltar ao login</Link>
           </div>
+        ) : step === 'code' ? (
+          <form className={`${login.loginForm} ${styles.form}`} onSubmit={confirmCode}>
+            <div className={styles.codeIntro}>
+              <MailCheck size={30} />
+              <p>Mandamos um código de 6 números para <strong>{form.email}</strong>. Digite abaixo para confirmar o e-mail e criar a conta.</p>
+              <small>Não chegou? Olhe a caixa de spam ou promoções. O código vale 15 minutos.</small>
+            </div>
+            {error && <div className={login.errorMessage}>{error}</div>}
+            {notice && <div className={styles.notice}>{notice}</div>}
+            <div className={login.inputGroup}>
+              <label htmlFor="s-code">Código de confirmação</label>
+              <input
+                id="s-code"
+                className={styles.codeInput}
+                value={code}
+                onChange={(e) => setCode(digits(e.target.value).slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="000000"
+                maxLength={6}
+                autoFocus
+                required
+              />
+            </div>
+            <button type="submit" className={login.loginBtn} disabled={busy || code.length !== 6}>
+              {busy ? <div className={login.loader} /> : <>Confirmar e criar a conta <ArrowRight size={18} /></>}
+            </button>
+            <div className={styles.codeActions}>
+              <button type="button" onClick={resend} disabled={busy || resendIn > 0}>
+                <RotateCw size={14} /> {resendIn > 0 ? `Reenviar código em ${resendIn}s` : 'Reenviar código'}
+              </button>
+              <button type="button" onClick={backToForm} disabled={busy}>
+                <ArrowLeft size={14} /> Trocar e-mail ou dados
+              </button>
+            </div>
+          </form>
         ) : (
           <form className={`${login.loginForm} ${styles.form}`} onSubmit={submit}>
             {error && <div className={login.errorMessage}>{error}</div>}
@@ -174,7 +306,7 @@ function SignupForm() {
             </label>
 
             <button type="submit" className={login.loginBtn} disabled={busy}>
-              {busy ? <div className={login.loader} /> : <>Começar o teste grátis <ArrowRight size={18} /></>}
+              {busy ? <div className={login.loader} /> : <>{trial.emailCode ? 'Continuar' : 'Começar o teste grátis'} <ArrowRight size={18} /></>}
             </button>
             <p className={styles.fine}>
               <ShieldCheck size={14} /> Sem fidelidade no teste: se não pagar a primeira fatura, o acesso é suspenso 3 dias depois do vencimento e nada mais é cobrado.
