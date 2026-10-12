@@ -156,6 +156,7 @@ vtecos/
 ├── .github/workflows/        # CI: checagens em cada PR
 ├── docs/                     # Fluxograma em PDF
 ├── deploy.sh                 # Deploy para a VPS (rodar no Mac)
+├── backup.sh                 # Backup do banco: instalar, agora, listar, baixar (rodar no Mac)
 └── .env.example              # Modelo das variáveis de ambiente
 ```
 
@@ -194,6 +195,7 @@ O modelo completo, com comentários, está em [`.env.example`](.env.example). As
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Conexão do navegador com o Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Acesso do servidor ao banco (nunca vai ao navegador) |
+| `SUPABASE_DB_URL` | Endereço do banco com senha (Session pooler), só para o backup diário |
 | `NEXT_PUBLIC_APP_URL` | Endereço público do sistema |
 | `GEMINI_API_KEY` | IA da Vórtice (as empresas podem cadastrar a própria chave em Integrações) |
 | `AI_PROVIDER`, `OLLAMA_URL`, `OLLAMA_MODEL` | IA local opcional na VPS |
@@ -240,6 +242,45 @@ Use `./deploy.sh --sem-git` para pular a conferência do GitHub. Depois do deplo
 | Tela nova com "Acesso negado" | O módulo não está no plano da empresa, ou a migration não foi rodada |
 | Posts, disparos ou lembretes não saem | Conferir `CONTENT_SCHEDULER_ENABLED=true` e `pm2 logs vtec-os` |
 | WhatsApp Web desconectado | Integrações > WhatsApp > ler o QR Code de novo |
+
+---
+
+## 💾 Backup do banco
+
+Todo dia às **03:17 (Brasília)** a VPS copia o banco do Supabase (dados das empresas e logins: esquemas `public` e `auth`) para `/root/vtec-os-backups`, fora do Supabase. Ficam os **últimos 14 dias** + o **primeiro backup de cada um dos últimos 6 meses**. O resultado aparece em **Painel Master > Status > Backup diário do banco**, e o sino avisa a equipe se falhar ou se passar de 26 horas sem backup.
+
+As fotos e arquivos enviados (Storage do Supabase) **não** entram neste backup: só o banco.
+
+**Ligar (uma vez):**
+
+1. No Supabase: botão **Connect** (no topo) > **Connection String** > **Session pooler**. Copie o endereço e troque `[YOUR-PASSWORD]` pela senha do banco (se não lembrar: Project Settings > Database > Reset database password).
+2. No `.env.local` do Mac: `SUPABASE_DB_URL="postgresql://postgres.xxxx:SENHA@aws-0-....pooler.supabase.com:5432/postgres"`
+3. No Mac: `./backup.sh instalar` (instala o `pg_dump` 17 na VPS, liga o cron e já faz o primeiro backup).
+4. `./deploy.sh` (para o Painel Master > Status mostrar o backup).
+
+**No dia a dia (no Mac):**
+
+| Comando | O que faz |
+|---|---|
+| `./backup.sh agora` | Faz um backup na hora (bom antes de rodar uma migration) |
+| `./backup.sh listar` | Mostra os backups guardados na VPS |
+| `./backup.sh baixar` | Baixa o mais recente para `~/Backups/vtec-os` (guarde uma cópia fora da VPS de vez em quando) |
+
+**Restaurar** (cuidado: escreve no banco de destino). O arquivo `.dump` abre com o `pg_restore`:
+
+```bash
+# Ver o que tem no backup
+pg_restore --list vtec-AAAA-MM-DD_HHMM.dump | less
+
+# Restaurar UMA tabela (ex.: leads apagados por engano) num banco de destino
+pg_restore --no-owner --data-only --table=leads \
+  -d "postgresql://...destino..." vtec-AAAA-MM-DD_HHMM.dump
+
+# Restaurar tudo num projeto Supabase NOVO e vazio
+pg_restore --no-owner -d "postgresql://...projeto-novo..." vtec-AAAA-MM-DD_HHMM.dump
+```
+
+Na dúvida, restaure primeiro num projeto Supabase novo (de teste), confira os dados e só depois copie o que precisa para produção.
 
 ---
 

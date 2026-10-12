@@ -96,6 +96,7 @@ export const HEALTH_CHECKS: { key: string; label: string; services: string[] }[]
   { key: 'redes', label: 'Publicação das Redes Sociais', services: ['redes'] },
   { key: 'discador', label: 'Motor do Discador', services: ['discador'] },
   { key: 'cobranca', label: 'Conferência da cobrança (Asaas)', services: [] },
+  { key: 'backup', label: 'Backup diário do banco', services: [] },
 ];
 
 export const healthLabel = (key: string) => HEALTH_CHECKS.find((item) => item.key === key)?.label || key;

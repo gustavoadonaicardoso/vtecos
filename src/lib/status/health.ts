@@ -11,6 +11,9 @@
  * ============================================================
  */
 
+import { readFile } from 'fs/promises';
+import path from 'path';
+import { backupDir, backupHealth } from '@/lib/status/backup';
 import { supabaseAdmin as db } from '@/lib/supabase-admin';
 import { lastBeat } from '@/lib/heartbeat';
 import { platformSettings } from '@/lib/platform-settings';
@@ -26,8 +29,8 @@ const WORKER_MAX_SILENCE_MS = 10 * 60_000;
 /** Logo depois de subir, o agendador ainda não bateu: não acusa. */
 const STARTUP_GRACE_S = 180;
 const WORKERS = ['automacoes', 'disparos', 'agendamento', 'redes', 'discador'];
-/** Banco e agendadores a cada minuto; IA e Meta (serviços de fora) a cada 2. */
-export const EXTERNAL_CHECKS = ['ia', 'meta'];
+/** Banco e agendadores a cada minuto; IA, Meta e backup a cada 2. */
+export const EXTERNAL_CHECKS = ['ia', 'meta', 'backup'];
 
 const workersEnabled = () => process.env.NODE_ENV === 'production' && process.env.CONTENT_SCHEDULER_ENABLED === 'true';
 
@@ -79,6 +82,12 @@ async function checkMeta(): Promise<Result> {
   return response.status >= 500 ? { status: 'down', message: `A API da Meta respondeu ${response.status}.`, latencyMs: null } : { status: 'ok', message: null, latencyMs: null };
 }
 
+async function checkBackup(): Promise<Result> {
+  if (!workersEnabled()) return { status: 'off', message: 'O backup roda só na VPS.', latencyMs: null };
+  const raw = await readFile(path.join(backupDir(), 'status.json'), 'utf8').catch(() => null);
+  return backupHealth(raw, new Date(), Boolean(process.env.SUPABASE_DB_URL));
+}
+
 function checkWorker(key: string): Result {
   if (!workersEnabled()) return { status: 'off', message: 'Os agendadores não rodam neste servidor (só na VPS, com CONTENT_SCHEDULER_ENABLED=true).', latencyMs: null };
   const last = lastBeat(key);
@@ -97,6 +106,7 @@ async function runCheck(key: string): Promise<Result> {
   if (key === 'banco') return timed(checkDatabase);
   if (key === 'ia') return timed(checkAi);
   if (key === 'meta') return timed(checkMeta);
+  if (key === 'backup') return timed(checkBackup);
   return checkWorker(key);
 }
 

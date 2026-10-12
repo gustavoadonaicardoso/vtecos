@@ -25,7 +25,7 @@ APP_NAME="vtec-os"
 APP_PORT="3000"
 PACKAGE="/tmp/vtec-os-deploy.tgz"
 # Arquivos que vão para a VPS (a .next vai sem o cache).
-FILES=(".next" "public" "package.json" "package-lock.json" "next.config.ts" "tsconfig.json" ".env.local")
+FILES=(".next" "public" "package.json" "package-lock.json" "next.config.ts" "tsconfig.json" ".env.local" "scripts/backup-db.sh")
 
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
@@ -135,6 +135,9 @@ rm -rf .next-old public-old
 mv .deploy-new/.next .next
 mv .deploy-new/public public
 cp .deploy-new/next.config.ts .deploy-new/tsconfig.json .deploy-new/.env.local .
+# Script do backup diário (o cron é ligado uma vez por ./backup.sh instalar).
+mkdir -p scripts
+cp .deploy-new/scripts/backup-db.sh scripts/ && chmod +x scripts/backup-db.sh
 
 restart() {
   if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
