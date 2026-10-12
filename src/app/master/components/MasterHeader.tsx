@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Activity, Building2, CheckCircle2, Layout, LayoutGrid, LifeBuoy, Loader2, Palette, Plus, RotateCcw, Save, ServerCog, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Activity, Building2, TrendingUp, CheckCircle2, Layout, LayoutGrid, LifeBuoy, Loader2, Palette, Plus, RotateCcw, Save, ServerCog, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import styles from '../master.module.css';
 import type { TabId } from '../types';
 
@@ -17,6 +17,7 @@ interface MasterHeaderProps {
 const TABS: { id: TabId; label: string; icon: typeof Layout }[] = [
   { id: 'modules', label: 'Módulo de Comando', icon: LayoutGrid },
   { id: 'tenants', label: 'Empresas e Planos', icon: Building2 },
+  { id: 'sales', label: 'Vendas', icon: TrendingUp },
   { id: 'branding', label: 'Identidade Visual', icon: Palette },
   { id: 'permissions', label: 'Menu por Função', icon: SlidersHorizontal },
   { id: 'banners', label: 'Banners', icon: Layout },
