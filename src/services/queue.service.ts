@@ -59,8 +59,8 @@ export async function syncLeadFromTicket(tenantId: string, params: {
   try {
     let existing: { id: string; name: string | null; phone: string | null; cpf_cnpj: string | null; tags: string[] | null } | null = null;
     if (params.whatsapp) {
-      const { data } = await supabase.from('leads').select('id, name, phone, cpf_cnpj, tags').eq('tenant_id', tenantId).eq('phone', params.whatsapp).limit(1).maybeSingle();
-      existing = data;
+      const { findLeadByPhone } = await import('@/lib/lead-phone');
+      existing = await findLeadByPhone(supabase, tenantId, params.whatsapp, 'id, name, phone, cpf_cnpj, tags');
     }
     if (!existing && params.document) {
       const { data } = await supabase.from('leads').select('id, name, phone, cpf_cnpj, tags').eq('tenant_id', tenantId).eq('cpf_cnpj', params.document).limit(1).maybeSingle();

@@ -41,15 +41,9 @@ export async function processInboundWhatsAppMessage(payload: any, db: any, tenan
             const mediaUrl = media?.url || payload.audio?.audioUrl || null;
             const messageType = media?.kind || (mediaUrl ? 'audio' : 'text');
 
-            // 1. Lead desta empresa com o mesmo telefone
-            const { data: candidates } = await db
-                .from('leads')
-                .select('id, name, phone')
-                .eq('tenant_id', tenantId)
-                .ilike('phone', `%${searchSuffix}`)
-                .limit(20);
-            const targetLead = (candidates || []).find((l: { phone?: string }) =>
-                (l.phone || '').replace(/\D/g, '').endsWith(searchSuffix));
+            // 1. Lead desta empresa com o mesmo telefone (em qualquer formato: "(11) 98888-7777", "5511988887777"...)
+            const { findLeadByPhone } = await import('@/lib/lead-phone');
+            const targetLead = await findLeadByPhone<{ id: string; name: string }>(db, tenantId, cleanPhone);
 
             let leadId = targetLead?.id;
 

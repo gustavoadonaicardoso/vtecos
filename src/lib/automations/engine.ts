@@ -1292,12 +1292,6 @@ function hookLimited(token: string) {
   return recent.length > 60;
 }
 
-const phoneVariants = (digits: string) => {
-  const local = digits.startsWith('55') && digits.length >= 12 ? digits.slice(2) : digits;
-  const full = local.length === 10 || local.length === 11 ? `55${local}` : digits;
-  return [...new Set([full, local, `+${full}`])];
-};
-
 /** POST /api/automations/hooks/[token]: acha (ou cria) o lead pelo telefone e inicia o fluxo. */
 export async function handleAutomationWebhook(token: string, payload: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
   if (!/^wh_[a-f0-9]{32}$/.test(token)) return { status: 404, body: { error: 'Endereço inválido.' } };
@@ -1319,8 +1313,8 @@ export async function handleAutomationWebhook(token: string, payload: Record<str
   if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
   if (digits.length < 10 || digits.length > 15) return { status: 400, body: { error: `Informe o telefone do contato no campo "${c.phoneField || 'phone'}".` } };
 
-  const { data: found } = await supabaseAdmin.from('leads').select('id').eq('tenant_id', flow.tenant_id).in('phone', phoneVariants(digits)).limit(1);
-  let leadId = found?.[0]?.id as string | undefined;
+  const { findLeadByPhone } = await import('@/lib/lead-phone');
+  let leadId = ((await findLeadByPhone(supabaseAdmin, flow.tenant_id, digits, 'id'))?.id as string | undefined);
   let created = false;
   if (!leadId) {
     if (c.createLead === false) return { status: 404, body: { error: 'Nenhum lead com esse telefone.' } };

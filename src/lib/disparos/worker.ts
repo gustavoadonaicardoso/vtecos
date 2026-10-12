@@ -31,6 +31,7 @@ import { companyOf, syncCounts } from '@/services/disparos.service';
 import { blastsLeftToday, tenantHasModule } from '@/lib/plan-limits';
 import { ChannelError, deliverWhatsApp, recordOutbound } from '@/lib/whatsapp-outbound';
 import { getAccessPassword } from '@/services/lead-fields.service';
+import { findLeadByPhone } from '@/lib/lead-phone';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -60,9 +61,7 @@ async function leadFor(campaign: Row, contact: Row): Promise<Row | null> {
     const { data } = await db.from('leads').select('*').eq('tenant_id', campaign.tenant_id).eq('id', contact.lead_id).maybeSingle();
     if (data) return data;
   }
-  const suffix = String(contact.phone).slice(-8);
-  const { data: candidates } = await db.from('leads').select('*').eq('tenant_id', campaign.tenant_id).ilike('phone', `%${suffix}`).limit(10);
-  const match = ((candidates || []) as Row[]).find((lead) => String(lead.phone || '').replace(/\D/g, '').endsWith(suffix));
+  const match = await findLeadByPhone<Row>(db, campaign.tenant_id, contact.phone, '*');
   if (match) return match;
   if (!campaign.create_leads) return null;
   const { data: stage } = await db.from('pipeline_stages').select('id').eq('tenant_id', campaign.tenant_id).order('position').limit(1).maybeSingle();

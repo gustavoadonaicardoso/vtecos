@@ -89,15 +89,8 @@ async function handleInboundMessage(
     const wamid = message.id; // WhatsApp Message ID
 
     // 1. Lead DESTA empresa com o mesmo telefone
-    const { data: candidates } = await supabase
-      .from('leads')
-      .select('id, name, phone')
-      .eq('tenant_id', tenantId)
-      .ilike('phone', `%${searchSuffix}`)
-      .limit(20);
-    const targetLead = (candidates || []).find((l: { phone?: string }) =>
-      (l.phone || '').replace(/\D/g, '').endsWith(searchSuffix)
-    );
+    const { findLeadByPhone } = await import('@/lib/lead-phone');
+    const targetLead = await findLeadByPhone<{ id: string; name: string }>(supabase, tenantId, searchSuffix);
 
     let leadId: string | null = targetLead?.id ?? null;
     let isNewLead = false;
