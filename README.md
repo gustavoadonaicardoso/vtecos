@@ -151,7 +151,9 @@ vtecos/
 ├── supabase/
 │   ├── base-schema.sql       # Esquema inicial (só instalação nova)
 │   └── migrations/           # Mudanças do banco, em ordem de nome
-├── scripts/                  # check-tenant-scope, check-route-permissions, seed-admin, check-schema
+├── scripts/                  # check-tenant-scope, check-route-permissions, check-lint, seed-admin, check-schema
+├── tests/                    # Testes das regras (npm test)
+├── .github/workflows/        # CI: checagens em cada PR
 ├── docs/                     # Fluxograma em PDF
 ├── deploy.sh                 # Deploy para a VPS (rodar no Mac)
 └── .env.example              # Modelo das variáveis de ambiente
@@ -248,13 +250,17 @@ Use `./deploy.sh --sem-git` para pular a conferência do GitHub. Depois do deplo
 | `npm run dev` | Servidor de desenvolvimento |
 | `npm run build` | Build de produção |
 | `npm run start` | Sobe o build (porta 3000) |
-| `npm run lint` | ESLint |
+| `npm run lint` | ESLint (mostra também os erros antigos) |
+| `npm run check:lint` | ESLint sem erros **novos**: só falha se um arquivo piorar em relação a `scripts/lint-baseline.json` |
+| `npm test` | Testes das regras (cobrança, teste grátis, planos, campos dos leads, automações, permissões), sem banco |
 | `npm run check:tenant-scope` | Garante que toda consulta do servidor filtra pela empresa (exceções marcadas com `// tenant-scope: ok`) |
 | `npm run check:permissions` | Garante que toda rota de API checa uma permissão |
 | `npm run db:seed-admin` | Cria o primeiro administrador |
 | `npm run db:check-schema` | Confere se o banco tem as tabelas esperadas |
 
-Antes de abrir uma PR: `npx tsc --noEmit`, `npm run lint`, os dois `check:*` e `npm run build`.
+Antes de abrir uma PR: `npx tsc --noEmit`, `npm run check:lint`, `npm run check:tenant-scope`, `npm run check:permissions`, `npm test` e `npm run build`.
+
+**CI (GitHub Actions):** cada PR e cada push na `main` rodam essas mesmas checagens ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); o resultado aparece na PR como **CI / Checagens**. Corrigiu erros de lint antigos? Rode `npm run check:lint -- --update` para baixar a lista.
 
 ---
 

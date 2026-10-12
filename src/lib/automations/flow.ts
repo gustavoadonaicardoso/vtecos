@@ -519,7 +519,7 @@ export function normalizeGraph(raw: unknown): FlowGraph {
     const from = byId.get(item.fromId as string);
     const to = byId.get(item.toId as string);
     if (!from || !to || from.id === to.id || isTrigger(to.type)) continue;
-    const port = PORT_RE.test(String(item.fromPort)) ? String(item.fromPort) : 'default';
+    const port = typeof item.fromPort === 'string' && PORT_RE.test(item.fromPort) ? item.fromPort : 'default';
     // Saída que não existe mais (opção removida, por exemplo) some junto.
     if (!portsFor(from).some((candidate) => candidate.id === port)) continue;
     // Cada saída leva a um só bloco.

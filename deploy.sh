@@ -78,6 +78,12 @@ echo "  Versão: $(git log --oneline -1 2>/dev/null || echo 'sem git')"
 
 # -- 2. Build do zero ------------------------------------------
 log "[2/6] Compilando do zero (pode levar alguns minutos)..."
+# Dependência nova no package-lock.json (veio no git pull)? Instala antes
+# de compilar -- senão o build falha com "Module not found".
+if [[ ! -f node_modules/.package-lock.json || package-lock.json -nt node_modules/.package-lock.json ]]; then
+  echo "  Dependências mudaram: instalando (npm install)..."
+  npm install --no-audit --no-fund || fail "npm install falhou. Confira a internet e rode de novo."
+fi
 rm -rf .next
 npm run build
 BUILD_ID="$(cat .next/BUILD_ID)"

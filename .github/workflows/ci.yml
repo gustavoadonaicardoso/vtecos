@@ -1,0 +1,57 @@
+# Checagens automáticas em cada PR (e em cada push na main).
+# O que roda aqui é o mesmo que dá para rodar no computador antes de subir:
+#   npx tsc --noEmit · npm run check:lint · npm run check:tenant-scope
+#   npm run check:permissions · npm test · npm run build
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Checagens
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      - name: Tipos (TypeScript)
+        run: npx tsc --noEmit
+
+      - name: Lint (sem erros novos)
+        run: npm run check:lint
+
+      - name: Separação por empresa
+        run: npm run check:tenant-scope
+
+      - name: Permissões das rotas
+        run: npm run check:permissions
+
+      - name: Testes
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Valores de mentira: o build não fala com o banco.
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+          NEXT_TELEMETRY_DISABLED: 1
