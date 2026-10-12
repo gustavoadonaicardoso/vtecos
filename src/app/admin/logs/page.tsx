@@ -16,6 +16,7 @@ import {
   PlusCircle,
   Edit,
   Trash2,
+  Eye,
   ChevronDown,
   Megaphone,
   ClipboardList
@@ -40,6 +41,7 @@ const ACTION_ICONS: Record<string, any> = {
   'LEAD_CREATE': PlusCircle,
   'LEAD_UPDATE': Edit,
   'LEAD_DELETE': Trash2,
+  'LEAD_SECRET_VIEW': Eye,
   'TICKET_CREATE': Database,
   'TICKET_CALL': Activity,
   'TICKET_COMPLETE': Shield,
@@ -55,6 +57,7 @@ const ACTION_COLORS: Record<string, string> = {
   'LEAD_CREATE': '#3b82f6',
   'LEAD_UPDATE': '#f59e0b',
   'LEAD_DELETE': '#ef4444',
+  'LEAD_SECRET_VIEW': '#8b5cf6',
   'TICKET_CREATE': '#8b5cf6',
   'TICKET_CALL': '#06b6d4',
   'TICKET_COMPLETE': '#10b981',

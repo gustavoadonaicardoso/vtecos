@@ -8,6 +8,9 @@ import type { Lead, LeadTag, PipelineStage } from '@/types';
 import TagPicker from '@/components/leads/TagPicker';
 import type { TeamMember } from '@/components/leads/useTeam';
 import { formatDateTime, initials, moneyInput, parseMoneyInput } from '../format';
+import LeadExtraFields from './LeadExtraFields';
+import { useCustomFields } from '@/components/leads/useCustomFields';
+import type { LeadExtra } from '@/lib/lead-fields';
 
 interface LeadPanelProps {
   lead: Lead;
@@ -22,7 +25,12 @@ interface LeadPanelProps {
   hideConversation?: boolean;
 }
 
-type Draft = { name: string; phone: string; email: string; cpfCnpj: string; value: string; pipelineStage: string; assignedTo: string; tags: string[]; notes: string; blocked: boolean };
+type Draft = {
+  name: string; phone: string; email: string; cpfCnpj: string; value: string; pipelineStage: string; assignedTo: string; tags: string[]; notes: string; blocked: boolean;
+  extra: LeadExtra; custom: Record<string, string>;
+  /** undefined = a senha não foi mexida. */
+  password?: string;
+};
 
 const toDraft = (lead: Lead): Draft => ({
   name: lead.name,
@@ -35,6 +43,9 @@ const toDraft = (lead: Lead): Draft => ({
   tags: lead.tags,
   notes: lead.notes || '',
   blocked: lead.status === 'Bloqueado',
+  extra: lead.extra || {},
+  custom: lead.customFields || {},
+  password: undefined,
 });
 
 export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, onSave, onDelete, onClose, hideConversation }: LeadPanelProps) {
@@ -42,8 +53,17 @@ export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, o
   const original = toDraft(lead);
   const [draft, setDraft] = useState<Draft>(original);
   const [busy, setBusy] = useState(false);
+  // Depois de salvar, o painel volta a mostrar o que o servidor gravou (ex.: CEP e Instagram formatados).
+  const [savedFrom, setSavedFrom] = useState<Lead | null>(null);
+  const [resetKey, setResetKey] = useState(0);
+  if (savedFrom && lead !== savedFrom) {
+    setSavedFrom(null);
+    setDraft(toDraft(lead));
+    setResetKey((value) => value + 1);
+  }
   const [error, setError] = useState('');
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
+  const { fields: customDefs } = useCustomFields();
 
   // Só o que mudou vai para o servidor.
   const changes: Record<string, unknown> = {};
@@ -57,14 +77,21 @@ export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, o
   if (JSON.stringify(draft.tags) !== JSON.stringify(original.tags)) changes.tags = draft.tags;
   if (draft.notes !== original.notes) changes.notes = draft.notes;
   if (draft.blocked !== original.blocked) changes.status = draft.blocked ? 'Bloqueado' : 'Ativo';
+  const extraChanges = Object.fromEntries(Object.entries({ ...original.extra, ...draft.extra }).filter(([key]) => (draft.extra[key as keyof LeadExtra] || '') !== (original.extra[key as keyof LeadExtra] || '')).map(([key]) => [key, draft.extra[key as keyof LeadExtra] || '']));
+  if (Object.keys(extraChanges).length) changes.extra = extraChanges;
+  const customChanges = Object.fromEntries(Object.keys({ ...original.custom, ...draft.custom }).filter((key) => (draft.custom[key] || '') !== (original.custom[key] || '')).map((key) => [key, draft.custom[key] || '']));
+  if (Object.keys(customChanges).length) changes.customFields = customChanges;
+  if (draft.password !== undefined) changes.accessPassword = draft.password;
   const dirty = Object.keys(changes).length > 0;
 
   const save = async () => {
+    const before = lead;
     setBusy(true);
     setError('');
     const failure = await onSave(changes);
     setBusy(false);
     if (failure) setError(failure);
+    else setSavedFrom(before);
   };
 
   const remove = async () => {
@@ -155,6 +182,21 @@ export default function LeadPanel({ lead, stages, team, tagOptions, canAssign, o
             <span>Etiquetas</span>
             <TagPicker value={draft.tags} options={tagOptions} onChange={(tags) => set('tags', tags)} />
           </div>
+
+          <LeadExtraFields
+            key={`${lead.id}-${resetKey}`}
+            leadId={lead.id}
+            leadEmail={draft.email}
+            extra={draft.extra}
+            onExtra={(key, value) => set('extra', { ...draft.extra, [key]: value })}
+            onExtras={(values) => setDraft((current) => ({ ...current, extra: { ...current.extra, ...values } }))}
+            customDefs={customDefs}
+            custom={draft.custom}
+            onCustom={(key, value) => set('custom', { ...draft.custom, [key]: value })}
+            password={draft.password}
+            onPassword={(value) => set('password', value)}
+            canManageFields={canAssign}
+          />
 
           <label className={styles.field}>
             <span>Observações</span>

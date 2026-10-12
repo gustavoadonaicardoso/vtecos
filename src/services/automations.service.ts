@@ -224,7 +224,9 @@ export async function editorOptions(tenantId: string) {
     supabaseAdmin.from('automation_flows').select('id, name, status').eq('tenant_id', tenantId).order('name'),
   ]);
   const { getWhatsAppWebStatus } = await import('@/lib/whatsapp-web');
+  const { listCustomFields } = await import('@/services/lead-fields.service');
   return {
+    customFields: await listCustomFields(tenantId),
     stages: stages || [],
     team: (team || []).map((member) => ({ id: member.id, name: member.name, role: member.role, hasPhone: Boolean(member.phone) })),
     tags: (tags || []).map((tag) => String(tag.name)),

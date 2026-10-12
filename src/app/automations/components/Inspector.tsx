@@ -29,6 +29,7 @@ import {
   type NodeConfig,
 } from '@/lib/automations/flow';
 import { BLOCKS, newItemId, type EditorOptions } from '../library';
+import { EXTRA_FIELDS } from '@/lib/lead-fields';
 
 interface InspectorProps {
   node: FlowNode;
@@ -48,8 +49,12 @@ interface InspectorProps {
 type VariableGroup = { group: string; items: { name: string; description: string }[] };
 
 /** Variáveis disponíveis: as prontas + as que os blocos deste fluxo guardam + as do gatilho. */
-function variableGroups(graph: FlowGraph): VariableGroup[] {
+function variableGroups(graph: FlowGraph, options: EditorOptions | null): VariableGroup[] {
   const groups: VariableGroup[] = [...BUILTIN_VARIABLES];
+  if (options?.customFields?.length) {
+    const at = groups.findIndex((group) => group.group === 'Dados do cliente');
+    groups.splice(at + 1, 0, { group: 'Campos personalizados', items: options.customFields.map((field) => ({ name: `lead.campo.${field.key}`, description: field.label })) });
+  }
   const own = flowVariables(graph);
   if (graph.nodes.some((node) => node.type === 'webhook')) own.push({ name: 'webhook_status', description: 'Código de resposta do último webhook' });
   if (own.length) groups.unshift({ group: 'Deste fluxo', items: own });
@@ -267,7 +272,7 @@ const ROLE_HINT = 'Ninguém escolhido = vendedores e gerentes ativos.';
 export default function Inspector({ node, graph, options, readOnly, flowId, webhookToken, onRegenerateToken, onLabel, onConfig, onRemoveConnection, onDelete, onClose }: InspectorProps) {
   const c = node.config;
   const block = BLOCKS[node.type];
-  const groups = useMemo(() => variableGroups(graph), [graph]);
+  const groups = useMemo(() => variableGroups(graph, options), [graph, options]);
   const set = (changes: NodeConfig) => onConfig(changes);
   const tpl = (key: keyof NodeConfig, props: { rows?: number; placeholder?: string; maxLength?: number } = {}) => (
     <TemplateInput value={String(c[key] ?? '')} onChange={(value) => set({ [key]: value })} groups={groups} disabled={readOnly} {...props} />
@@ -749,14 +754,29 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
         {node.type === 'update-lead' && (
           <>
             <Field label="O que mudar">
-              <select className={styles.input} value={c.field || 'stage'} onChange={(e) => set({ field: e.target.value as NodeConfig['field'], fieldValue: '' })}>
-                <option value="stage">Etapa do funil</option>
-                <option value="assigned_to">Responsável</option>
-                <option value="value">Valor</option>
-                <option value="name">Nome</option>
-                <option value="email">E-mail</option>
-                <option value="cpf_cnpj">CPF/CNPJ</option>
-                <option value="source">Origem</option>
+              <select className={styles.input} value={c.field || 'stage'} onChange={(e) => set({ field: e.target.value as NodeConfig['field'], fieldValue: e.target.value === 'access_password' ? '{{gerar.senha}}' : '' })}>
+                <optgroup label="Principais">
+                  <option value="stage">Etapa do funil</option>
+                  <option value="assigned_to">Responsável</option>
+                  <option value="value">Valor</option>
+                  <option value="name">Nome</option>
+                  <option value="email">E-mail</option>
+                  <option value="cpf_cnpj">CPF/CNPJ</option>
+                  <option value="source">Origem</option>
+                </optgroup>
+                <optgroup label="Acesso do cliente">
+                  {EXTRA_FIELDS.filter((field) => field.group === 'access').map((field) => <option key={field.column} value={field.column}>{field.label}</option>)}
+                  <option value="access_password">Senha de acesso</option>
+                </optgroup>
+                <optgroup label="Dados do cliente">
+                  {EXTRA_FIELDS.filter((field) => field.group !== 'access').map((field) => <option key={field.column} value={field.column}>{field.label}</option>)}
+                </optgroup>
+                {(options?.customFields?.length || String(c.field || '').startsWith('campo.')) && (
+                  <optgroup label="Campos personalizados">
+                    {options?.customFields?.map((field) => <option key={field.key} value={`campo.${field.key}`}>{field.label}</option>)}
+                    {String(c.field || '').startsWith('campo.') && !options?.customFields?.some((field) => `campo.${field.key}` === c.field) && <option value={c.field}>Campo removido</option>}
+                  </optgroup>
+                )}
               </select>
             </Field>
             {c.field === 'stage' || !c.field ? (
@@ -770,8 +790,13 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
                   {options?.team.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                 </select>
               </Field>
+            ) : c.field === 'access_password' ? (
+              <Field label="Nova senha" hint="{{gerar.senha}} cria uma senha aleatória (10 caracteres, sem letras parecidas). Depois, use {{lead.access_password}} na mensagem. A senha não aparece no histórico da execução.">
+                {tpl('fieldValue')}
+                <button type="button" className={styles.linkBtn} disabled={readOnly} onClick={() => set({ fieldValue: '{{gerar.senha}}' })}>Usar senha aleatória</button>
+              </Field>
             ) : (
-              <Field label="Novo valor" hint="Pode usar respostas: {{email}}, {{valor}}...">{tpl('fieldValue')}</Field>
+              <Field label="Novo valor" hint={c.field === 'birth_date' ? 'Data no formato dd/mm/aaaa. Pode usar respostas: {{data}}...' : 'Pode usar respostas: {{email}}, {{valor}}... Valor vazio apaga o campo.'}>{tpl('fieldValue')}</Field>
             )}
           </>
         )}

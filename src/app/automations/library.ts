@@ -30,6 +30,7 @@ import {
   Workflow,
   Zap,
 } from 'lucide-react';
+import { EXTRA_FIELDS } from '@/lib/lead-fields';
 import {
   aiCategories,
   conditionRules,
@@ -120,6 +121,8 @@ export const BLOCKS: Record<NodeType, BlockDefinition> = Object.fromEntries(
 ) as Record<NodeType, BlockDefinition>;
 
 export interface EditorOptions {
+  /** Campos personalizados dos leads (Leads > Campos). */
+  customFields?: { key: string; label: string; type: string }[];
   stages: { id: string; name: string }[];
   team: { id: string; name: string; role?: string; hasPhone?: boolean }[];
   tags: string[];
@@ -130,7 +133,10 @@ export interface EditorOptions {
 }
 
 const SOURCE_LABEL: Record<string, string> = { any: 'qualquer origem', whatsapp: 'WhatsApp', form: 'formulário do site', manual: 'cadastro manual', totem: 'totem de senhas', webhook: 'outro sistema' };
-const FIELD_LABEL: Record<string, string> = { value: 'Valor', name: 'Nome', email: 'E-mail', cpf_cnpj: 'CPF/CNPJ', source: 'Origem' };
+const FIELD_LABEL: Record<string, string> = {
+  value: 'Valor', name: 'Nome', email: 'E-mail', cpf_cnpj: 'CPF/CNPJ', source: 'Origem', access_password: 'Senha de acesso',
+  ...Object.fromEntries(EXTRA_FIELDS.map((field) => [field.column, field.label])),
+};
 const MEDIA_LABEL: Record<string, string> = { image: 'Imagem', video: 'Vídeo', audio: 'Áudio', document: 'Arquivo' };
 
 export function formatMinutes(minutes: number) {
@@ -214,6 +220,8 @@ export function describeNode(node: FlowNode, options: EditorOptions | null): str
     case 'update-lead': {
       if (c.field === 'stage' || !c.field) return `Mover para: ${stage(c.fieldValue)}`;
       if (c.field === 'assigned_to') return `Responsável: ${names([c.fieldValue || ''], options)}`;
+      if (c.field.startsWith('campo.')) return `${options?.customFields?.find((field) => `campo.${field.key}` === c.field)?.label || 'Campo personalizado'}: ${c.fieldValue || '…'}`;
+      if (c.field === 'access_password') return c.fieldValue === '{{gerar.senha}}' ? 'Senha de acesso: aleatória' : 'Senha de acesso: ••••';
       return `${FIELD_LABEL[c.field] || 'Campo'}: ${c.fieldValue || '…'}`;
     }
     case 'tag-lead':

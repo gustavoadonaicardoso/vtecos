@@ -55,7 +55,7 @@ function simulate(graph: FlowGraph, options: EditorOptions | null, input: { name
   if (!trigger) return [];
   const stage = options?.stages.find((item) => item.id === input.stageId);
   const ctx: RunContext = emptyContext({
-    lead: { ...emptyContext().lead, id: 'simulado', name: input.name, phone: '5511999998888', stage_id: input.stageId, stage: stage?.name || '', tags: input.tags.split(',').map((tag) => tag.trim()).filter(Boolean), source: 'WhatsApp', created_at: new Date().toISOString(), stage_changed_at: new Date().toISOString() },
+    lead: { ...emptyContext().lead, id: 'simulado', name: input.name, phone: '5511999998888', stage_id: input.stageId, stage: stage?.name || '', tags: input.tags.split(',').map((tag) => tag.trim()).filter(Boolean), source: 'WhatsApp', created_at: new Date().toISOString(), stage_changed_at: new Date().toISOString(), email: 'cliente@exemplo.com', extra: { accessLogin: 'cliente.exemplo', accessUrl: 'https://acesso.exemplo.com' }, access_password: '(senha de acesso)' },
     company: { name: 'Sua empresa', phone: '', website: '', address: '' },
     flow: { name: 'Simulação' },
     message: input.message,

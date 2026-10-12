@@ -1,4 +1,7 @@
 import type { ChatMessage, MessageKind } from './types';
+import type { Lead } from '@/types';
+import { emptyContext } from '@/lib/automations/flow';
+import { isKnownMessageVariable, messageVariableValue } from '@/lib/message-variables';
 
 const KINDS: MessageKind[] = ['text', 'audio', 'image', 'document'];
 
@@ -42,19 +45,38 @@ export function initials(name: string) {
 }
 
 /**
- * Variáveis das respostas rápidas: {{nome}}, {{primeiro_nome}},
- * {{atendente}} (e os nomes das automações: {{lead.name}}, {{lead.first_name}}).
+ * Variáveis das respostas rápidas: as mesmas das mensagens agendadas
+ * ({{nome}}, {{primeiro_nome}}, {{email_acesso}}, {{campo.chave}}...),
+ * {{atendente}} e os nomes das automações. Variável que o sistema não
+ * conhece fica como está. A senha ({{senha_acesso}}) só entra quando
+ * `password` vem preenchida (lida do servidor na hora de inserir); na
+ * prévia aparece "••••••".
  */
-export function fillTemplate(text: string, vars: { name: string; agent: string }) {
-  const first = vars.name.trim().split(/\s+/)[0] || '';
-  const map: Record<string, string> = {
-    nome: vars.name,
-    'lead.name': vars.name,
-    primeiro_nome: first,
-    'lead.first_name': first,
-    atendente: vars.agent,
-  };
-  return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key: string) => map[key.toLowerCase()] ?? match);
+export function fillTemplate(text: string, vars: { name: string; agent: string; lead?: Lead | null; password?: string | null }) {
+  const lead = vars.lead;
+  const ctx = emptyContext({
+    lead: {
+      ...emptyContext().lead,
+      id: lead?.id || '',
+      name: lead?.name || vars.name,
+      phone: lead?.phone || '',
+      email: lead?.email || '',
+      cpf_cnpj: lead?.cpfCnpj || '',
+      tags: lead?.tags || [],
+      value: lead?.valueNumber || 0,
+      source: lead?.source || '',
+      created_at: lead?.createdAt || '',
+      stage_changed_at: lead?.stageChangedAt || '',
+      protocol: lead?.protocol || '',
+      extra: lead?.extra || {},
+      custom: lead?.customFields || {},
+      access_password: vars.password === undefined ? '••••••' : vars.password || '',
+    },
+  });
+  return text.replace(/\{\{\s*([\w.]+)\s*(?:\|([^}]*))?\}\}/g, (match, key: string, fallback?: string) => {
+    if (!isKnownMessageVariable(key)) return match;
+    return messageVariableValue(key, ctx, { agentName: vars.agent }) || (fallback ?? '').trim();
+  });
 }
 
 export const EMOJIS = ['😀', '😂', '😊', '😍', '😉', '😎', '🤔', '😅', '🙏', '👍', '👏', '💪', '🙌', '🎉', '✅', '❤️', '🔥', '⭐', '📅', '📞', '💬', '📍', '💰', '🛒', '📦', '🚚', '⏰', '👋', '😢', '😮', '🤝', '✨'];

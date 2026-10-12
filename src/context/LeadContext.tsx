@@ -22,7 +22,13 @@ export type { Lead, LeadTag, PipelineStage };
 /** Campos que a tela pode alterar (o resto é calculado pelo servidor). */
 const EDITABLE: (keyof Lead)[] = ['name', 'email', 'phone', 'cpfCnpj', 'value', 'pipelineStage', 'assignedTo', 'tags', 'notes', 'status'];
 
-export type LeadInput = Partial<Pick<Lead, 'name' | 'email' | 'phone' | 'cpfCnpj' | 'pipelineStage' | 'assignedTo' | 'tags' | 'notes' | 'status'>> & { value?: string | number };
+export type LeadInput = Partial<Pick<Lead, 'name' | 'email' | 'phone' | 'cpfCnpj' | 'pipelineStage' | 'assignedTo' | 'tags' | 'notes' | 'status'>> & {
+  value?: string | number;
+  /** Só os campos que mudaram. */
+  extra?: Record<string, string>;
+  customFields?: Record<string, string>;
+  accessPassword?: string;
+};
 
 export type AddLeadResult =
   | { ok: true; lead: Lead }
@@ -238,10 +244,15 @@ export const LeadProvider = ({ children }: { children: ReactNode }) => {
       const before = current ? (current as Record<string, unknown>)[key] : undefined;
       if (JSON.stringify(next ?? null) !== JSON.stringify(before ?? null)) changed[key] = next;
     }
+    const optimistic = { ...changed };
+    // Campos extras, personalizados e senha: só o que mudou vai para o servidor (a resposta traz o lead completo).
+    for (const key of ['extra', 'customFields', 'accessPassword'] as const) {
+      if (key in updates) changed[key] = (updates as Record<string, unknown>)[key];
+    }
     if (Object.keys(changed).length === 0) return { ok: true };
 
     const previous = leadsRef.current;
-    setLeads((prev) => prev.map((lead) => (lead.id === leadId ? { ...lead, ...(changed as Partial<Lead>) } : lead)));
+    setLeads((prev) => prev.map((lead) => (lead.id === leadId ? { ...lead, ...(optimistic as Partial<Lead>) } : lead)));
     const { ok, json } = await send(`/api/leads/${leadId}`, 'PATCH', changed);
     if (!ok) {
       setLeads(previous);

@@ -30,6 +30,7 @@ import {
 import { companyOf, syncCounts } from '@/services/disparos.service';
 import { blastsLeftToday, tenantHasModule } from '@/lib/plan-limits';
 import { ChannelError, deliverWhatsApp, recordOutbound } from '@/lib/whatsapp-outbound';
+import { getAccessPassword } from '@/services/lead-fields.service';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -76,7 +77,10 @@ async function leadFor(campaign: Row, contact: Row): Promise<Row | null> {
 /** Manda a mensagem de um contato. ChannelError = problema do canal (não do contato). */
 async function sendContact(campaign: Row, contact: Row, company: Awaited<ReturnType<typeof companyOf>>) {
   const lead = await leadFor(campaign, contact);
-  const ctx = contextFor({ name: contact.name, phone: contact.phone, data: contact.data || {} }, lead, company);
+  // Senha de acesso só é lida quando a mensagem usa a variável.
+  const usesPassword = /senha_acesso|access_password/.test(`${campaign.template || ''} ${(campaign.variants || []).join(' ')} ${JSON.stringify(campaign.meta_template?.params || [])}`);
+  const password = lead && usesPassword ? await getAccessPassword(campaign.tenant_id, String(lead.id)).catch(() => null) : null;
+  const ctx = contextFor({ name: contact.name, phone: contact.phone, data: contact.data || {} }, lead, company, password);
   const channel = campaign.channel === 'api' ? 'api' : 'web';
   const rendered = renderForContact({ template: campaign.template || '', variants: campaign.variants || [], optoutText: campaign.optout_text || null, channel, metaTemplate: campaign.meta_template || null }, ctx);
   if (!rendered.text) throw new Error('Mensagem vazia depois de trocar as variáveis.');

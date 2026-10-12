@@ -1,3 +1,5 @@
+import type { LeadExtra } from '@/lib/lead-fields';
+
 // ─── CRM — Leads & Pipeline ──────────────────────────────────
 
 export type Lead = {
@@ -38,6 +40,10 @@ export type Lead = {
   instagramUsername?: string | null;
   /** Protocolo do atendimento (000123), usado em {{protocolo}}. */
   protocol?: string;
+  /** Acesso, dados pessoais e endereço (src/lib/lead-fields.ts). A senha de acesso não vem aqui. */
+  extra?: LeadExtra;
+  /** Campos personalizados da empresa ({chave: valor}). */
+  customFields?: Record<string, string>;
 };
 
 /** Etiqueta cadastrada pela empresa. */

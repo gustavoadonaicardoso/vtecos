@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, Edit2, Loader2, Plus, Search, T
 import styles from './respostas.module.css';
 import { useAuth } from '@/context/AuthContext';
 import { fillTemplate } from '../format';
+import type { Lead } from '@/types';
 import {
   QUICK_REPLY_CONTENT_MAX,
   QUICK_REPLY_NAME_MAX,
@@ -29,7 +30,17 @@ const VARIABLES: { token: string; label: string }[] = [
   { token: '{{primeiro_nome}}', label: 'Primeiro nome' },
   { token: '{{nome}}', label: 'Nome completo' },
   { token: '{{atendente}}', label: 'Seu nome' },
+  { token: '{{email_acesso}}', label: 'E-mail de acesso' },
+  { token: '{{senha_acesso}}', label: 'Senha de acesso' },
+  { token: '{{link_acesso}}', label: 'Link de acesso' },
+  { token: '{{saudacao}}', label: 'Bom dia / Boa tarde' },
 ];
+
+/** Lead de exemplo da prévia (a senha aparece como ••••••). */
+const PREVIEW_LEAD = {
+  id: 'exemplo', name: 'Maria Souza', email: 'maria@email.com', phone: '', cpfCnpj: '', tags: [], pipelineStage: '', entryDate: '', status: 'Ativo', color: '', channels: [], lastMsg: '',
+  extra: { accessEmail: 'maria.aluna@escola.com', accessUrl: 'https://portal.exemplo.com', accessLogin: 'maria.souza' },
+} as Lead;
 
 /** Pontos de partida para quem ainda não tem nenhuma resposta. */
 const EXAMPLES: { name: string; shortcut: string; content: string }[] = [
@@ -37,6 +48,7 @@ const EXAMPLES: { name: string; shortcut: string; content: string }[] = [
   { name: 'Horário de atendimento', shortcut: 'horario', content: 'Nosso atendimento é de segunda a sexta, das [__h] às [__h].' },
   { name: 'Endereço', shortcut: 'endereco', content: 'Estamos em [endereço completo]. Quer que eu mande a localização?' },
   { name: 'Agradecimento', shortcut: 'obrigado', content: 'Obrigado pelo contato, {{primeiro_nome}}! Qualquer dúvida, é só chamar por aqui.' },
+  { name: 'Dados de acesso', shortcut: 'acesso', content: '{{saudacao}}, {{primeiro_nome}}! Seu acesso está liberado:\n\nLink: {{link_acesso}}\nE-mail: {{email_acesso}}\nSenha: {{senha_acesso}}\n\nQualquer dúvida, é só chamar por aqui.' },
 ];
 
 const emptyDraft = (): Draft => ({ id: null, name: '', shortcut: '', shortcutTouched: false, content: '' });
@@ -159,7 +171,7 @@ export default function QuickRepliesPage() {
   };
 
   const previewName = 'Maria Souza';
-  const preview = draft ? fillTemplate(draft.content, { name: previewName, agent }) : '';
+  const preview = draft ? fillTemplate(draft.content, { name: previewName, agent, lead: PREVIEW_LEAD }) : '';
 
   return (
     <div className={styles.page}>

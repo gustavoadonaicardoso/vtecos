@@ -374,3 +374,45 @@ textarea.input { resize: vertical; line-height: 1.5; }
   .formGrid, .facts { grid-template-columns: 1fr; }
   .panel { width: 100%; }
 }
+
+/* ── Campos extras do lead (acesso, dados pessoais, endereço, personalizados) ── */
+
+.extraSections { display: flex; flex-direction: column; gap: 8px; }
+.extraSection { border: 1px solid var(--card-border); border-radius: 14px; padding: 0 12px; }
+.extraSection[open] { padding-bottom: 12px; }
+.extraSection > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--foreground);
+  cursor: pointer;
+  list-style: none;
+}
+.extraSection > summary::-webkit-details-marker { display: none; }
+.extraSection > summary::after { content: '▸'; margin-left: auto; color: var(--muted); transition: transform 0.15s; }
+.extraSection[open] > summary::after { transform: rotate(90deg); }
+.extraCount { padding: 1px 7px; border-radius: 99px; background: rgba(59, 130, 246, 0.14); color: var(--brand, #3b82f6); font-size: 0.72rem; }
+.secretRow { display: flex; gap: 6px; align-items: center; }
+.secretRow .input { flex: 1; min-width: 0; }
+.hintText { margin: 0; font-size: 0.76rem; line-height: 1.45; color: var(--muted); }
+.varHint { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; color: var(--muted); }
+
+/* ── Modal de campos personalizados ── */
+
+.fieldRows { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.fieldRows li { display: grid; grid-template-columns: auto 1fr 120px auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--card-border); }
+.fieldRows li .input { min-height: 34px; }
+.fieldRows code { grid-column: 2 / -1; font-size: 0.72rem; color: var(--muted); }
+.moveBtns { display: flex; flex-direction: column; }
+.moveBtns button { padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; line-height: 0; }
+.moveBtns button:disabled { opacity: 0.3; cursor: default; }
+.modalFoot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 20px; border-top: 1px solid var(--card-border); }
+
+@media (max-width: 560px) {
+  .fieldRows li { grid-template-columns: auto 1fr auto; }
+  .fieldRows li select { grid-column: 2 / 3; }
+  .secretRow { flex-wrap: wrap; }
+}

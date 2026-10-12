@@ -38,7 +38,7 @@ import {
   type MetaTemplateChoice,
   type SendWindow,
 } from '@/lib/disparos';
-import { BUILTIN_VARIABLES, WEEKDAYS } from '@/lib/automations/flow';
+import { BUILTIN_VARIABLES, WEEKDAYS, isCustomFieldVariable } from '@/lib/automations/flow';
 
 interface Options {
   stages: { id: string; name: string }[];
@@ -214,7 +214,7 @@ export default function NewCampaignPage() {
     const known = new Set([...BUILTIN_VARIABLES.flatMap((group) => group.items.map((item) => item.name)), ...variableGroups[0].names]);
     const texts = channel === 'api' ? metaTemplate?.params || [] : [template, ...variants];
     const used = texts.flatMap((text) => [...text.matchAll(/\{\{\s*([\w.]+)\s*(\|[^}]*)?\}\}/g)].filter((match) => !match[2]).map((match) => match[1]));
-    return [...new Set(used.filter((name) => !known.has(name)))];
+    return [...new Set(used.filter((name) => !known.has(name) && !isCustomFieldVariable(name)))];
   }, [variableGroups, channel, metaTemplate, template, variants]);
 
   const pickVariable = (variable: string) => {

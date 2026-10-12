@@ -1,4 +1,5 @@
 import type { Lead } from '@/types';
+import { EXTRA_FIELDS, brDate } from '@/lib/lead-fields';
 
 export function initials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -24,7 +25,9 @@ export const digits = (value: string) => value.replace(/\D/g, '');
 
 /** Exporta os leads filtrados em CSV (abre no Excel com acentos). */
 export function exportCsv(leads: Lead[], stageName: (id: string) => string, ownerName: (id?: string | null) => string) {
-  const header = ['Nome', 'Telefone', 'E-mail', 'CPF/CNPJ', 'Etapa', 'Responsável', 'Etiquetas', 'Origem', 'Valor', 'Entrada', 'Situação', 'Observações'];
+  // Campos extras e personalizados entram como colunas (a senha de acesso nunca é exportada).
+  const customKeys = Array.from(new Set(leads.flatMap((lead) => Object.keys(lead.customFields || {}))));
+  const header = ['Nome', 'Telefone', 'E-mail', 'CPF/CNPJ', 'Etapa', 'Responsável', 'Etiquetas', 'Origem', 'Valor', 'Entrada', 'Situação', 'Observações', ...EXTRA_FIELDS.map((field) => field.label), ...customKeys];
   const rows = leads.map((lead) => [
     lead.name,
     lead.phone,
@@ -38,6 +41,8 @@ export function exportCsv(leads: Lead[], stageName: (id: string) => string, owne
     lead.entryDate,
     lead.status,
     (lead.notes || '').replace(/\s+/g, ' '),
+    ...EXTRA_FIELDS.map((field) => (field.key === 'birthDate' && lead.extra?.birthDate ? brDate(lead.extra.birthDate) : lead.extra?.[field.key] || '')),
+    ...customKeys.map((key) => lead.customFields?.[key] || ''),
   ]);
   const escape = (value: string) => (/[";\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
   const csv = '﻿' + [header, ...rows].map((row) => row.map((cell) => escape(String(cell ?? ''))).join(';')).join('\r\n');
