@@ -233,10 +233,8 @@ export async function fetchLeadById(tenantId: string, leadId: string, filters?: 
 
 /** Lead desta empresa com o mesmo telefone (compara os últimos 8 números). */
 export async function findLeadByPhone(tenantId: string, phone: string) {
-  const suffix = digits(phone).slice(-8);
-  if (suffix.length < 8) return null;
-  const { data } = await supabase.from('leads').select('id, name, phone, assigned_to').eq('tenant_id', tenantId).ilike('phone', `%${suffix.slice(-4)}%`).limit(200);
-  return ((data || []) as Row[]).find((row) => digits(row.phone).endsWith(suffix)) as { id: string; name: string; phone: string; assigned_to: string | null } | undefined ?? null;
+  const { findLeadByPhone: byPhone } = await import('@/lib/lead-phone');
+  return byPhone<{ id: string; name: string; phone: string; assigned_to: string | null }>(supabase, tenantId, phone, 'id, name, phone, assigned_to');
 }
 
 /**
