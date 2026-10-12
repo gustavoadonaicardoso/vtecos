@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isPlatformTenant, parseTenantInput, updateTenant } from '@/services/tenants.service';
 import { requirePlatformAdmin } from '@/lib/session';
 import { syncSubscriptionPrice } from '@/services/billing.service';
+import { clearPendingPlanChange } from '@/services/plan-change.service';
 
 // PATCH: altera nome, status, plano e dados de contato da empresa (só admin).
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +23,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     // Trocou de plano: a assinatura no Asaas passa a cobrar o valor novo.
     let warning: string | null = null;
     if ('plan_id' in parsed.data) {
+      // O Master decidiu o plano: uma troca que o cliente tinha agendado deixa de valer.
+      await clearPendingPlanChange(id).catch(() => null);
       const synced = await syncSubscriptionPrice(id);
       if (!synced.success) warning = `Plano trocado, mas a cobrança no Asaas não foi atualizada: ${synced.error}`;
     }

@@ -29,6 +29,7 @@ import { playNotificationSound } from '@/lib/notificationSound';
 import { getNotificationPrefs, setNotificationPrefs, DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from '@/lib/notificationPrefs';
 import { LIMIT_INFO, PLAN_MODULES, limitLabel, type PlanLimits } from '@/lib/plans';
 import { BILLING_STATUS_LABEL, BILLING_TONE, INVOICE_STATUS_LABEL, billingSentence, brDate, cycleText, isPaidInvoice, money as brl, type BillingSummaryView, type InvoiceView } from '@/lib/billing-labels';
+import PlanChangeSection from './PlanChangeSection';
 
 type TabId = 'profile' | 'security' | 'notifications' | 'company' | 'plan';
 
@@ -742,6 +743,14 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {!plan.is_platform && (
+            <PlanChangeSection
+              onChanged={async () => {
+                await Promise.all([loadCompany(), loadBilling(), refreshUser()]);
+              }}
+            />
+          )}
+
           {!plan.is_platform && (!plan.name || !plan.active) && (
             <div className={styles.error}><AlertTriangle size={16} /> Sem um plano ativo, a equipe só vê Início, Chat, Equipe, Integrações, Configurações e Ajuda.</div>
           )}
@@ -783,7 +792,7 @@ export default function SettingsPage() {
 
           {!plan.is_platform && (
             <p className={styles.hint}>
-              Para mudar de plano ou liberar outro módulo, fale com a Vórtice Tecnologia.
+              {billing && billing.summary.automatic ? 'Troque de plano acima a qualquer momento.' : 'Para mudar de plano ou liberar outro módulo, fale com a Vórtice Tecnologia.'}
               {plan.usage && plan.usage.limits.ai_monthly_limit !== null && ' A franquia de IA não vale para quem cadastra a própria chave do Gemini em Integrações.'}
             </p>
           )}
