@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowRight, ArrowUp, Braces, Copy, Loader2, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react';
 import styles from '../automations.module.css';
 import {
@@ -224,6 +224,32 @@ function FieldSelect({ value, onChange, graph }: { value: string; onChange: (val
       </select>
       {custom && <input className={styles.input} value={value} placeholder="ex.: entrada.produto" onChange={(e) => onChange(e.target.value.replace(/[^\w.]/g, ''))} />}
     </div>
+  );
+}
+
+/** Caixas da empresa (módulo E-mail) para o bloco "Enviar e-mail". */
+function EmailAccountSelect({ value, onChange, disabled }: { value: string; onChange: (value: string) => void; disabled: boolean }) {
+  const [state, setState] = useState<{ accounts: { id: string; name: string; emailAddress: string; status: string }[]; error: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/email/automation-accounts')
+      .then(async (response) => {
+        const json = await response.json().catch(() => ({}));
+        if (alive) setState(response.ok ? { accounts: json.data || [], error: '' } : { accounts: [], error: json.error || 'Não foi possível carregar as caixas.' });
+      })
+      .catch(() => alive && setState({ accounts: [], error: 'Sem conexão.' }));
+    return () => { alive = false; };
+  }, []);
+  if (!state) return <p className={styles.hint}><Loader2 size={13} className={styles.spin} /> Carregando caixas...</p>;
+  if (state.error) return <p className={styles.hint}>{state.error}</p>;
+  if (!state.accounts.length) return <p className={styles.hint}>Nenhuma caixa da empresa conectada. Conecte em E-mail &gt; Caixas.</p>;
+  return (
+    <select className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+      <option value="">Escolha a caixa...</option>
+      {state.accounts.map((account) => (
+        <option key={account.id} value={account.id}>{account.name} ({account.emailAddress}){account.status === 'error' ? ' — com erro' : account.status === 'paused' ? ' — pausada' : ''}</option>
+      ))}
+    </select>
   );
 }
 
@@ -875,6 +901,18 @@ export default function Inspector({ node, graph, options, readOnly, flowId, webh
             <Check checked={Boolean(c.alsoWhatsApp)} onChange={(value) => set({ alsoWhatsApp: value })}>
               Mandar também pelo WhatsApp da empresa para o celular de cada pessoa (telefone do perfil em Equipe)
             </Check>
+          </>
+        )}
+
+        {node.type === 'send-email' && (
+          <>
+            <Field label="Caixa que envia" hint="Só caixas da empresa (E-mail > Caixas). A assinatura da caixa vai no final.">
+              <EmailAccountSelect value={c.emailAccountId || ''} onChange={(emailAccountId) => set({ emailAccountId })} disabled={readOnly} />
+            </Field>
+            <Field label="Para" hint="Normalmente o e-mail do lead. Separe vários com vírgula.">{tpl('emailTo', { placeholder: '{{lead.email}}' })}</Field>
+            <Field label="Assunto">{tpl('emailSubject', { maxLength: 300 })}</Field>
+            <Field label="Texto do e-mail" hint={'Use variáveis como {{lead.first_name}}, {{lead.access_email}} e {{lead.access_password}}. O texto não aparece no histórico da automação.'}>{tpl('message', { rows: 8 })}</Field>
+            <p className={styles.hint}>Lead sem e-mail ou envio recusado: segue pela saída <strong>Erro</strong> (se estiver ligada) ou a execução para com o motivo.</p>
           </>
         )}
 

@@ -187,6 +187,16 @@ function simulate(graph: FlowGraph, options: EditorOptions | null, input: { name
         port = ok ? 'default' : 'no';
         break;
       }
+      case 'send-email': {
+        const to = renderTemplate(c.emailTo || '', ctx).trim();
+        if (!to) {
+          steps.push({ node, text: 'O lead não tem e-mail: segue por "Erro" (não é enviado na simulação).', tone: 'info' });
+          port = 'no';
+          break;
+        }
+        steps.push({ node, text: `📧 Para ${to}\nAssunto: ${renderTemplate(c.emailSubject || '', ctx)}\n\n${renderTemplate(c.message || '', ctx)}`, tone: 'send' });
+        break;
+      }
       case 'ai-reply': {
         const text = '(a IA escreveria a resposta aqui, seguindo as instruções)';
         if (c.variable) ctx.vars[c.variable] = text;

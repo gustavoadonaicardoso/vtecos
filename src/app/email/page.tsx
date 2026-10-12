@@ -72,6 +72,19 @@ function EmailPage() {
       openedFromLink.current = true;
       setDraft({ mode: 'new', accountId: data[0].id, to, cc: '', subject: params.get('assunto') || '', body: '' });
     }
+    // ?abrir=id abre um e-mail (aviso do sino, e-mails do lead).
+    const openId = params.get('abrir');
+    if (openId && data.length && !openedFromLink.current) {
+      openedFromLink.current = true;
+      setSelectedId(openId);
+      setThreadLoading(true);
+      try {
+        setThread(await api<Thread>(`/api/email/messages/${encodeURIComponent(openId)}`));
+      } catch (err) {
+        setThreadError(err instanceof Error ? err.message : 'Não foi possível abrir.');
+      }
+      setThreadLoading(false);
+    }
   }, [params]);
 
   const loadTemplates = useCallback(async () => {
@@ -216,6 +229,11 @@ function EmailPage() {
       to = message.replyTo || formatAddress(from);
     }
     setDraft({ mode, accountId: thread.account.id, to, cc, subject: replySubject(message.subject), body: '', parent: message });
+  };
+
+  const reloadThread = async () => {
+    if (!thread) return;
+    setThread(await api<Thread>(`/api/email/messages/${thread.openedId}`).catch(() => thread));
   };
 
   const afterSent = async (accountId: string) => {
@@ -368,7 +386,7 @@ function EmailPage() {
           </section>
 
           <section className={styles.readerPane} aria-label="Leitura">
-            <Reader thread={thread} loading={threadLoading} error={threadError} onBack={closeReader} onReply={startReply} onAction={readerAction} />
+            <Reader thread={thread} loading={threadLoading} error={threadError} onBack={closeReader} onReply={startReply} onAction={readerAction} onLeadLinked={reloadThread} />
           </section>
         </div>
       )}

@@ -17,6 +17,7 @@ export interface Account {
   status: 'active' | 'error' | 'paused';
   lastError: string | null;
   lastSyncAt: string | null;
+  notify: boolean;
   unread: number;
   canManage: boolean;
 }
@@ -51,6 +52,10 @@ export interface Thread {
   account: Account;
   messages: MessageFull[];
   openedId: string;
+  /** Lead ligado à conversa (pelo e-mail do contato). */
+  lead: { id: string; name: string; canOpen: boolean } | null;
+  /** Quem está do outro lado da conversa (para "Criar lead"). */
+  contact: EmailAddress | null;
 }
 
 export interface Template {

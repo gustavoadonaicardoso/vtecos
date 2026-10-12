@@ -19,6 +19,7 @@ interface FormState {
   smtp_port: string;
   username: string;
   signature: string;
+  notify: boolean;
 }
 
 const blank = (canShared: boolean): FormState => {
@@ -36,6 +37,7 @@ const blank = (canShared: boolean): FormState => {
     smtp_port: String(preset.smtpPort),
     username: '',
     signature: '',
+    notify: true,
   };
 };
 
@@ -52,6 +54,7 @@ const fromAccount = (account: Account): FormState => ({
   smtp_port: String(account.smtpPort),
   username: account.username,
   signature: account.signature,
+  notify: account.notify,
 });
 
 interface Props {
@@ -68,7 +71,7 @@ export default function AccountsModal({ accounts, canShared, onClose, onChanged 
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
 
-  const set = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }));
   const preset = EMAIL_PRESETS.find((item) => item.key === form.preset) || EMAIL_PRESETS[EMAIL_PRESETS.length - 1];
 
   const choosePreset = (key: string) => {
@@ -220,6 +223,10 @@ export default function AccountsModal({ accounts, canShared, onClose, onChanged 
               <label className={styles.field}>
                 <span>Assinatura (vai no fim de cada e-mail)</span>
                 <textarea className={styles.input} rows={3} value={form.signature} onChange={(e) => set('signature', e.target.value)} placeholder={'Ana Souza\nDoces da Ana · (11) 99999-0000'} maxLength={2000} />
+              </label>
+              <label className={styles.checkRow}>
+                <input type="checkbox" checked={form.notify} onChange={(e) => set('notify', e.target.checked)} />
+                <span>Avisar no sino quando chegar e-mail{form.kind === 'shared' ? ' (para quem tem acesso ao E-mail)' : ''}</span>
               </label>
               <details className={styles.details} open={form.preset === 'custom'}>
                 <summary>Servidores (avançado)</summary>

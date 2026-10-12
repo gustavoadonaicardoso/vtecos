@@ -7,13 +7,14 @@
  * a impressão da versão anterior (a que está no ar).
  */
 export const DEFAULT_ARTICLE_HISTORY: Record<string, string[]> = {
-  'automacoes': ['01eac17b35babcdb', '24c8afd9dbdb083d', '35ab6dfd40617093', 'a7024cbeb5bdc340', 'd4103bcee3e62dfa'],
+  'automacoes': ['01eac17b35babcdb', '24c8afd9dbdb083d', '35ab6dfd40617093', '4216fe5a30ddb0e8', 'a7024cbeb5bdc340', 'd4103bcee3e62dfa'],
   'chamados-suporte': ['00ede920232aee66'],
   'conectar-redes-sociais': ['04a9c410840e7805', '32ec6f383fe5ef22'],
   'configuracoes-da-conta': ['8037512b15a1d207', '8c5337aab3a64296', '963e9af61e70ecbb', 'ed278d8ca98ea088'],
   'custos-e-precificacao': ['002a9fea5fcc9fbc', '9838f47a1686045e'],
   'discador': ['716fb1ac28bdd0c9'],
   'disparos': ['674c4741e23550fb', 'caa0ff85c901e227'],
+  'email': ['edd37b4c1049d67c'],
   'equipe-e-permissoes': ['4faa066eec057aa4', 'd5a11671f5482616', 'df7c96c8033999fe'],
   'gestao-de-leads': ['835aead334f91cf8', '8ca85b8407094581', 'f775719117699453'],
   'integracao-captura-leads': ['9362f55de09bce0f', 'e271e2f397918dab'],

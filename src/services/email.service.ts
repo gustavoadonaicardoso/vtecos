@@ -28,6 +28,7 @@ import {
   type EmailAddress,
 } from '@/lib/email/format';
 import { fetchNewMessages, markSeenOnServer, sendThroughServer, testMailServer, type IncomingMessage, type MailServer } from '@/lib/email/transport';
+import { profileHasPermission } from '@/lib/permissions.constants';
 import type { TenantAuth } from '@/lib/session';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -63,6 +64,8 @@ export interface AccountView {
   lastSyncAt: string | null;
   unread: number;
   canManage: boolean;
+  /** Avisa no sino quando chega e-mail. */
+  notify: boolean;
 }
 
 const canSee = (account: Row, auth: TenantAuth) => account.tenant_id === auth.tenantId && (account.kind === 'shared' || account.owner_id === auth.profile.id);
@@ -86,6 +89,7 @@ function toView(account: Row, auth: TenantAuth, unread = 0): AccountView {
     lastSyncAt: account.last_sync_at,
     unread,
     canManage: canManage(account, auth),
+    notify: account.notify !== false,
   };
 }
 
@@ -142,6 +146,7 @@ interface AccountInput {
   username: string;
   password: string;
   signature: string;
+  notify: boolean;
 }
 
 const port = (value: unknown, fallback: number) => {
@@ -165,6 +170,7 @@ function cleanAccount(body: Row, current?: Row): { value: AccountInput } | { err
     username: text('username', 160) || email,
     password: typeof body.password === 'string' ? body.password : '',
     signature: text('signature', 2000),
+    notify: typeof body.notify === 'boolean' ? body.notify : current ? current.notify !== false : true,
   };
   if (!value.imap_host) return { error: 'Informe o servidor de entrada (IMAP).' };
   if (!value.smtp_host) return { error: 'Informe o servidor de saída (SMTP).' };
@@ -231,6 +237,7 @@ export async function updateAccount(auth: TenantAuth, id: string, body: Row): Pr
     name: input.name,
     from_name: input.from_name,
     signature: input.signature,
+    notify: input.notify,
     updated_at: nowIso(),
   };
   if (serverChanged) {
@@ -275,6 +282,19 @@ export async function deleteAccount(auth: TenantAuth, id: string): Promise<Resul
 
 // ── Sincronização ──────────────────────────────────────────────
 
+// ── Leads ──────────────────────────────────────────────────────
+
+/** Lead da empresa com um destes e-mails (o mais antigo, se houver mais de um). */
+async function matchLead(tenantId: string, addresses: string[]): Promise<string | null> {
+  const wanted = [...new Set(addresses.map((item) => item.trim().toLowerCase()).filter(isEmail))].slice(0, 10);
+  for (const address of wanted) {
+    const { data } = await db.from('leads').select('id, email').eq('tenant_id', tenantId).ilike('email', address).order('created_at', { ascending: true }).limit(5);
+    const found = ((data || []) as Row[]).find((row) => String(row.email || '').toLowerCase() === address);
+    if (found) return String(found.id);
+  }
+  return null;
+}
+
 const safeName = (name: string) => name.normalize('NFD').replace(/[^\w.-]+/g, '_').replace(/_+/g, '_').slice(-80) || 'anexo';
 
 async function uploadAttachments(tenantId: string, accountId: string, files: { filename: string; contentType: string; size: number; content: Buffer }[]) {
@@ -308,9 +328,9 @@ async function threadKeyForIncoming(account: Row, message: IncomingMessage) {
   return threadKeyFor({ messageId: message.messageId, inReplyTo: message.inReplyTo, references: message.references, subject: message.subject });
 }
 
-async function storeIncoming(account: Row, message: IncomingMessage): Promise<'saved' | 'duplicate'> {
+async function storeIncoming(account: Row, message: IncomingMessage): Promise<{ id: string } | 'duplicate'> {
   const attachments = message.attachments.length ? await uploadAttachments(account.tenant_id, account.id, message.attachments) : [];
-  const { error } = await db.from('email_messages').insert({
+  const { data: saved, error } = await db.from('email_messages').insert({
     tenant_id: account.tenant_id,
     account_id: account.id,
     folder: 'inbox',
@@ -331,7 +351,8 @@ async function storeIncoming(account: Row, message: IncomingMessage): Promise<'s
     attachments,
     sent_at: message.date,
     is_read: message.seen,
-  });
+    lead_id: await matchLead(account.tenant_id, [message.from.address]),
+  }).select('id').single();
   if (error) {
     if (error.code === '23505') {
       await removeFiles(attachmentPaths([{ attachments }])).catch(() => {});
@@ -339,7 +360,26 @@ async function storeIncoming(account: Row, message: IncomingMessage): Promise<'s
     }
     throw new Error(error.message);
   }
-  return 'saved';
+  return { id: String(saved.id) };
+}
+
+/** Quem recebe o aviso de e-mail novo: o dono (pessoal) ou quem tem a permissão E-mail (da empresa). */
+async function notifyNewMail(account: Row, items: { id: string; from: string; subject: string }[]) {
+  if (!items.length || account.notify === false) return;
+  let userIds: string[];
+  if (account.kind === 'personal') {
+    userIds = account.owner_id ? [String(account.owner_id)] : [];
+  } else {
+    const { data } = await db.from('profiles').select('id, role, permissions').eq('tenant_id', account.tenant_id).eq('status', 'ACTIVE');
+    userIds = ((data || []) as Row[]).filter((person) => profileHasPermission(person as { role: string; permissions: unknown }, 'email.view')).map((person) => String(person.id));
+  }
+  if (!userIds.length) return;
+  const single = items.length === 1 ? items[0] : null;
+  const title = single ? `Novo e-mail de ${single.from}`.slice(0, 120) : `${items.length} e-mails novos em ${account.name}`;
+  const content = single ? `${single.subject || '(sem assunto)'} · ${account.email_address}` : items.slice(0, 3).map((item) => `${item.from}: ${item.subject || '(sem assunto)'}`).join(' · ');
+  const link = single ? `/email?abrir=${single.id}` : '/email';
+  const { error } = await db.from('system_notifications').insert(userIds.map((user_id) => ({ user_id, type: 'email', title, content: content.slice(0, 500), is_read: false, link })));
+  if (error) console.error('[email] aviso no sino falhou:', error.message);
 }
 
 async function notifyError(account: Row, message: string) {
@@ -368,11 +408,22 @@ export async function syncAccount(account: Row, maxBatches = 3): Promise<{ saved
   let saved = 0;
   let uidValidity = account.uid_validity == null ? null : String(account.uid_validity);
   let lastUid = Number(account.last_uid) || 0;
+  // Primeira busca (ou caixa recriada no servidor) traz o histórico: não avisa no sino.
+  // E só avisa do que chegou no último dia (resto de histórico grande não vira aviso).
+  const fresh: { id: string; from: string; subject: string }[] = [];
+  const own = String(account.email_address).toLowerCase();
+  const recentSince = Date.now() - 24 * 60 * 60 * 1000;
+  let importing: boolean | null = null;
   try {
     for (let round = 0; round < maxBatches; round++) {
       const result = await fetchNewMessages(serverOf(account, password), { uidValidity, lastUid });
+      if (importing === null) importing = uidValidity === null || result.uidValidity !== uidValidity;
       for (const message of result.messages) {
-        if ((await storeIncoming(account, message)) === 'saved') saved++;
+        const stored = await storeIncoming(account, message);
+        if (stored === 'duplicate') continue;
+        saved++;
+        const recent = new Date(message.date).getTime() >= recentSince;
+        if (!importing && recent && !message.seen && message.from.address !== own) fresh.push({ id: stored.id, from: message.from.name || message.from.address, subject: message.subject });
       }
       uidValidity = result.uidValidity;
       lastUid = result.lastUid;
@@ -384,9 +435,11 @@ export async function syncAccount(account: Row, maxBatches = 3): Promise<{ saved
       if (!result.more) break;
     }
   } catch (error) {
+    await notifyNewMail(account, fresh).catch(() => {});
     const { emailErrorMessage } = await import('@/lib/email/errors');
     return markError(error instanceof Error && /^(O servidor|Servidor|Não foi|Problema|Erro no)/.test(error.message) ? error.message : emailErrorMessage(error, 'imap'));
   }
+  await notifyNewMail(account, fresh).catch(() => {});
   return { saved };
 }
 
@@ -473,7 +526,17 @@ async function loadMessage(auth: TenantAuth, id: string): Promise<{ message: Row
   return account ? { message: message as Row, account } : null;
 }
 
-export async function getThread(auth: TenantAuth, id: string): Promise<Result<{ account: AccountView; messages: MessageFull[]; openedId: string }>> {
+export interface ThreadLead {
+  id: string;
+  name: string;
+  /** Vendedor não abre lead de outro vendedor: vê só que o contato já é lead. */
+  canOpen: boolean;
+}
+
+/** Mesma regra da tela de Leads: admin e gerente veem todos; vendedor, só os seus. */
+const canSeeLead = (auth: TenantAuth, lead: Row) => isManager(auth) || lead.assigned_to === auth.profile.id;
+
+export async function getThread(auth: TenantAuth, id: string): Promise<Result<{ account: AccountView; messages: MessageFull[]; openedId: string; lead: ThreadLead | null; contact: EmailAddress | null }>> {
   const loaded = await loadMessage(auth, id);
   if (!loaded) return fail(404, 'E-mail não encontrado.');
   const { message, account } = loaded;
@@ -491,6 +554,26 @@ export async function getThread(auth: TenantAuth, id: string): Promise<Result<{ 
     if (uids.length && password) void markSeenOnServer(serverOf(account, password), uids);
   }
 
+  // Lead da conversa: o já ligado ou, se o cliente virou lead depois, procura agora pelo e-mail.
+  const own = String(account.email_address).toLowerCase();
+  const contactRow = rows.find((row) => row.direction === 'in' && row.from_address !== own);
+  const contact: EmailAddress | null = contactRow
+    ? { name: contactRow.from_name || '', address: contactRow.from_address }
+    : (((rows[0]?.to_list || []) as EmailAddress[])[0] || null);
+  let leadId = (rows.find((row) => row.lead_id)?.lead_id as string | undefined) || null;
+  if (!leadId && contact) {
+    leadId = await matchLead(auth.tenantId, [contact.address]);
+    if (leadId) await db.from('email_messages').update({ lead_id: leadId }).eq('tenant_id', auth.tenantId).in('id', rows.map((row) => row.id));
+  }
+  let lead: ThreadLead | null = null;
+  if (leadId) {
+    const { data: leadRow } = await db.from('leads').select('id, name, assigned_to').eq('tenant_id', auth.tenantId).eq('id', leadId).maybeSingle();
+    if (leadRow) {
+      const canOpen = canSeeLead(auth, leadRow);
+      lead = { id: String(leadRow.id), name: canOpen ? String(leadRow.name || 'Lead') : 'de outro vendedor', canOpen };
+    }
+  }
+
   const senderIds = [...new Set(rows.map((row) => row.sent_by).filter(Boolean))];
   const names = new Map<string, string>();
   if (senderIds.length) {
@@ -503,6 +586,8 @@ export async function getThread(auth: TenantAuth, id: string): Promise<Result<{ 
     data: {
       account: toView(account, auth),
       openedId: message.id,
+      lead,
+      contact,
       messages: rows.map((row) => ({
         ...toItem({ ...row, is_read: true }),
         cc: row.cc_list || [],
@@ -665,11 +750,98 @@ export async function sendEmail(auth: TenantAuth, body: Row, files: SendFile[] =
       sent_at: nowIso(),
       is_read: true,
       sent_by: auth.profile.id,
+      lead_id: (isReply ? parent!.lead_id : null) || (await matchLead(auth.tenantId, [...to.list, ...cc.list].map((item) => item.address))),
     })
     .select('id')
     .single();
   if (error) return fail(500, `O e-mail foi enviado, mas não ficou salvo no sistema: ${error.message}`);
   return { ok: true, data: { id: String(data.id) } };
+}
+
+// ── E-mails de um lead ─────────────────────────────────────────
+
+export async function listLeadEmails(auth: TenantAuth, leadId: string): Promise<Result<{ email: string | null; items: MessageItem[] }>> {
+  const { data: lead } = await db.from('leads').select('id, email, assigned_to').eq('tenant_id', auth.tenantId).eq('id', leadId).maybeSingle();
+  if (!lead || !canSeeLead(auth, lead)) return fail(404, 'Lead não encontrado.');
+  const ids = (await visibleAccounts(auth)).map((account) => String(account.id));
+  if (!ids.length) return { ok: true, data: { email: lead.email || null, items: [] } };
+  const { data } = await db
+    .from('email_messages')
+    .select(LIST_COLUMNS)
+    .eq('tenant_id', auth.tenantId)
+    .eq('lead_id', leadId)
+    .in('account_id', ids)
+    .neq('folder', 'trash')
+    .order('sent_at', { ascending: false })
+    .limit(20);
+  return { ok: true, data: { email: lead.email || null, items: ((data || []) as Row[]).map(toItem) } };
+}
+
+/** Lead novo (ou que ganhou e-mail): liga a ele os e-mails já recebidos e enviados para o endereço. */
+export async function linkLeadEmails(auth: TenantAuth, leadId: string): Promise<Result<{ linked: number }>> {
+  const { data: lead } = await db.from('leads').select('id, email, assigned_to').eq('tenant_id', auth.tenantId).eq('id', leadId).maybeSingle();
+  if (!lead || !canSeeLead(auth, lead)) return fail(404, 'Lead não encontrado.');
+  const email = String(lead.email || '').trim().toLowerCase();
+  if (!isEmail(email)) return { ok: true, data: { linked: 0 } };
+  const incoming = await db.from('email_messages').update({ lead_id: leadId }).eq('tenant_id', auth.tenantId).is('lead_id', null).ilike('from_address', email).select('id');
+  const outgoing = await db.from('email_messages').update({ lead_id: leadId }).eq('tenant_id', auth.tenantId).is('lead_id', null).eq('direction', 'out').contains('to_list', JSON.stringify([{ address: email }])).select('id');
+  return { ok: true, data: { linked: (incoming.data?.length || 0) + (outgoing.data?.length || 0) } };
+}
+
+// ── Enviado pelas Automações ───────────────────────────────────
+
+/** Bloco "Enviar e-mail": só caixas da empresa (nunca a pessoal de alguém). */
+export async function sendAutomatedEmail(input: { tenantId: string; tenantName: string; accountId: string; to: string; subject: string; body: string; leadId: string | null }): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
+  const { data: account } = await db.from('email_accounts').select('*').eq('tenant_id', input.tenantId).eq('id', input.accountId).maybeSingle();
+  if (!account) return { ok: false, error: 'A caixa de e-mail escolhida não existe mais.' };
+  if (account.kind !== 'shared') return { ok: false, error: 'Automações só enviam por caixas da empresa.' };
+  const password = openSecret(account.password_enc);
+  if (!password) return { ok: false, error: 'A senha da caixa precisa ser digitada de novo (E-mail > Caixas).' };
+  const to = parseAddressList(input.to);
+  if (!to.list.length) return { ok: false, error: input.to.trim() ? `E-mail inválido: ${input.to.trim()}` : 'O lead não tem e-mail.' };
+  const subject = input.subject.trim().slice(0, 300) || '(sem assunto)';
+  const bodies = composeBodies({ body: input.body.slice(0, 100_000), signature: account.signature });
+  let messageId: string;
+  try {
+    ({ messageId } = await sendThroughServer(serverOf(account, password), {
+      fromName: account.from_name || input.tenantName,
+      fromAddress: account.email_address,
+      to: to.list.slice(0, 10),
+      cc: [],
+      bcc: [],
+      subject,
+      text: bodies.text,
+      html: bodies.html,
+      attachments: [],
+    }));
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Não foi possível enviar o e-mail.' };
+  }
+  await db.from('email_messages').insert({
+    tenant_id: input.tenantId,
+    account_id: account.id,
+    folder: 'sent',
+    direction: 'out',
+    message_id: messageId,
+    thread_key: messageId,
+    from_name: account.from_name || input.tenantName,
+    from_address: account.email_address,
+    to_list: to.list.slice(0, 10),
+    subject,
+    snippet: snippetOf(input.body),
+    body_text: bodies.text.slice(0, 200_000),
+    body_html: bodies.html.slice(0, 2_000_000),
+    sent_at: nowIso(),
+    is_read: true,
+    lead_id: input.leadId,
+  });
+  return { ok: true, to: to.list.map((item) => item.address).join(', ') };
+}
+
+/** Caixas da empresa para o bloco "Enviar e-mail" das Automações (sem nada sensível). */
+export async function automationAccounts(tenantId: string) {
+  const { data } = await db.from('email_accounts').select('id, name, email_address, status').eq('tenant_id', tenantId).eq('kind', 'shared').order('name');
+  return ((data || []) as Row[]).map((row) => ({ id: String(row.id), name: String(row.name), emailAddress: String(row.email_address), status: String(row.status) }));
 }
 
 // ── Modelos ────────────────────────────────────────────────────

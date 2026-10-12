@@ -45,6 +45,7 @@ export type NodeType =
   | 'add-note'
   | 'create-task'
   | 'notify-team'
+  | 'send-email'
   | 'webhook'
   // Inteligência artificial
   | 'ai-reply'
@@ -156,6 +157,10 @@ export interface NodeConfig {
   target?: 'assigned' | 'admins' | 'everyone' | 'specific';
   targetUsers?: string[];
   alsoWhatsApp?: boolean;
+  /** Enviar e-mail: caixa da empresa (módulo E-mail), para quem e assunto; o texto vai em `message`. */
+  emailAccountId?: string;
+  emailTo?: string;
+  emailSubject?: string;
   url?: string;
   method?: 'POST' | 'GET' | 'PUT' | 'PATCH';
   headers?: KeyValue[];
@@ -231,7 +236,7 @@ export const NODE_TYPES: NodeType[] = [
   ...TRIGGER_TYPES,
   'send-message', 'send-media', 'question', 'menu', 'wait-reply',
   'condition', 'switch', 'business-hours', 'split-ab', 'delay', 'set-variable', 'start-flow', 'end',
-  'update-lead', 'tag-lead', 'assign-lead', 'add-note', 'create-task', 'notify-team', 'webhook',
+  'update-lead', 'tag-lead', 'assign-lead', 'add-note', 'create-task', 'notify-team', 'send-email', 'webhook',
   'ai-reply', 'ai-classify', 'ai-chat',
 ];
 
@@ -285,6 +290,7 @@ export const DEFAULT_CONFIG: Record<NodeType, NodeConfig> = {
   'add-note': { note: 'Contato passou pela automação em {{data.hoje}} às {{hora.agora}}.' },
   'create-task': { taskTitle: 'Retornar para {{lead.name}}', taskDescription: '', dueMinutes: 60, taskAssignee: 'assigned', priority: 'medium' },
   'notify-team': { target: 'assigned', targetUsers: [], message: 'O lead {{lead.name}} precisa de atenção.', alsoWhatsApp: false },
+  'send-email': { emailAccountId: '', emailTo: '{{lead.email}}', emailSubject: 'Olá, {{lead.first_name|tudo bem}}!', message: 'Olá, {{lead.first_name|tudo bem}}!\n\nObrigado pelo contato com a {{empresa}}.' },
   webhook: { url: '', method: 'POST', headers: [], bodyMode: 'default', body: '', responseMap: [] },
   'ai-reply': { aiInstructions: 'Você é o atendente da {{empresa}}. Responda de forma curta, educada e em português. Se não souber, diga que um atendente vai continuar a conversa.', aiSend: true, aiInput: '{{message}}', variable: 'resposta_ia' },
   'ai-classify': {
@@ -336,6 +342,7 @@ export const DEFAULT_LABEL: Record<NodeType, string> = {
   'add-note': 'Anotar no lead',
   'create-task': 'Criar tarefa',
   'notify-team': 'Avisar a equipe',
+  'send-email': 'Enviar e-mail',
   webhook: 'Chamar webhook',
   'ai-reply': 'Resposta com IA',
   'ai-classify': 'Classificar com IA',
@@ -427,6 +434,8 @@ export function portsFor(node: Pick<FlowNode, 'type' | 'config'>): Port[] {
     }
     case 'webhook':
       return [{ id: 'default', label: 'Sucesso', tone: 'default' }, NO('Erro')];
+    case 'send-email':
+      return [{ id: 'default', label: 'Enviado', tone: 'default' }, NO('Erro')];
     case 'ai-reply':
       return [{ id: 'default', label: 'Pronto', tone: 'default' }, NO('Erro')];
     case 'ai-classify':
@@ -580,7 +589,7 @@ export function validateFlow(graph: FlowGraph): { errors: string[]; warnings: st
     if (trigger && !reachable.has(node.id)) warnings.push(`${name} não está ligado ao fluxo e nunca vai rodar.`);
 
     // Variáveis usadas nos textos que não existem em lugar nenhum.
-    const texts = [c.message, c.question, c.caption, c.fieldValue, c.note, c.taskTitle, c.taskDescription, c.body, c.value, c.aiInstructions, c.aiInput, c.handoffMessage, ...(c.variants || [])];
+    const texts = [c.message, c.emailTo, c.emailSubject, c.question, c.caption, c.fieldValue, c.note, c.taskTitle, c.taskDescription, c.body, c.value, c.aiInstructions, c.aiInput, c.handoffMessage, ...(c.variants || [])];
     for (const text of texts) {
       for (const match of String(text || '').matchAll(/\{\{\s*([\w.]+)\s*(\|[^}]*)?\}\}/g)) {
         const variable = match[1];
@@ -682,6 +691,12 @@ export function validateFlow(graph: FlowGraph): { errors: string[]; warnings: st
       case 'notify-team':
         if (!(c.message || '').trim()) errors.push(`${name}: escreva o aviso.`);
         if (c.target === 'specific' && stringList(c.targetUsers).length === 0) errors.push(`${name}: escolha quem recebe o aviso.`);
+        break;
+      case 'send-email':
+        if (!UUID_RE.test(c.emailAccountId || '')) errors.push(`${name}: escolha a caixa de e-mail que envia.`);
+        if (!(c.emailTo || '').trim()) errors.push(`${name}: informe para quem vai o e-mail.`);
+        if (!(c.emailSubject || '').trim()) errors.push(`${name}: escreva o assunto.`);
+        if (!(c.message || '').trim()) errors.push(`${name}: escreva o texto do e-mail.`);
         break;
       case 'webhook':
         if (!isHttps(c.url)) errors.push(`${name}: informe uma URL https.`);
