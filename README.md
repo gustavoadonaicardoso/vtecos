@@ -73,6 +73,7 @@ Criados pela migration `202610310001_plans_modules_limits.sql` e editáveis no P
 - **Lembretes pelo WhatsApp da Vórtice:** quem faz o teste vira lead no CRM da Vórtice (etiqueta "Teste grátis") e recebe boas-vindas, dica do 3º dia, lembrete do 5º, fatura no 6º e obrigado ao pagar. Textos editáveis em Painel Master > Plataforma ([`src/services/trial-messages.service.ts`](src/services/trial-messages.service.ts)).
 - **Primeiros passos:** quadro no Início para o administrador de empresa nova (WhatsApp, equipe, leads, funil, respostas rápidas), que marca sozinho cada passo feito ([`src/services/onboarding.service.ts`](src/services/onboarding.service.ts)).
 - **Painel Master > Vendas:** MRR (anual conta 1/12), clientes pagantes, testes em andamento, conversão do teste (90 dias), inadimplência, recebido por mês (avisos do Asaas, sem estornos) e receita por plano ([`src/services/sales-dashboard.service.ts`](src/services/sales-dashboard.service.ts)).
+- **Campos extras do lead:** acesso (e-mail de acesso, usuário, link e senha — a senha fica em `lead_secrets`, só o servidor lê, e cada visualização vai para a auditoria), dados pessoais, endereço (CEP preenche o resto) e campos personalizados por empresa (Leads > Campos). Viram variáveis em automações, agendamentos, disparos e respostas rápidas: `{{email_acesso}}`, `{{senha_acesso}}`, `{{campo.chave}}`, `{{gerar.senha}}`... ([`src/lib/lead-fields.ts`](src/lib/lead-fields.ts)).
 
 ---
 
@@ -177,7 +178,7 @@ No `npm run dev` as rotinas em segundo plano ficam desligadas: posts, disparos, 
 
 - **Instalação nova:** rode [`supabase/base-schema.sql`](supabase/base-schema.sql) no SQL Editor do Supabase e depois todos os arquivos de [`supabase/migrations`](supabase/migrations), em ordem de nome.
 - **Produção:** a cada PR que traz migration nova, rode **só o arquivo novo** no SQL Editor **antes** do deploy. As migrations são escritas para poder rodar de novo sem estragar nada.
-- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno) e `202611040001_billing_asaas.sql` (cobrança automática).
+- Últimas migrations: `202611020001_quick_reply_shortcuts.sql` (respostas rápidas), `202611030001_internal_chat_files_bucket.sql` (anexos do Chat interno), `202611040001_billing_asaas.sql` (cobrança automática) e `202611050001_lead_extra_fields.sql` (campos extras dos leads).
 - Depois de rodar uma migration, confira o banco com `npm run db:check-schema`.
 
 ---

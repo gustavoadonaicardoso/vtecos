@@ -324,7 +324,12 @@ function MessagesContent() {
               canUseQuickReplies={hasPermission('messages.templates')}
               canManageQuickReplies={canAssign}
               quickReplies={quickReplies}
-              fill={(text) => fillTemplate(text, { name: lead.name, agent: user?.name?.split(' ')[0] || '' })}
+              fill={(text, password) => fillTemplate(text, { name: lead.name, agent: user?.name?.split(' ')[0] || '', lead, password })}
+              loadAccessPassword={async () => {
+                const response = await fetch(`/api/leads/${lead.id}/access`, { cache: 'no-store' });
+                const json = await response.json().catch(() => ({}));
+                return response.ok ? json.data?.password ?? null : null;
+              }}
               agentName={user?.name?.split(' ')[0] || ''}
               sending={sending}
               onSend={sendText}

@@ -10,6 +10,7 @@
 
 import { Lead, LeadTag, PipelineStage, ServiceResult } from '@/types';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { EXTRA_FIELDS, cleanExtra, extraOf, type ExtraFieldKey } from '@/lib/lead-fields';
 
 type Row = Record<string, unknown>;
 
@@ -73,6 +74,8 @@ function mapDbRowToLead(row: Row): Lead {
     chatChannel: row.chat_channel === 'instagram' || row.chat_channel === 'messenger' ? row.chat_channel : 'whatsapp',
     instagramUsername: (row.instagram_username as string) || null,
     protocol: Number(row.protocol) > 0 ? String(row.protocol).padStart(6, '0') : undefined,
+    extra: extraOf(row),
+    customFields: row.custom_fields && typeof row.custom_fields === 'object' && !Array.isArray(row.custom_fields) ? (row.custom_fields as Record<string, string>) : {},
   };
 }
 
@@ -92,6 +95,12 @@ export function sanitizeTags(input: unknown): string[] {
 
 export type LeadInput = Partial<Pick<Lead, 'name' | 'email' | 'phone' | 'cpfCnpj' | 'pipelineStage' | 'assignedTo' | 'tags' | 'notes' | 'status'>> & {
   value?: unknown;
+  /** Só os campos extras que mudaram ({ accessEmail: '...', city: '' }); vazio apaga. */
+  extra?: Record<string, unknown>;
+  /** Campos personalizados que mudaram ({ matricula: '123' }); vazio apaga. */
+  customFields?: Record<string, unknown>;
+  /** Senha de acesso (fica em lead_secrets); vazio apaga. */
+  accessPassword?: unknown;
 };
 
 /** Valida e converte para colunas do banco. Erro = texto para a pessoa. */
@@ -125,7 +134,45 @@ export function leadInputToDb(input: LeadInput, { creating }: { creating: boolea
   if (input.tags !== undefined) data.tags = sanitizeTags(input.tags);
   if (input.notes !== undefined) data.notes = String(input.notes ?? '').slice(0, 4000) || null;
   if (input.status !== undefined) data.blocked = input.status === 'Bloqueado';
+  if (input.extra !== undefined) {
+    if (!input.extra || typeof input.extra !== 'object' || Array.isArray(input.extra)) return { error: 'Dados extras inválidos.' };
+    for (const [key, raw] of Object.entries(input.extra)) {
+      const field = EXTRA_FIELDS.find((item) => item.key === key);
+      if (!field) continue;
+      const cleaned = cleanExtra(key as ExtraFieldKey, raw);
+      if ('error' in cleaned) return { error: cleaned.error };
+      data[field.column] = cleaned.value;
+    }
+  }
   return { data };
+}
+
+const EXTRA_MIGRATION = 'Rode a migration 202611050001_lead_extra_fields.sql no Supabase para salvar os campos extras dos leads.';
+const extraColumnError = (message: string) => /custom_fields|access_|address_|birth_date|company_name|job_title|instagram|website/.test(message);
+
+/** Campos personalizados e senha: precisam do banco (definições da empresa, outra tabela). */
+async function applyExtras(tenantId: string, leadId: string | null, input: LeadInput, data: Row): Promise<string | null> {
+  if (input.customFields !== undefined) {
+    const { mergeCustomValues } = await import('@/services/lead-fields.service');
+    let current: unknown = {};
+    if (leadId) current = (await supabase.from('leads').select('custom_fields').eq('tenant_id', tenantId).eq('id', leadId).maybeSingle()).data?.custom_fields;
+    const merged = await mergeCustomValues(tenantId, current, input.customFields);
+    if ('error' in merged) return merged.error;
+    data.custom_fields = merged.value;
+  }
+  if (input.accessPassword !== undefined) {
+    const { cleanAccessPassword } = await import('@/services/lead-fields.service');
+    const cleaned = cleanAccessPassword(input.accessPassword);
+    if ('error' in cleaned) return cleaned.error;
+  }
+  return null;
+}
+
+async function saveAccessPassword(tenantId: string, leadId: string, input: LeadInput, actorId?: string | null): Promise<string | null> {
+  if (input.accessPassword === undefined) return null;
+  const { setAccessPassword } = await import('@/services/lead-fields.service');
+  const saved = await setAccessPassword(tenantId, leadId, input.accessPassword, actorId);
+  return saved.success ? null : saved.error || 'Não foi possível salvar a senha de acesso.';
 }
 
 // ─── CRUD de Leads ────────────────────────────────────────────
@@ -195,9 +242,11 @@ export async function findLeadByPhone(tenantId: string, phone: string) {
 /**
  * Cria um novo lead no banco e retorna o objeto mapeado.
  */
-export async function createLead(tenantId: string, input: LeadInput): Promise<ServiceResult<Lead>> {
+export async function createLead(tenantId: string, input: LeadInput, actorId?: string | null): Promise<ServiceResult<Lead>> {
   const parsed = leadInputToDb(input, { creating: true });
   if ('error' in parsed) return { success: false, error: parsed.error };
+  const extrasError = await applyExtras(tenantId, null, input, parsed.data);
+  if (extrasError) return { success: false, error: extrasError };
 
   if (!parsed.data.stage_id) {
     const { data: first } = await supabase.from('pipeline_stages').select('id').eq('tenant_id', tenantId).order('position').limit(1).maybeSingle();
@@ -206,6 +255,7 @@ export async function createLead(tenantId: string, input: LeadInput): Promise<Se
 
   const row: Row = { ...parsed.data, source: 'Manual' };
   let { data, error } = await supabase.from('leads').insert([{ ...row, tenant_id: tenantId }]).select().single();
+  if (error && extraColumnError(error.message)) return { success: false, error: EXTRA_MIGRATION };
   // Bancos sem as colunas novas (migration pendente): grava o básico.
   if (error && /column/i.test(error.message)) {
     const { tags: _tags, notes: _notes, blocked: _blocked, ...basic } = row as Row;
@@ -215,16 +265,26 @@ export async function createLead(tenantId: string, input: LeadInput): Promise<Se
 
   if (error || !data) return { success: false, error: error?.message || 'Erro ao criar lead' };
   if (Array.isArray(row.tags)) await registerTags(tenantId, row.tags as string[]);
+  const passwordError = await saveAccessPassword(tenantId, String((data as Row).id), input, actorId);
+  if (passwordError) return { success: false, error: `Lead cadastrado, mas a senha de acesso não foi salva: ${passwordError}` };
   return { success: true, data: mapDbRowToLead(data as Row) };
 }
 
 /**
  * Atualiza campos de um lead no banco.
  */
-export async function updateLeadInDb(tenantId: string, leadId: string, updates: LeadInput): Promise<ServiceResult<Lead>> {
+export async function updateLeadInDb(tenantId: string, leadId: string, updates: LeadInput, actorId?: string | null): Promise<ServiceResult<Lead>> {
   const parsed = leadInputToDb(updates, { creating: false });
   if ('error' in parsed) return { success: false, error: parsed.error };
-  if (Object.keys(parsed.data).length === 0) return { success: true };
+  const extrasError = await applyExtras(tenantId, leadId, updates, parsed.data);
+  if (extrasError) return { success: false, error: extrasError };
+  const passwordError = await saveAccessPassword(tenantId, leadId, updates, actorId);
+  if (passwordError) return { success: false, error: passwordError };
+  if (Object.keys(parsed.data).length === 0) {
+    if (updates.accessPassword === undefined) return { success: true };
+    const current = await fetchLeadById(tenantId, leadId);
+    return current ? { success: true, data: current } : { success: false, error: 'Lead não encontrado.' };
+  }
 
   const { data, error } = await supabase
     .from('leads')
@@ -234,7 +294,7 @@ export async function updateLeadInDb(tenantId: string, leadId: string, updates: 
     .select()
     .maybeSingle();
 
-  if (error) return { success: false, error: /column/i.test(error.message) ? 'Rode a migration 202610100001_leads_review.sql no Supabase para salvar etiquetas, observações e bloqueio.' : error.message };
+  if (error) return { success: false, error: extraColumnError(error.message) ? EXTRA_MIGRATION : /column/i.test(error.message) ? 'Rode a migration 202610100001_leads_review.sql no Supabase para salvar etiquetas, observações e bloqueio.' : error.message };
   if (!data) return { success: false, error: 'Lead não encontrado.' };
   if (parsed.data.tags) await registerTags(tenantId, parsed.data.tags as string[]);
   return { success: true, data: mapDbRowToLead(data as Row) };

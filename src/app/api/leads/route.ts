@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const result = await createLead(auth.tenantId, input);
+    const result = await createLead(auth.tenantId, input, auth.profile.id);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

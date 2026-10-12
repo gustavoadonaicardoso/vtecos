@@ -11,6 +11,8 @@
  * ============================================================
  */
 
+import { ageOn, brDate as isoToBr, formatAddress, generatePassword, type LeadExtra } from '@/lib/lead-fields';
+
 export type NodeType =
   // Gatilhos
   | 'trigger-message'
@@ -137,7 +139,8 @@ export interface NodeConfig {
   flowId?: string;
   stopOthers?: boolean;
   // ── CRM e integrações ──
-  field?: 'stage' | 'assigned_to' | 'value' | 'name' | 'email' | 'cpf_cnpj' | 'source';
+  /** Campo do lead: os de sempre, os extras (coluna: access_email, address_city...), 'access_password' ou 'campo.<chave>'. */
+  field?: 'stage' | 'assigned_to' | 'value' | 'name' | 'email' | 'cpf_cnpj' | 'source' | 'access_password' | (string & {});
   fieldValue?: string;
   tagAction?: 'add' | 'remove';
   assignMode?: 'specific' | 'round_robin' | 'least_busy';
@@ -581,7 +584,7 @@ export function validateFlow(graph: FlowGraph): { errors: string[]; warnings: st
     for (const text of texts) {
       for (const match of String(text || '').matchAll(/\{\{\s*([\w.]+)\s*(\|[^}]*)?\}\}/g)) {
         const variable = match[1];
-        if (!variableNames.has(variable) && !variable.startsWith('entrada.') && !match[2]) warnings.push(`${name}: a variável {{${variable}}} não existe neste fluxo (vai sair vazia).`);
+        if (!variableNames.has(variable) && !variable.startsWith('entrada.') && !isCustomFieldVariable(variable) && !match[2]) warnings.push(`${name}: a variável {{${variable}}} não existe neste fluxo (vai sair vazia).`);
       }
     }
 
@@ -793,6 +796,12 @@ export interface RunContext {
     stage_changed_at: string;
     /** Número de protocolo do lead (leads.protocol), vazio se a migration não rodou. */
     protocol?: string;
+    /** Acesso, dados pessoais e endereço (src/lib/lead-fields.ts). */
+    extra?: LeadExtra;
+    /** Campos personalizados da empresa ({chave: valor}). */
+    custom?: Record<string, string>;
+    /** Senha de acesso (lead_secrets): só no servidor. */
+    access_password?: string;
   };
   company: { name: string; phone: string; website: string; address: string };
   flow: { name: string };
@@ -837,6 +846,36 @@ export const BUILTIN_VARIABLES: { group: string; items: { name: string; descript
       { name: 'lead.created_at', description: 'Data de cadastro' },
       { name: 'lead.days_since_created', description: 'Dias desde o cadastro' },
       { name: 'lead.days_in_stage', description: 'Dias na etapa atual' },
+    ],
+  },
+  {
+    group: 'Acesso do cliente',
+    items: [
+      { name: 'lead.access_email', description: 'E-mail de acesso (se vazio, o e-mail do lead)' },
+      { name: 'lead.access_login', description: 'Usuário / login' },
+      { name: 'lead.access_password', description: 'Senha de acesso' },
+      { name: 'lead.access_url', description: 'Link de acesso' },
+      { name: 'gerar.senha', description: 'Senha nova aleatória (use em "Atualizar lead")' },
+    ],
+  },
+  {
+    group: 'Dados do cliente',
+    items: [
+      { name: 'lead.birth_date', description: 'Data de nascimento (dd/mm/aaaa)' },
+      { name: 'lead.birthday', description: 'Aniversário (dd/mm)' },
+      { name: 'lead.age', description: 'Idade' },
+      { name: 'lead.company', description: 'Empresa do cliente' },
+      { name: 'lead.job_title', description: 'Cargo' },
+      { name: 'lead.instagram', description: 'Instagram' },
+      { name: 'lead.website', description: 'Site' },
+      { name: 'lead.address', description: 'Endereço completo' },
+      { name: 'lead.cep', description: 'CEP' },
+      { name: 'lead.street', description: 'Rua' },
+      { name: 'lead.number', description: 'Número' },
+      { name: 'lead.complement', description: 'Complemento' },
+      { name: 'lead.district', description: 'Bairro' },
+      { name: 'lead.city', description: 'Cidade' },
+      { name: 'lead.state', description: 'UF' },
     ],
   },
   {
@@ -896,6 +935,9 @@ export function flowVariables(graph: FlowGraph): { name: string; description: st
   return out;
 }
 
+/** {{lead.campo.matricula}} ou {{campo.matricula}}: campo personalizado da empresa. */
+export const isCustomFieldVariable = (name: string) => /^(lead\.)?campo\.[a-z0-9_]+$/.test(name);
+
 export function availableVariableNames(graph: FlowGraph) {
   return [...BUILTIN_NAMES, 'lead.id', 'webhook_status', 'etiqueta', ...flowVariables(graph).map((item) => item.name)];
 }
@@ -934,6 +976,26 @@ export function variableValue(name: string, ctx: RunContext): string {
     case 'empresa.site': return ctx.company.website;
     case 'empresa.endereco': return ctx.company.address;
     case 'fluxo.nome': return ctx.flow.name;
+    case 'lead.access_email': return ctx.lead.extra?.accessEmail || ctx.lead.email;
+    case 'lead.access_login': return ctx.lead.extra?.accessLogin || '';
+    case 'lead.access_password': return ctx.lead.access_password || '';
+    case 'lead.access_url': return ctx.lead.extra?.accessUrl || '';
+    case 'gerar.senha': return generatePassword();
+    case 'lead.birth_date': return ctx.lead.extra?.birthDate ? isoToBr(ctx.lead.extra.birthDate) : '';
+    case 'lead.birthday': return ctx.lead.extra?.birthDate ? isoToBr(ctx.lead.extra.birthDate).slice(0, 5) : '';
+    case 'lead.age': return ageOn(ctx.lead.extra?.birthDate, now);
+    case 'lead.company': return ctx.lead.extra?.companyName || '';
+    case 'lead.job_title': return ctx.lead.extra?.jobTitle || '';
+    case 'lead.instagram': return ctx.lead.extra?.instagram || '';
+    case 'lead.website': return ctx.lead.extra?.website || '';
+    case 'lead.address': return formatAddress(ctx.lead.extra || {});
+    case 'lead.cep': return ctx.lead.extra?.cep || '';
+    case 'lead.street': return ctx.lead.extra?.street || '';
+    case 'lead.number': return ctx.lead.extra?.number || '';
+    case 'lead.complement': return ctx.lead.extra?.complement || '';
+    case 'lead.district': return ctx.lead.extra?.district || '';
+    case 'lead.city': return ctx.lead.extra?.city || '';
+    case 'lead.state': return ctx.lead.extra?.state || '';
     case 'saudacao': {
       const hour = zonedParts(now).hour;
       return hour >= 5 && hour < 12 ? 'Bom dia' : hour >= 12 && hour < 18 ? 'Boa tarde' : 'Boa noite';
@@ -948,6 +1010,11 @@ export function variableValue(name: string, ctx: RunContext): string {
     }
   }
   if (key.startsWith('entrada.')) return ctx.input[key.slice(8)] ?? '';
+  if (key.startsWith('lead.campo.') || key.startsWith('campo.')) {
+    const field = key.slice(key.indexOf('campo.') + 6);
+    const value = ctx.lead.custom?.[field] ?? '';
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? isoToBr(value) : value;
+  }
   if (key in ctx.vars) return ctx.vars[key];
   if (key in ctx.constants) return ctx.constants[key];
   return '';

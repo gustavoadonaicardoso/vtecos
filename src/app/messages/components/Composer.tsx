@@ -5,13 +5,17 @@ import styles from '../messages.module.css';
 import type { QuickReply } from '../types';
 import { EMOJIS } from '../format';
 import { matchQuickReplies, slashQueryAt } from '@/lib/quick-replies';
+import { usesAccessPassword } from '@/lib/message-variables';
 
 interface ComposerProps {
   disabledReason: string | null;
   canUseQuickReplies: boolean;
   canManageQuickReplies: boolean;
   quickReplies: QuickReply[];
-  fill: (text: string) => string;
+  /** Troca as variáveis. `password` undefined = prévia (senha aparece como ••••••). */
+  fill: (text: string, password?: string | null) => string;
+  /** Lê a senha de acesso do lead (só quando a resposta usa {{senha_acesso}}). */
+  loadAccessPassword?: () => Promise<string | null>;
   agentName: string;
   sending: boolean;
   onSend: (text: string) => Promise<boolean>;
@@ -58,7 +62,7 @@ function recorderMime() {
 }
 
 export default function Composer(props: ComposerProps) {
-  const { disabledReason, canUseQuickReplies, canManageQuickReplies, quickReplies, fill, agentName, sending, onSend, onSendFile } = props;
+  const { disabledReason, canUseQuickReplies, canManageQuickReplies, quickReplies, fill, loadAccessPassword, agentName, sending, onSend, onSendFile } = props;
   const [text, setText] = useState('');
   const [popover, setPopover] = useState<'emoji' | 'quick' | null>(null);
   const [quickSearch, setQuickSearch] = useState('');
@@ -130,15 +134,24 @@ export default function Composer(props: ComposerProps) {
     });
   };
 
+  /** Texto final da resposta (com a senha de acesso, se a resposta usar). */
+  const filled = async (reply: QuickReply) => {
+    if (!usesAccessPassword(reply.content) || !loadAccessPassword) return fill(reply.content, null);
+    const password = await loadAccessPassword().catch(() => null);
+    return fill(reply.content, password);
+  };
+
   /** Escolha pela "/": troca a "/termo" pela mensagem. */
-  const pickSlash = (reply: QuickReply) => {
+  const pickSlash = async (reply: QuickReply) => {
     if (!slash) return;
     const caret = textareaRef.current?.selectionStart ?? text.length;
-    placeText(slash.start, Math.max(caret, slash.start + 1 + slash.term.length), fill(reply.content));
+    const start = slash.start;
+    const end = Math.max(caret, slash.start + 1 + slash.term.length);
+    placeText(start, end, await filled(reply));
   };
 
   /** Escolha pelo botão: entra onde está o cursor (ou no fim). */
-  const pickFromMenu = (reply: QuickReply) => {
+  const pickFromMenu = async (reply: QuickReply) => {
     const el = textareaRef.current;
     const from = el ? el.selectionStart : text.length;
     const to = el ? el.selectionEnd : text.length;
@@ -146,7 +159,7 @@ export default function Composer(props: ComposerProps) {
     const spacer = before && !/\s$/.test(before) ? ' ' : '';
     setPopover(null);
     setQuickSearch('');
-    placeText(from, to, spacer + fill(reply.content));
+    placeText(from, to, spacer + (await filled(reply)));
   };
 
   const toggleSignature = () => {

@@ -20,6 +20,7 @@
 
 import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { EXTRA_FIELDS, cleanExtra, extraOf } from '@/lib/lead-fields';
 import { beat } from '@/lib/heartbeat';
 import { tenantHasModule } from '@/lib/plan-limits';
 import { assertPublicHttpsUrl } from '@/lib/integrations/safe-url';
@@ -131,9 +132,11 @@ async function loadContext(tenantId: string, leadId: string, run: Pick<RunRow, '
   ]);
   if (!lead) return null;
 
-  const [stage, owner] = await Promise.all([
+  const { getAccessPassword } = await import('@/services/lead-fields.service');
+  const [stage, owner, accessPassword] = await Promise.all([
     lead.stage_id ? supabaseAdmin.from('pipeline_stages').select('name').eq('tenant_id', tenantId).eq('id', lead.stage_id).maybeSingle() : Promise.resolve({ data: null }),
     lead.assigned_to ? supabaseAdmin.from('profiles').select('name').eq('tenant_id', tenantId).eq('id', lead.assigned_to).maybeSingle() : Promise.resolve({ data: null }),
+    getAccessPassword(tenantId, leadId).catch(() => null),
   ]);
 
   const constants = Object.fromEntries(flow.graphParsed.variables.map((variable) => [variable.name, variable.value]));
@@ -156,6 +159,9 @@ async function loadContext(tenantId: string, leadId: string, run: Pick<RunRow, '
         created_at: String(lead.created_at || ''),
         stage_changed_at: String(lead.stage_changed_at || lead.created_at || ''),
         protocol: formatProtocol(lead.protocol),
+        extra: extraOf(lead),
+        custom: lead.custom_fields && typeof lead.custom_fields === 'object' && !Array.isArray(lead.custom_fields) ? (lead.custom_fields as Record<string, string>) : {},
+        access_password: accessPassword || '',
       },
       company: {
         name: String(tenant?.name || ''),
@@ -363,6 +369,25 @@ async function runNode(node: FlowNode, run: RunRow, flow: LoadedFlow, ctx: RunCo
       } else if (c.field === 'name' || c.field === 'source') {
         if (!value && c.field === 'name') return { kind: 'fail', detail: 'O nome ficaria vazio.' };
         updates[c.field] = value.slice(0, 120);
+      } else if (c.field === 'access_password') {
+        const { setAccessPassword } = await import('@/services/lead-fields.service');
+        const saved = await setAccessPassword(tenantId, leadId, value, null);
+        if (!saved.success) return { kind: 'fail', detail: saved.error || 'Não foi possível salvar a senha de acesso.' };
+        // A senha nunca vai para o histórico da execução.
+        return { kind: 'next', port: 'default', detail: value ? 'Senha de acesso salva no lead.' : 'Senha de acesso apagada.' };
+      } else if (c.field?.startsWith('campo.')) {
+        const { mergeCustomValues } = await import('@/services/lead-fields.service');
+        const key = c.field.slice(6);
+        const merged = await mergeCustomValues(tenantId, lead.custom_fields, { [key]: value });
+        if ('error' in merged) return { kind: 'fail', detail: merged.error };
+        if (!(key in merged.value) && value) return { kind: 'fail', detail: 'O campo personalizado escolhido não existe mais.' };
+        updates.custom_fields = merged.value;
+      } else {
+        const extra = EXTRA_FIELDS.find((field) => field.column === c.field);
+        if (!extra) return { kind: 'fail', detail: 'Escolha o campo do lead.' };
+        const cleaned = cleanExtra(extra.key, value);
+        if ('error' in cleaned) return { kind: 'fail', detail: cleaned.error };
+        updates[extra.column] = cleaned.value;
       }
       let { error } = await supabaseAdmin.from('leads').update(updates).eq('tenant_id', tenantId).eq('id', leadId);
       // Banco sem stage_changed_at (migration 202610110001) ainda move o lead.
@@ -637,7 +662,10 @@ async function advance(run: RunRow, startNodeId: string | null, preloaded?: Load
       result = { kind: 'fail', detail: error instanceof Error ? error.message : 'Erro ao executar o bloco.' };
     }
 
-    steps.push({ node_id: node.id, label: node.label, at: nowIso(), ok: result.kind !== 'fail' && !(result.kind === 'next' && result.detail.startsWith('Erro:')), detail: result.detail.slice(0, 400) });
+    // A senha de acesso do lead nunca fica no histórico (ex.: "Enviou: ... Senha: ••••••").
+    const secret = loaded.ctx.lead.access_password;
+    const detail = secret && secret.length >= 3 ? result.detail.split(secret).join('••••••') : result.detail;
+    steps.push({ node_id: node.id, label: node.label, at: nowIso(), ok: result.kind !== 'fail' && !(result.kind === 'next' && result.detail.startsWith('Erro:')), detail: detail.slice(0, 400) });
     if ((result.kind === 'next') && result.vars) run.context.vars = { ...(run.context.vars || {}), ...result.vars };
 
     if (result.kind === 'fail') {

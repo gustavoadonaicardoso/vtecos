@@ -8,6 +8,7 @@ import { fireAutomation, onStageChanged, onTagAdded } from '@/lib/automations/en
 const FIELD_LABEL: Record<string, string> = {
   name: 'nome', phone: 'telefone', email: 'e-mail', cpfCnpj: 'CPF/CNPJ', value: 'valor', pipelineStage: 'etapa',
   assignedTo: 'responsável', tags: 'etiquetas', notes: 'observações', status: 'bloqueio',
+  extra: 'dados extras', customFields: 'campos personalizados', accessPassword: 'senha de acesso',
 };
 
 /**
@@ -86,7 +87,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ? (((await supabaseAdmin.from('leads').select('tags').eq('tenant_id', auth.tenantId).eq('id', leadId).maybeSingle()).data?.tags as string[] | null) || [])
       : null;
 
-    const result = await updateLeadInDb(auth.tenantId, leadId, updates);
+    const result = await updateLeadInDb(auth.tenantId, leadId, updates, auth.profile.id);
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 });
     notifyStage();
     if (tagsBefore && Array.isArray(updates.tags)) {

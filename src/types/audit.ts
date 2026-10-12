@@ -6,6 +6,7 @@ export type AuditAction =
   | 'LEAD_CREATE'
   | 'LEAD_UPDATE'
   | 'LEAD_DELETE'
+  | 'LEAD_SECRET_VIEW'
   | 'TICKET_CREATE'
   | 'TICKET_CALL'
   | 'TICKET_COMPLETE'

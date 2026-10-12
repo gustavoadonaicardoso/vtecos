@@ -3,6 +3,7 @@
  * telas e pelo servidor (sem banco e sem React).
  */
 
+import { extraOf } from '@/lib/lead-fields';
 import { cleanVariableName, emptyContext, fold, nextTimeOfDay, pickMessage, renderTemplate, zonedParts, zonedTime, type RunContext } from '@/lib/automations/flow';
 
 export type CampaignStatus = 'draft' | 'scheduled' | 'running' | 'paused' | 'completed' | 'canceled';
@@ -264,11 +265,25 @@ export function rowVariables(data: Record<string, unknown>) {
   return vars;
 }
 
-export function contextFor(contact: { name?: string | null; phone: string; data?: Record<string, unknown> }, lead: Record<string, any> | null, company: RunContext['company']): RunContext { // eslint-disable-line @typescript-eslint/no-explicit-any
+export function contextFor(contact: { name?: string | null; phone: string; data?: Record<string, unknown> }, lead: Record<string, any> | null, company: RunContext['company'], accessPassword?: string | null): RunContext { // eslint-disable-line @typescript-eslint/no-explicit-any
   const base = emptyContext().lead;
   return emptyContext({
     lead: lead
-      ? { ...base, id: String(lead.id), name: String(lead.name || contact.name || ''), phone: String(lead.phone || contact.phone), email: String(lead.email || ''), cpf_cnpj: String(lead.cpf_cnpj || ''), tags: Array.isArray(lead.tags) ? lead.tags : [], value: Number(lead.value) || 0, source: String(lead.source || ''), created_at: String(lead.created_at || '') }
+      ? {
+          ...base,
+          id: String(lead.id),
+          name: String(lead.name || contact.name || ''),
+          phone: String(lead.phone || contact.phone),
+          email: String(lead.email || ''),
+          cpf_cnpj: String(lead.cpf_cnpj || ''),
+          tags: Array.isArray(lead.tags) ? lead.tags : [],
+          value: Number(lead.value) || 0,
+          source: String(lead.source || ''),
+          created_at: String(lead.created_at || ''),
+          extra: extraOf(lead),
+          custom: lead.custom_fields && typeof lead.custom_fields === 'object' && !Array.isArray(lead.custom_fields) ? lead.custom_fields : {},
+          access_password: accessPassword || '',
+        }
       : { ...base, name: String(contact.name || ''), phone: contact.phone },
     company,
     vars: rowVariables(contact.data || {}),

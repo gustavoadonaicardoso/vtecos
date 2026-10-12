@@ -3,6 +3,7 @@ import { logAudit } from '@/lib/audit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { emitIntegrationEvent, leadEventData } from '@/lib/integrations/events';
 import { fireAutomation, onLeadCreated } from '@/lib/automations/engine';
+import { extrasFromPayload, setAccessPassword } from '@/services/lead-fields.service';
 
 /**
  * Captura de leads (Integrações > Captura de leads): formulário do site,
@@ -93,14 +94,20 @@ export async function POST(request: Request) {
     last_msg: message ? `📝 ${message}` : '📝 Formulário do site',
   };
 
-  // Bancos sem a coluna "source" (migration 202610080001) ainda recebem o lead.
-  let { data: lead, error } = await supabaseAdmin.from('leads').insert({ ...row, tenant_id: tenantId, source: 'Formulário' }).select().single();
+  // Acesso (email_acesso, senha_acesso...), dados pessoais, endereço e campos personalizados.
+  const extras = await extrasFromPayload(tenantId, body).catch(() => ({ columns: {}, custom: {}, password: null, ignored: [] as string[] }));
+  const withExtras = { ...row, ...extras.columns, ...(Object.keys(extras.custom).length ? { custom_fields: extras.custom } : {}) };
+
+  // Bancos sem a coluna "source" (migration 202610080001) ou sem os campos extras (202611050001) ainda recebem o lead.
+  let { data: lead, error } = await supabaseAdmin.from('leads').insert({ ...withExtras, tenant_id: tenantId, source: 'Formulário' }).select().single();
+  if (error && /column|schema cache/i.test(error.message) && !/source/.test(error.message)) ({ data: lead, error } = await supabaseAdmin.from('leads').insert({ ...row, tenant_id: tenantId, source: 'Formulário' }).select().single());
   if (error && /source/.test(error.message)) ({ data: lead, error } = await supabaseAdmin.from('leads').insert({ ...row, tenant_id: tenantId }).select().single());
   if (error || !lead) {
     console.error('[Captura de leads] Falha ao criar lead:', error?.message);
     return fail('Não foi possível registrar agora. Tente de novo em instantes.', 500);
   }
 
+  if (extras.password) await setAccessPassword(tenantId, String(lead.id), extras.password, null).catch(() => null);
   await logAudit(null, 'LEAD_CREATE', `Lead ${name} criado pelo formulário/API de captura.`, 'lead', lead.id, supabaseAdmin, tenantId).catch(() => {});
   emitIntegrationEvent(tenantId, 'lead.created', leadEventData(lead, 'form'));
   fireAutomation(onLeadCreated, tenantId, String(lead.id), 'form');
@@ -110,5 +117,5 @@ export async function POST(request: Request) {
     if (/^https?:\/\//i.test(redirect)) return NextResponse.redirect(redirect, { status: 303, headers: CORS });
     return thanksPage('Recebemos seus dados. Em breve entraremos em contato!');
   }
-  return NextResponse.json({ success: true, id: lead.id }, { status: 201, headers: CORS });
+  return NextResponse.json({ success: true, id: lead.id, ...(extras.ignored.length ? { ignored: extras.ignored } : {}) }, { status: 201, headers: CORS });
 }

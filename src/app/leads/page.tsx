@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { AlertTriangle, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, Loader2, MessageSquare, Plus, Search, Tag as TagIcon, Trash2, UserX, Users, X } from 'lucide-react';
+import { AlertTriangle, Ban, CheckCircle2, ChevronLeft, ChevronRight, Download, ListPlus, Loader2, MessageSquare, Plus, Search, Tag as TagIcon, Trash2, UserX, Users, X } from 'lucide-react';
 
 import styles from './leads.module.css';
 import { useLeads, type BulkAction } from '@/context/LeadContext';
@@ -13,6 +13,8 @@ import { TagBadge } from '@/components/leads/TagPicker';
 import { useTeam } from '@/components/leads/useTeam';
 import LeadPanel from './components/LeadPanel';
 import TagsManager from './components/TagsManager';
+import CustomFieldsManager from './components/CustomFieldsManager';
+import { useCustomFields } from '@/components/leads/useCustomFields';
 import { digits, exportCsv, initials } from './format';
 
 const PAGE_SIZE = 50;
@@ -38,6 +40,15 @@ function LeadsContent() {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showTags, setShowTags] = useState(false);
+  // ?campos=1 (link do painel do lead) abre os campos personalizados.
+  const [showFields, setShowFields] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get('campos') === '1') setShowFields(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const { fields: customFields, loaded: fieldsLoaded, reload: reloadFields } = useCustomFields();
   const [notice, setNotice] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -149,6 +160,11 @@ function LeadsContent() {
           {canAssign && (
             <button type="button" className={styles.secondaryBtn} onClick={() => setShowTags(true)}>
               <TagIcon size={16} /> Etiquetas
+            </button>
+          )}
+          {canAssign && (
+            <button type="button" className={styles.secondaryBtn} onClick={() => setShowFields(true)}>
+              <ListPlus size={16} /> Campos
             </button>
           )}
           <button type="button" className={styles.secondaryBtn} onClick={() => exportCsv(filtered, stageName, ownerName)} disabled={filtered.length === 0}>
@@ -329,6 +345,7 @@ function LeadsContent() {
       )}
 
       {showTags && <TagsManager tags={tags} onChanged={refreshTags} onClose={() => setShowTags(false)} />}
+      {showFields && canAssign && fieldsLoaded && <CustomFieldsManager fields={customFields} onSaved={() => reloadFields(true)} onClose={() => setShowFields(false)} />}
 
       {notice && (
         <div className={`${styles.toast} ${notice.type === 'error' ? styles.toastError : ''}`} role="status">
