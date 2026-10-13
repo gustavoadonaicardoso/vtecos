@@ -488,7 +488,9 @@ export async function sendWhatsAppWebMedia(
   }
 
   if (kind === 'audio') {
-    return socket.sendMessage(jid, { audio: buffer, mimetype: options.mimetype, ptt: false });
+    // Ogg/Opus vai como mensagem de voz (o "microfone" verde); outros formatos, como arquivo de áudio.
+    const voice = /^audio\/ogg\b/i.test(options.mimetype) && buffer.subarray(0, 200).includes('OpusHead');
+    return socket.sendMessage(jid, { audio: buffer, mimetype: voice ? 'audio/ogg; codecs=opus' : options.mimetype, ptt: voice });
   }
 
   if (kind === 'video') {

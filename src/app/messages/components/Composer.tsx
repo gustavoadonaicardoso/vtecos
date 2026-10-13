@@ -204,7 +204,7 @@ export default function Composer(props: ComposerProps) {
         recorder.current = null;
         if (!current || current.cancel || chunks.length === 0) return;
         const type = (media.mimeType || 'audio/webm').split(';')[0];
-        const ext = type.includes('ogg') ? 'ogg' : 'webm';
+        const ext = type.includes('ogg') ? 'ogg' : type.includes('mp4') || type.includes('aac') ? 'm4a' : 'webm';
         void sendFile(new File([new Blob(chunks, { type: media.mimeType || type })], `audio-${Date.now()}.${ext}`, { type }));
       };
       media.start();
