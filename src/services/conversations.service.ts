@@ -14,6 +14,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { insertChatMessage } from '@/lib/chat-messages';
 import { safeContentType } from '@/lib/safe-content-type';
+import { isWebm, webmToOgg } from '@/lib/audio/webm-to-ogg';
 import type { SocialTarget } from '@/lib/social/inbox';
 
 type Row = Record<string, unknown>;
@@ -170,6 +171,16 @@ export async function sendMediaToLead(
   if ('error' in route) return { ok: false, error: route.error };
   const provider = route.provider;
   const kind = mediaKind(file.mimetype);
+
+  // Áudio gravado no Chrome vem em WebM, que o WhatsApp não entrega: vira Ogg (mensagem de voz).
+  if (kind === 'audio' && isWebm(file.buffer)) {
+    try {
+      file = { buffer: webmToOgg(file.buffer), name: file.name.replace(/\.[^.]*$/, '') + '.ogg', mimetype: 'audio/ogg' };
+    } catch (convertError) {
+      console.error('[conversations] áudio WebM → Ogg falhou:', convertError);
+      return { ok: false, error: 'Não foi possível preparar o áudio para o WhatsApp. Grave de novo.' };
+    }
+  }
 
   const safeName = (file.name || 'arquivo').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
   const storagePath = `${tenantId}/${lead.id}/${Date.now()}-${safeName}`;
